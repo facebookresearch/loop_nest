@@ -9,8 +9,13 @@ namespace sysml
 namespace aot
 {
 
+#ifndef NDEBUG
 static constexpr bool DEBUG = true;
 static constexpr bool INFO  = true;
+#else
+static constexpr bool DEBUG = false;
+static constexpr bool INFO  = false;
+#endif
 
 class LN_LOG
 {
