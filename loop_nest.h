@@ -245,6 +245,11 @@ private:
     // Number of available vector registers for computing
     int available_registers;
 
+    // First register that will not be used by C or auxiliary
+    // registers.  Can be used for software pipelining.  Set to
+    // isa_traits<ISA>::total_vector_registers if none available
+    int first_unused_vmm_register;
+
     // Some information about the nested loops.  It is kept constant.
     // To be extended with more rich info in the future.
     std::vector<loop_descriptor> loops;
@@ -1033,7 +1038,7 @@ private:
 
     {
         // Assignment of vector registers
-        Vmm arg1_values, arg2_values;
+        Vmm arg1_register, arg2_register;
         Vmm arg_A_strides, arg_B_strides;
 
         OpMask tail_k_mask = k2;
@@ -1042,8 +1047,8 @@ private:
 
         int next_vector_register = 0;
 
-        arg1_values = Vmm(next_vector_register++);
-        arg2_values = Vmm(next_vector_register++);
+        arg1_register = Vmm(next_vector_register++);
+        arg2_register = Vmm(next_vector_register++);
 
         std::map<std::string, Vmm> tensor_strides;
 
@@ -1100,8 +1105,31 @@ private:
             queue.inc(inst.src2);
         }
 
-        while (queue.size() > 0)
+        std::vector<Vmm> arg1_registers;
+        arg1_registers.push_back(arg1_register);
+        for (int i = first_unused_vmm_register;
+             i < isa_traits<ISA>::total_vector_registers; ++i)
         {
+            arg1_registers.push_back(Vmm(i));
+        }
+
+        // TODO(zi) replace this eyeballed value
+        if (arg1_registers.size() > 5)
+        {
+            arg1_registers.resize(5);
+        }
+
+        int cycle   = arg1_registers.size();
+        int current = 0;
+
+        std::vector<std::function<void()>> issue_delayed_ops(cycle, []() {});
+
+        for (; queue.size() > 0; ++current)
+        {
+            issue_delayed_ops[current % cycle]();
+
+            auto arg1_reg = arg1_registers[current % cycle];
+
             auto addr = queue.top();
             queue.pop();
 
@@ -1114,13 +1142,13 @@ private:
                 if (C_traits.access == SCALAR && addr.mask != vector_size)
                 {
                     ensure_initalized_mask(addr.mask);
-                    vbroadcastss(arg1_values | tail_k_mask | T_z,
+                    vbroadcastss(arg1_reg | tail_k_mask | T_z,
                                  ptr[addressers.at(addr.traits->reg.getIdx())
                                          ->get_address(addr.offset * 4)]);
                 }
                 else
                 {
-                    vbroadcastss(arg1_values,
+                    vbroadcastss(arg1_reg,
                                  ptr[addressers.at(addr.traits->reg.getIdx())
                                          ->get_address(addr.offset * 4)]);
                 }
@@ -1130,13 +1158,13 @@ private:
                 if (C_traits.access == SCALAR && addr.mask != vector_size)
                 {
                     ensure_initalized_mask(addr.mask);
-                    vmovups(arg1_values | tail_k_mask | T_z,
+                    vmovups(arg1_reg | tail_k_mask | T_z,
                             ptr[addressers.at(addr.traits->reg.getIdx())
                                     ->get_address(addr.offset * 4)]);
                 }
                 else
                 {
-                    vmovups(arg1_values,
+                    vmovups(arg1_reg,
                             ptr[addressers.at(addr.traits->reg.getIdx())
                                     ->get_address(addr.offset * 4)]);
                 }
@@ -1156,12 +1184,12 @@ private:
                         // Need to zero out the register
                         // as gather doesn't leaves
                         // previous values
-                        vxorpd(arg1_values, arg1_values, arg1_values);
+                        vxorpd(arg1_reg, arg1_reg, arg1_reg);
                     }
                 }
 
                 vgatherdps(
-                    arg1_values | temp_k_mask,
+                    arg1_reg | temp_k_mask,
                     ptr[addressers.at(addr.traits->reg.getIdx())
                             ->get_address_without_index(addr.offset * 4) +
                         tensor_strides[addr.traits->name]]);
@@ -1169,7 +1197,7 @@ private:
                 break;
             }
 
-            bool first = true;
+            std::vector<fma_operation> delayed_fma_operations;
 
             // auto fmas = unrolled_fmas;
 
@@ -1186,6 +1214,37 @@ private:
 
                     queue.dec(src2);
 
+                    delayed_fma_operations.push_back(*it);
+
+                    LN_LOG(INFO) << tabs.back() << it->dest.readable()
+                                 << " += " << it->src1.readable() << " * "
+                                 << it->src2.readable() << "\n";
+                    it = fmas.erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+
+            issue_delayed_ops[current % cycle] = [arg1_reg, addr,
+                                                  delayed_fma_operations,
+                                                  &addressers, temp_k_mask,
+                                                  full_k_mask, tail_k_mask,
+                                                  this, &ensure_initalized_mask,
+                                                  arg2_register,
+                                                  &tensor_strides]() {
+                bool first = true;
+                for (auto const& op : delayed_fma_operations)
+                {
+                    auto src1 = op.src1;
+                    auto src2 = op.src2;
+
+                    if (addr == src2)
+                    {
+                        std::swap(src1, src2);
+                    }
+
                     if (first)
                     {
                         first = false;
@@ -1197,14 +1256,14 @@ private:
                     {
                     case SCALAR:
                         vfmadd231ps(
-                            C_VMMs[it->dest]++, arg1_values,
+                            C_VMMs[op.dest]++, arg1_reg,
                             ptr_b[addressers.at(src2.traits->reg.getIdx())
                                       ->get_address(src2.offset * 4)]);
                         break;
 
                     case VECTOR_PACKED:
                         vfmadd231ps(
-                            C_VMMs[it->dest]++, arg1_values,
+                            C_VMMs[op.dest]++, arg1_reg,
                             ptr[addressers.at(src2.traits->reg.getIdx())
                                     ->get_address(src2.offset * 4)]);
                         break;
@@ -1219,27 +1278,23 @@ private:
                                                ? full_k_mask
                                                : tail_k_mask);
 
-                        vgatherdps(arg2_values | temp_k_mask,
+                        vgatherdps(arg2_register | temp_k_mask,
                                    ptr[addressers.at(src2.traits->reg.getIdx())
                                            ->get_address_without_index(
                                                src2.offset * 4) +
                                        tensor_strides[src2.traits->name]]);
-                        vfmadd231ps(C_VMMs[it->dest]++, arg1_values,
-                                    arg2_values);
+                        vfmadd231ps(C_VMMs[op.dest]++, arg1_reg, arg2_register);
                         break;
                     }
-
-                    LN_LOG(INFO) << tabs.back() << it->dest.readable()
-                                 << " += " << it->src1.readable() << " * "
-                                 << it->src2.readable() << "\n";
-                    it = fmas.erase(it);
                 }
-                else
-                {
-                    ++it;
-                }
-            }
+            };
         }
+
+        for (int off = 0; off < cycle; ++off, ++current)
+        {
+            issue_delayed_ops[current % cycle]();
+        }
+
         for (auto const& p : addressers)
         {
             p.second->restore();
@@ -1254,13 +1309,13 @@ private:
 
     {
         // Assignment of vector registers
-        Vmm arg1_values, arg2_values;
+        Vmm arg1_register, arg2_register;
         Vmm arg_A_strides, arg_B_strides;
 
         int next_vector_register = 0;
 
-        arg1_values = Vmm(next_vector_register++);
-        arg2_values = Vmm(next_vector_register++);
+        arg1_register = Vmm(next_vector_register++);
+        arg2_register = Vmm(next_vector_register++);
 
         std::map<std::string, Vmm> tensor_strides;
 
@@ -1347,18 +1402,18 @@ private:
                 if (C_traits.access == SCALAR && addr.mask != vector_size)
                 {
                     ensure_initalized_mask(addr.mask);
-                    vbroadcastss(arg1_values,
+                    vbroadcastss(arg1_register,
                                  ptr[addressers.at(addr.traits->reg.getIdx())
                                          ->get_address(addr.offset * 4)]);
 
-                    // reusing arg2_values as temporary
-                    vxorpd(arg2_values, arg2_values, arg2_values);
-                    vblendvps(arg1_values, arg1_values, arg2_values,
+                    // reusing arg2_register as temporary
+                    vxorpd(arg2_register, arg2_register, arg2_register);
+                    vblendvps(arg1_register, arg1_register, arg2_register,
                               ymm_tail_mask);
                 }
                 else
                 {
-                    vbroadcastss(arg1_values,
+                    vbroadcastss(arg1_register,
                                  ptr[addressers.at(addr.traits->reg.getIdx())
                                          ->get_address(addr.offset * 4)]);
                 }
@@ -1368,13 +1423,13 @@ private:
                 if (C_traits.access == SCALAR && addr.mask != vector_size)
                 {
                     ensure_initalized_mask(addr.mask);
-                    vmaskmovps(arg1_values, ymm_tail_mask,
+                    vmaskmovps(arg1_register, ymm_tail_mask,
                                ptr[addressers.at(addr.traits->reg.getIdx())
                                        ->get_address(addr.offset * 4)]);
                 }
                 else
                 {
-                    vmovups(arg1_values,
+                    vmovups(arg1_register,
                             ptr[addressers.at(addr.traits->reg.getIdx())
                                     ->get_address(addr.offset * 4)]);
                 }
@@ -1394,12 +1449,12 @@ private:
                     vmovups(ymm_temp_register, ymm_tail_mask);
                     if (C_traits.access == SCALAR)
                     {
-                        vxorpd(arg1_values, arg1_values, arg1_values);
+                        vxorpd(arg1_register, arg1_register, arg1_register);
                     }
                 }
 
                 vgatherdps(
-                    arg1_values,
+                    arg1_register,
                     ptr[addressers.at(addr.traits->reg.getIdx())
                             ->get_address_without_index(addr.offset * 4) +
                         tensor_strides[addr.traits->name]],
@@ -1436,17 +1491,17 @@ private:
                     {
                     case SCALAR:
                         vbroadcastss(
-                            arg2_values,
+                            arg2_register,
                             ptr[addressers.at(src2.traits->reg.getIdx())
                                     ->get_address(src2.offset * 4)]);
 
-                        vfmadd231ps(C_VMMs[it->dest]++, arg1_values,
-                                    arg2_values);
+                        vfmadd231ps(C_VMMs[it->dest]++, arg1_register,
+                                    arg2_register);
                         break;
 
                     case VECTOR_PACKED:
                         vfmadd231ps(
-                            C_VMMs[it->dest]++, arg1_values,
+                            C_VMMs[it->dest]++, arg1_register,
                             ptr[addressers.at(src2.traits->reg.getIdx())
                                     ->get_address(src2.offset * 4)]);
                         break;
@@ -1461,15 +1516,15 @@ private:
                                                        ? ymm_full_mask
                                                        : ymm_tail_mask);
 
-                        vgatherdps(arg2_values,
+                        vgatherdps(arg2_register,
                                    ptr[addressers.at(src2.traits->reg.getIdx())
                                            ->get_address_without_index(
                                                src2.offset * 4) +
                                        tensor_strides[src2.traits->name]],
                                    ymm_temp_register);
 
-                        vfmadd231ps(C_VMMs[it->dest]++, arg1_values,
-                                    arg2_values);
+                        vfmadd231ps(C_VMMs[it->dest]++, arg1_register,
+                                    arg2_register);
                         break;
                     }
 
@@ -1932,8 +1987,8 @@ private:
                 total_required_fma_operations};
     }
 
-    void assign_vmm_registers(int depth_for_register_blocked_C,
-                              int inner_fma_operations)
+    int assign_vmm_registers(int depth_for_register_blocked_C,
+                             int inner_fma_operations)
     {
         auto collected_load_store =
             collect_default_loads_and_stores_at(depth_for_register_blocked_C);
@@ -1959,7 +2014,9 @@ private:
                 C_VMMs[c] = multi_zmm(per_register, next);
                 next += per_register;
             }
-            assert(next <= 32);
+            assert(next <= isa_traits<ISA>::total_vector_registers);
+
+            return next;
         }
     }
 
@@ -2424,7 +2481,8 @@ public:
                 lower_register_blocked_loop(unroll_stage, inner_fma_operations);
         }
 
-        assign_vmm_registers(first_loop_that_can_hold_C, inner_fma_operations);
+        first_unused_vmm_register = assign_vmm_registers(
+            first_loop_that_can_hold_C, inner_fma_operations);
 
         //
 
