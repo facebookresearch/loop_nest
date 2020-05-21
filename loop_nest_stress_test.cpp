@@ -85,7 +85,7 @@ int main()
                         // Variables of B
                         {"AcBr", "BcCc"},
                         // C's strides for each variable.
-                        {{"ArCr", BcCc * 2}, {"BcCc", 2}},
+                        {{"ArCr", BcCc}, {"BcCc", 1}},
                         // A's strides for each variable
                         {{"ArCr", AcBr}, {"AcBr", 1}},
                         // B's strides for each variable
@@ -95,16 +95,18 @@ int main()
                 auto A = getRandomVector<float>(AcBr * ArCr);
                 auto B = getRandomVector<float>(AcBr * BcCc);
 
-                auto CN = getRandomVector<float>(ArCr * BcCc * 2);
+                auto CN = getRandomVector<float>(ArCr * BcCc);
                 auto CJ = CN;
 
-                baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc * 2, 2,
+                baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1,
                             A.data(), B.data(), CN.data(), 1);
+
+                apply_relu(CN.data(), CN.data() + CN.size());
 
                 fn(CJ.data(), A.data(), B.data(), 1);
 
-                auto madiff = maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc * 2,
-                                         CN.data());
+                auto madiff =
+                    maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data());
 
                 std::cout << "MAXABSDIFF: " << madiff << std::endl;
 
