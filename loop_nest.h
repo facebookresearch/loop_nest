@@ -1388,8 +1388,31 @@ private:
             }
         };
 
-        while (queue.size() > 0)
+        std::vector<Vmm> arg1_registers;
+        arg1_registers.push_back(arg1_register);
+        for (int i = first_unused_vmm_register;
+             i < isa_traits<ISA>::total_vector_registers; ++i)
         {
+            arg1_registers.push_back(Vmm(i));
+        }
+
+        // TODO(zi) replace this eyeballed value
+        if (arg1_registers.size() > 5)
+        {
+            arg1_registers.resize(5);
+        }
+
+        int cycle   = arg1_registers.size();
+        int current = 0;
+
+        std::vector<std::function<void()>> issue_delayed_ops(cycle, []() {});
+
+        for (; queue.size() > 0; ++current)
+        {
+            issue_delayed_ops[current % cycle]();
+
+            auto arg1_reg = arg1_registers[current % cycle];
+
             auto addr = queue.top();
             queue.pop();
 
@@ -1402,18 +1425,17 @@ private:
                 if (C_traits.access == SCALAR && addr.mask != vector_size)
                 {
                     ensure_initalized_mask(addr.mask);
-                    vbroadcastss(arg1_register,
+                    vbroadcastss(arg1_reg,
                                  ptr[addressers.at(addr.traits->reg.getIdx())
                                          ->get_address(addr.offset * 4)]);
 
                     // reusing arg2_register as temporary
                     vxorpd(arg2_register, arg2_register, arg2_register);
-                    vblendvps(arg1_register, arg1_register, arg2_register,
-                              ymm_tail_mask);
+                    vblendvps(arg1_reg, arg1_reg, arg2_register, ymm_tail_mask);
                 }
                 else
                 {
-                    vbroadcastss(arg1_register,
+                    vbroadcastss(arg1_reg,
                                  ptr[addressers.at(addr.traits->reg.getIdx())
                                          ->get_address(addr.offset * 4)]);
                 }
@@ -1423,13 +1445,13 @@ private:
                 if (C_traits.access == SCALAR && addr.mask != vector_size)
                 {
                     ensure_initalized_mask(addr.mask);
-                    vmaskmovps(arg1_register, ymm_tail_mask,
+                    vmaskmovps(arg1_reg, ymm_tail_mask,
                                ptr[addressers.at(addr.traits->reg.getIdx())
                                        ->get_address(addr.offset * 4)]);
                 }
                 else
                 {
-                    vmovups(arg1_register,
+                    vmovups(arg1_reg,
                             ptr[addressers.at(addr.traits->reg.getIdx())
                                     ->get_address(addr.offset * 4)]);
                 }
@@ -1449,12 +1471,12 @@ private:
                     vmovups(ymm_temp_register, ymm_tail_mask);
                     if (C_traits.access == SCALAR)
                     {
-                        vxorpd(arg1_register, arg1_register, arg1_register);
+                        vxorpd(arg1_reg, arg1_reg, arg1_reg);
                     }
                 }
 
                 vgatherdps(
-                    arg1_register,
+                    arg1_reg,
                     ptr[addressers.at(addr.traits->reg.getIdx())
                             ->get_address_without_index(addr.offset * 4) +
                         tensor_strides[addr.traits->name]],
@@ -1462,7 +1484,7 @@ private:
                 break;
             }
 
-            bool first = true;
+            std::vector<fma_operation> delayed_fma_operations;
 
             // auto fmas = unrolled_fmas;
 
@@ -1480,6 +1502,38 @@ private:
 
                     queue.dec(src2);
 
+                    delayed_fma_operations.push_back(*it);
+
+                    LN_LOG(INFO) << tabs.back() << it->dest.readable()
+                                 << " += " << it->src1.readable() << " * "
+                                 << it->src2.readable() << "\n";
+                    it = fmas.erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+
+            issue_delayed_ops[current % cycle] = [arg1_reg, addr,
+                                                  delayed_fma_operations,
+                                                  &addressers,
+                                                  ymm_temp_register,
+                                                  ymm_tail_mask, ymm_full_mask,
+                                                  this, &ensure_initalized_mask,
+                                                  arg2_register,
+                                                  &tensor_strides]() {
+                bool first = true;
+                for (auto const& op : delayed_fma_operations)
+                {
+                    auto src1 = op.src1;
+                    auto src2 = op.src2;
+
+                    if (addr == op.src2)
+                    {
+                        std::swap(src1, src2);
+                    }
+
                     if (first)
                     {
                         first = false;
@@ -1495,13 +1549,12 @@ private:
                             ptr[addressers.at(src2.traits->reg.getIdx())
                                     ->get_address(src2.offset * 4)]);
 
-                        vfmadd231ps(C_VMMs[it->dest]++, arg1_register,
-                                    arg2_register);
+                        vfmadd231ps(C_VMMs[op.dest]++, arg1_reg, arg2_register);
                         break;
 
                     case VECTOR_PACKED:
                         vfmadd231ps(
-                            C_VMMs[it->dest]++, arg1_register,
+                            C_VMMs[op.dest]++, arg1_reg,
                             ptr[addressers.at(src2.traits->reg.getIdx())
                                     ->get_address(src2.offset * 4)]);
                         break;
@@ -1523,22 +1576,18 @@ private:
                                        tensor_strides[src2.traits->name]],
                                    ymm_temp_register);
 
-                        vfmadd231ps(C_VMMs[it->dest]++, arg1_register,
-                                    arg2_register);
+                        vfmadd231ps(C_VMMs[op.dest]++, arg1_reg, arg2_register);
                         break;
                     }
-
-                    LN_LOG(INFO) << tabs.back() << it->dest.readable()
-                                 << " += " << it->src1.readable() << " * "
-                                 << it->src2.readable() << "\n";
-                    it = fmas.erase(it);
                 }
-                else
-                {
-                    ++it;
-                }
-            }
+            };
         }
+
+        for (int off = 0; off < cycle; ++off, ++current)
+        {
+            issue_delayed_ops[current % cycle]();
+        }
+
         for (auto const& p : addressers)
         {
             p.second->restore();
@@ -1808,7 +1857,7 @@ private:
             std::accumulate(padded_sizes.begin(), padded_sizes.end(),
                             (std::int64_t)1,
                             [&](std::int64_t v, auto const& s) {
-                                //std::cout << v << " :: " << s.second << "\n";
+                                // std::cout << v << " :: " << s.second << "\n";
                                 return (B_strides.count(s.first) ||
                                         A_strides.count(s.first) ||
                                         C_strides.count(s.first))
@@ -2052,7 +2101,7 @@ private:
                 }
                 else
                 {
-                    //std::cout << loops[i].var << " :: " << loops[i].end
+                    // std::cout << loops[i].var << " :: " << loops[i].end
                     //          << std::endl;
                     assert((loops[i].end % vector_size) == 0);
                 }
@@ -2424,7 +2473,7 @@ public:
         std::map<std::string, int> const&               C_strides,
         std::map<std::string, int> const&               A_strides,
         std::map<std::string, int> const&               B_strides,
-        std::optional<int> user_fma_unroll_limit = std::nullopt,
+        std::optional<int> user_fma_unroll_limit           = std::nullopt,
         std::shared_ptr<elementwise_operation> elementwise = nullptr)
         : order(_order)
         , sizes(sizes)
