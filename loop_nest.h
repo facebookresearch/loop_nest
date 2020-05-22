@@ -1808,7 +1808,7 @@ private:
             std::accumulate(padded_sizes.begin(), padded_sizes.end(),
                             (std::int64_t)1,
                             [&](std::int64_t v, auto const& s) {
-                                std::cout << v << " :: " << s.second << "\n";
+                                //std::cout << v << " :: " << s.second << "\n";
                                 return (B_strides.count(s.first) ||
                                         A_strides.count(s.first) ||
                                         C_strides.count(s.first))
@@ -2052,8 +2052,8 @@ private:
                 }
                 else
                 {
-                    std::cout << loops[i].var << " :: " << loops[i].end
-                              << std::endl;
+                    //std::cout << loops[i].var << " :: " << loops[i].end
+                    //          << std::endl;
                     assert((loops[i].end % vector_size) == 0);
                 }
             }
@@ -2425,8 +2425,7 @@ public:
         std::map<std::string, int> const&               A_strides,
         std::map<std::string, int> const&               B_strides,
         std::optional<int> user_fma_unroll_limit = std::nullopt,
-        std::shared_ptr<elementwise_operation> elementwise =
-            std::make_shared<relu_elementwise_operation>())
+        std::shared_ptr<elementwise_operation> elementwise = nullptr)
         : order(_order)
         , sizes(sizes)
         , elementwise(elementwise)
