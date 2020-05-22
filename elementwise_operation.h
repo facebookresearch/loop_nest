@@ -5,6 +5,8 @@
 
 #include "isa.h"
 
+#include <memory>
+
 namespace facebook
 {
 namespace sysml
@@ -132,6 +134,9 @@ public:
         process_scalar(cg, dest, auxillary, avx512());
     }
 };
+
+inline std::shared_ptr<elementwise_operation> const elementwise_relu =
+    std::make_shared<relu_elementwise_operation>();
 
 } // namespace aot
 } // namespace sysml

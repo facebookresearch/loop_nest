@@ -89,7 +89,8 @@ int main()
                         // A's strides for each variable
                         {{"ArCr", AcBr}, {"AcBr", 1}},
                         // B's strides for each variable
-                        {{"AcBr", BcCc}, {"BcCc", 1}}, max_fmas_unrolled)
+                        {{"AcBr", BcCc}, {"BcCc", 1}}, max_fmas_unrolled,
+                        facebook::sysml::aot::elementwise_relu)
                         .get_shared();
 
                 auto A = getRandomVector<float>(AcBr * ArCr);

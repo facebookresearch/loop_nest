@@ -1,7 +1,7 @@
 #include "loop_nest.h"
-#include "loop_nest_baseline.h"
-
 #include "baselines.h"
+#include "loop_nest_baseline.h"
+#include "one_constant.h"
 #include "utils.h"
 
 #include <algorithm>
@@ -87,7 +87,7 @@ int main()
         baseline_MM(ArCr, AcBr, BcCc, 1, ArCr, 1, AcBr, 1, ArCr, A.data(),
                     B.data(), CN.data(), 1);
 
-        apply_relu(CN.data(), CN.data() + CN.size());
+        // apply_relu(CN.data(), CN.data() + CN.size());
 
         fn(CJ.data(), A.data(), B.data(), 1);
 
@@ -107,7 +107,7 @@ int main()
             1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
     }
 
-    //return 0;
+    // return 0;
 
     // 2D convolution on NCHW16c layout example:
     // O(g_out, c_out, o_h, o_w) = I(g_in, c_in, o_h + k_h, ow + k_w) *
@@ -185,7 +185,7 @@ int main()
 
         fn(CJ.data(), A.data(), B.data(), 0);
 
-        apply_relu(CN.data(), CN.data() + CN.size());
+        // apply_relu(CN.data(), CN.data() + CN.size());
 
         std::cout << "MAXABSDIFF: "
                   << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS,
@@ -273,7 +273,7 @@ int main()
         fn.save_to_file("zi.asm");
         fn.register_perf("fn1");
 
-        float A = 1.f;
+        // float A = 1.f;
 
         auto B  = getRandomVector<float>(AcBr * BcCc);
         auto CN = getRandomVector<float>(ArCr * BcCc);
@@ -282,17 +282,20 @@ int main()
         // baseline_MM(ArCr, AcBr, BcCc, 0, 0, BcCc, 1, BcCc, 1, &A, B.data(),
         //             CN.data(), 1);
 
-        fn(CJ.data(), &A, B.data(), 1);
-        baseline_fn(CN.data(), &A, B.data(), 1);
+        using facebook::sysml::aot::one_constant;
 
-        apply_relu(CN.data(), CN.data() + CN.size());
+        fn(CJ.data(), one_constant<float>, B.data(), 1);
+        baseline_fn(CN.data(), one_constant<float>, B.data(), 1);
+
+        // apply_relu(CN.data(), CN.data() + CN.size());
 
         std::cout << "MAXABSDIFF: "
                   << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
 
         auto secs = measureFastestWithWarmup(
-            [&]() { fn(CJ.data(), &A, B.data(), 0); }, 10, 100);
+            [&]() { fn(CJ.data(), one_constant<float>, B.data(), 0); }, 10,
+            100);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
 
@@ -335,7 +338,8 @@ int main()
                       // A's strides for each variable
                       {{"ArCr", 0}, {"AcBr", 0}},
                       // B's strides for each variable
-                      {{"AcBr", 1}, {"BcCc", AcBr}}, 512)
+                      {{"AcBr", 1}, {"BcCc", AcBr}}, 512,
+                      facebook::sysml::aot::elementwise_relu)
                       .get_shared();
 
         fn.save_to_file("zi.asm");
@@ -413,7 +417,8 @@ int main()
                       // A's strides for each variable
                       {{"ArCr", 1}, {"AcBr", ArCr}},
                       // B's strides for each variable
-                      {{"AcBr", 1}, {"BcCc", AcBr}}, 512)
+                      {{"AcBr", 1}, {"BcCc", AcBr}}, 512,
+                      facebook::sysml::aot::elementwise_relu)
                       .get_shared();
 
         fn.save_to_file("zi.asm");
@@ -476,7 +481,7 @@ int main()
                       // A's strides for each variable
                       {{"r", k * 2}, {"k", 2}},
                       // B's strides for each variable
-                      {{"k", 2}})
+                      {{"k", 2}}, 1024, facebook::sysml::aot::elementwise_relu)
                       .get_shared();
 
         fn.save_to_file("zi.asm");
@@ -559,7 +564,8 @@ int main()
                       // A's strides for each variable
                       {{"ArCr", AcBr}, {"AcBr", 1}},
                       // B's strides for each variable
-                      {{"AcBr", BcCc}, {"BcCc", 1}}, 512)
+                      {{"AcBr", BcCc}, {"BcCc", 1}}, 512,
+                      facebook::sysml::aot::elementwise_relu)
                       .get_shared();
 
         fn.save_to_file("zi.asm");
@@ -641,7 +647,8 @@ int main()
                       // A's strides for each variable
                       {{"ArCr", AcBr}, {"AcBr", 1}},
                       // B's strides for each variable
-                      {{"AcBr", BcCc}, {"BcCc", 1}}, 2)
+                      {{"AcBr", BcCc}, {"BcCc", 1}}, 2,
+                      facebook::sysml::aot::elementwise_relu)
                       .get_shared();
 
         fn.save_to_file("zi.asm");
@@ -716,7 +723,7 @@ int main()
                     CN.data());
 
         fn(CJ.data(), A.data(), B.data(), 0);
-        apply_relu(CN.data(), CN.data() + CN.size());
+        // apply_relu(CN.data(), CN.data() + CN.size());
 
         std::cout << "MAXABSDIFF: "
                   << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
@@ -773,7 +780,8 @@ int main()
                       // A's strides for each variable
                       {{"ArCr", AcBr}, {"AcBr", 1}},
                       // B's strides for each variable
-                      {{"AcBr", 1}, {"BcCc", AcBr}})
+                      {{"AcBr", 1}, {"BcCc", AcBr}}, 1024,
+                      facebook::sysml::aot::elementwise_relu)
                       .get_shared();
 
         fn.save_to_file("zi.asm");
@@ -861,7 +869,7 @@ int main()
                     CN.data());
 
         fn(CJ.data(), A.data(), B.data(), 0);
-        apply_relu(CN.data(), CN.data() + CN.size());
+        // apply_relu(CN.data(), CN.data() + CN.size());
 
         std::cout << "MAXABSDIFF: "
                   << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
@@ -937,7 +945,7 @@ int main()
                     CN.data());
 
         fn(CJ.data(), A.data(), B.data(), 0);
-        apply_relu(CN.data(), CN.data() + CN.size());
+        // apply_relu(CN.data(), CN.data() + CN.size());
 
         std::cout << "MAXABSDIFF: "
                   << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
@@ -1015,7 +1023,8 @@ int main()
                        {"KY", IZ},
                        {"KZ", 1}},
                       // B's strides for each variable
-                      {{"KX", KY * KZ}, {"KY", KZ}, {"KZ", 1}})
+                      {{"KX", KY * KZ}, {"KY", KZ}, {"KZ", 1}}, 1024,
+                      facebook::sysml::aot::elementwise_relu)
                       .get_shared();
 
         fn.save_to_file("zi.asm");
@@ -1087,7 +1096,6 @@ int main()
             [=](float* Cdata, float const* Adata, float const* Bdata) {
                 baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, Adata, Bdata,
                             Cdata);
-                apply_relu(Cdata, Cdata + ArCr * BcCc);
             },
             fn, k, k * c, c);
 
@@ -1133,7 +1141,6 @@ int main()
             [=](float* Cdata, float const* Adata, float const* Bdata) {
                 baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, Adata, Bdata,
                             Cdata);
-                apply_relu(Cdata, Cdata + ArCr * BcCc);
             },
             fn, AcBr * ArCr, AcBr * BcCc, ArCr * BcCc);
 
@@ -1215,7 +1222,6 @@ int main()
         baseline_Conv(COUT, CIN, OS, OS, KS, KS, A.data(), B.data(), CN.data());
 
         fn(CJ.data(), A.data(), B.data(), 0);
-        apply_relu(CN.data(), CN.data() + CN.size());
 
         std::cout << "MAXABSDIFF: "
                   << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS,
