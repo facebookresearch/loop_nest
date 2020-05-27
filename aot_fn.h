@@ -317,7 +317,7 @@ struct aot_fn_caster<unique_aot_fn<RetTo(ArgsTo...)>,
                      unique_aot_fn<RetFrom(ArgsFrom...)>>
 {
     unique_aot_fn<RetTo(ArgsTo...)>
-    do_cast(unique_aot_fn<RetFrom, ArgsFrom...>&& other)
+    do_cast(unique_aot_fn<RetFrom(ArgsFrom...)>&& other)
     {
         return unique_aot_fn<RetTo(ArgsTo...)>(std::move(other),
                                                aot_fn_cast_tag());
@@ -329,14 +329,14 @@ struct aot_fn_caster<shared_aot_fn<RetTo(ArgsTo...)>,
                      shared_aot_fn<RetFrom(ArgsFrom...)>>
 {
     shared_aot_fn<RetTo(ArgsTo...)>
-    do_cast(shared_aot_fn<RetFrom, ArgsFrom...>&& other)
+    do_cast(shared_aot_fn<RetFrom(ArgsFrom...)>&& other)
     {
         return shared_aot_fn<RetTo(ArgsTo...)>(std::move(other),
                                                aot_fn_cast_tag());
     }
 
     shared_aot_fn<RetTo(ArgsTo...)>
-    do_cast(shared_aot_fn<RetFrom, ArgsFrom...> const& other)
+    do_cast(shared_aot_fn<RetFrom(ArgsFrom...)> const& other)
     {
         return shared_aot_fn<RetTo(ArgsTo...)>(other, aot_fn_cast_tag());
     }
@@ -347,7 +347,7 @@ struct aot_fn_caster<aot_fn_ref<RetTo(ArgsTo...)>,
                      aot_fn_ref<RetFrom(ArgsFrom...)>>
 {
     aot_fn_ref<RetTo(ArgsTo...)>
-    do_cast(aot_fn_ref<RetFrom, ArgsFrom...> const& other)
+    do_cast(aot_fn_ref<RetFrom(ArgsFrom...)> const& other)
     {
         return aot_fn_ref<RetTo(ArgsTo...)>(other, aot_fn_cast_tag());
     }
