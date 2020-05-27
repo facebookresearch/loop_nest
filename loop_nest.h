@@ -1,16 +1,13 @@
-// DEBUG: clang++ -Wall -Wpedantic  -std=c++17 loop_nest.cpp -I./xbyak
-// -DCT_ISA=avx2 && ./a.out | grep DIF
+// TODO(partially done) - generalize to FN(alpha C + A * B + W)
+// -- needs the W
 
-// TODO - generalize to FN(alpha C + A * B + W)
+// TODO - arbitrary inner operation
 
-// TODO(done) - inject a loop based on the max unroll
-// TODO - Better tails (try to reuse the fully unrolled code)
+// TODO(partially done) - Better tails (try to reuse the fully unrolled code)
 
-// TODO - remove zero-outs from the tail? (Alpha == 0)
-
-// TODO - document the logic for relu (with the +1 thing) We are using
-// the upper 31 bits of AlphaReg store the sum of all visited
-// dimensions
+// TODO(partially done) - document the logic for relu (with the +1
+// thing) We are using the upper 31 bits of AlphaReg store the sum of
+// all visited dimensions
 
 #pragma once
 
@@ -301,7 +298,6 @@ private:
                 auto fullIterations = limits[loop.var].back() / vector_size;
                 auto rest           = limits[loop.var].back() % vector_size;
 
-                // TODO(zi) Support for masked tail logic should be here
                 for (int i = 0; i < fullIterations; ++i)
                 {
                     ret.insert(memory_argument{get_cursor_offset(C_strides),
@@ -491,8 +487,9 @@ private:
         return ret;
     }
 
-    // Pushes the pointers (C, A or B) that have strides along the
-    // dimension dim.
+    // Pushes the "followed" pointers (C, A or B, and any extra ons
+    // that will be used by the future arbitrary innermost operations)
+    // that have strides along the dimension dim.
     void push_pointers(std::string const& dim)
     {
         for (auto const& ptr : in_register_tensor_pointers)
@@ -522,8 +519,8 @@ private:
         }
     };
 
-    // Advanced pointers of C, B and A along dimension dim by delta
-    // elements.
+    // Similarly advances the pointers by delta elements along the
+    // given dimension
     void advance_pointers(std::string const& dim, int delta)
     {
         for (auto const& ptr : in_register_tensor_pointers)
@@ -552,9 +549,10 @@ private:
         }
 
         // The commented out method below has more instructions (and
-        // much more instruction bytes) byt requires fewer memory
-        // accesses.  It probably doens't matter as the reads in the
-        // approach above can be pipelined with the writes.
+        // much more instruction bytes) but requires fewer memory
+        // accesses.  It probably doens't matter, as the reads in the
+        // approach above can be pipelined with the writes.  Need a
+        // good benchmark, or maybe a binary parameter?
 
         // if (mask == 0)
         //     return;
@@ -741,7 +739,6 @@ private:
     {
         std::optional<int> tail_mask;
 
-        // Same code among all ISAs for initializing registers to zero
         for (auto const& c : loads)
         {
             if (c.mask != vector_size)
@@ -803,9 +800,8 @@ private:
                 cmp(AlphaReg_, max_alpha - 1);
                 jl(not_last_label, T_NEAR);
 
-                // TODO(zi): Nicer using auxiliary array and extra classes
+                // TODO(zi): Better use of auxiliary array and extra classes
                 elementwise->initialize_vector(this, {Vmm(0)}, R());
-                // vxorpd(Vmm(0), Vmm(0), Vmm(0));
 
                 for (auto const& c : stores)
                 {
@@ -813,7 +809,6 @@ private:
                     LN_LOG(INFO) << tabs.back() << "RELU " << c.readable()
                                  << " at (" << max_alpha << ")\n";
                     elementwise->process_vector(this, C_VMMs[c][0], {}, R());
-                    // vmaxps(C_VMMs[c][0], C_VMMs[c][0], Vmm(0));
                 }
 
                 L(not_last_label);
@@ -825,7 +820,10 @@ private:
             arg_C_strides = Vmm(next_vector_register++);
             vmovups(arg_C_strides, ptr[rip + C_access_strides_label]);
             mov(r12, (1 << vector_size) - 1); // TODO (this is probably already
-            kmovw(full_k_mask, r12.cvt32());  // initialized during loads
+            kmovw(full_k_mask, r12.cvt32());  // initialized during
+                                              // loads)? Add logic to
+                                              // check that, and skip
+                                              // if not necessary
         }
 
         assert(next_vector_register <= auxiliary_registers);
@@ -877,16 +875,12 @@ private:
                 vpermilps(xmm1, xmm0, 177);
                 vaddps(xmm0, xmm0, xmm1);
 
-                // TODO(zi) BETTER!
                 if (issue_max_alpha_logic && elementwise)
                 {
                     cmp(AlphaReg_, max_alpha - 1);
                     jl(not_last_label);
 
                     elementwise->process_scalar(this, xmm0, {xmm1}, R());
-                    // xorpd(xmm1, xmm1);
-                    // maxps(xmm0, xmm1);
-
                     L(not_last_label);
                 }
 
@@ -931,17 +925,15 @@ private:
                 cmp(AlphaReg_, max_alpha - 1);
                 jl(not_last_label, T_NEAR);
 
-                // TODO(zi): Nicer using auxiliary array and extra classes
                 elementwise->initialize_vector(this, {Vmm(0)}, R());
-                // vxorpd(Vmm(0), Vmm(0), Vmm(0));
 
                 for (auto const& c : stores)
                 {
                     C_VMMs[c].reduce(*this);
-                    LN_LOG(INFO) << tabs.back() << "RELU " << c.readable()
-                                 << " at (" << max_alpha << ")\n";
+                    LN_LOG(INFO)
+                        << tabs.back() << "NONLINEARITY " << c.readable()
+                        << " at (" << max_alpha << ")\n";
                     elementwise->process_vector(this, C_VMMs[c][0], {}, R());
-                    // vmaxps(C_VMMs[c][0], C_VMMs[c][0], Vmm(0));
                 }
 
                 L(not_last_label);
@@ -978,16 +970,12 @@ private:
                 vpermilps(xmm1, xmm0, 177);
                 vaddps(xmm0, xmm0, xmm1);
 
-                // TODO(zi) BETTER!
                 if (issue_max_alpha_logic && elementwise)
                 {
                     cmp(AlphaReg_, max_alpha - 1);
                     jl(not_last_label);
 
                     elementwise->process_scalar(this, xmm0, {xmm1}, R());
-                    // xorpd(xmm1, xmm1);
-                    // maxps(xmm0, xmm1);
-
                     L(not_last_label);
                 }
 
@@ -1198,8 +1186,6 @@ private:
             }
 
             std::vector<fma_operation> delayed_fma_operations;
-
-            // auto fmas = unrolled_fmas;
 
             for (auto it = fmas.begin(); it != fmas.end();)
             {
@@ -1485,8 +1471,6 @@ private:
             }
 
             std::vector<fma_operation> delayed_fma_operations;
-
-            // auto fmas = unrolled_fmas;
 
             for (auto it = fmas.begin(); it != fmas.end();)
             {
