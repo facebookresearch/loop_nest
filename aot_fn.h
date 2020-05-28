@@ -10,6 +10,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <type_traits>
 
 namespace facebook
 {
@@ -93,6 +94,9 @@ private:
     template <class, class>
     friend struct aot_fn_caster;
 
+    template <class>
+    friend class unique_aot_fn;
+
     template <typename OtherSignature>
     unique_aot_fn(unique_aot_fn<OtherSignature>&& other, aot_fn_cast_tag)
     {
@@ -167,6 +171,9 @@ private:
 
     template <class, class>
     friend struct aot_fn_caster;
+
+    template <class>
+    friend class shared_aot_fn;
 
     template <typename OtherSignature>
     shared_aot_fn(shared_aot_fn<OtherSignature>&& other, aot_fn_cast_tag)
@@ -275,6 +282,9 @@ private:
     template <class, class>
     friend struct aot_fn_caster;
 
+    template <class>
+    friend class aot_fn_ref;
+
     template <typename OtherSignature>
     aot_fn_ref(aot_fn_ref<OtherSignature> const& other, aot_fn_cast_tag)
     {
@@ -313,8 +323,7 @@ public:
 };
 
 template <class RetTo, class... ArgsTo, class RetFrom, class... ArgsFrom>
-struct aot_fn_caster<unique_aot_fn<RetTo(ArgsTo...)>,
-                     unique_aot_fn<RetFrom(ArgsFrom...)>>
+struct aot_fn_caster<RetTo(ArgsTo...), unique_aot_fn<RetFrom(ArgsFrom...)>>
 {
     unique_aot_fn<RetTo(ArgsTo...)>
     do_cast(unique_aot_fn<RetFrom(ArgsFrom...)>&& other)
@@ -325,8 +334,7 @@ struct aot_fn_caster<unique_aot_fn<RetTo(ArgsTo...)>,
 };
 
 template <class RetTo, class... ArgsTo, class RetFrom, class... ArgsFrom>
-struct aot_fn_caster<shared_aot_fn<RetTo(ArgsTo...)>,
-                     shared_aot_fn<RetFrom(ArgsFrom...)>>
+struct aot_fn_caster<RetTo(ArgsTo...), shared_aot_fn<RetFrom(ArgsFrom...)>>
 {
     shared_aot_fn<RetTo(ArgsTo...)>
     do_cast(shared_aot_fn<RetFrom(ArgsFrom...)>&& other)
@@ -343,8 +351,7 @@ struct aot_fn_caster<shared_aot_fn<RetTo(ArgsTo...)>,
 };
 
 template <class RetTo, class... ArgsTo, class RetFrom, class... ArgsFrom>
-struct aot_fn_caster<aot_fn_ref<RetTo(ArgsTo...)>,
-                     aot_fn_ref<RetFrom(ArgsFrom...)>>
+struct aot_fn_caster<RetTo(ArgsTo...), aot_fn_ref<RetFrom(ArgsFrom...)>>
 {
     aot_fn_ref<RetTo(ArgsTo...)>
     do_cast(aot_fn_ref<RetFrom(ArgsFrom...)> const& other)
@@ -354,10 +361,10 @@ struct aot_fn_caster<aot_fn_ref<RetTo(ArgsTo...)>,
 };
 
 template <class To, class From>
-To aot_fn_cast(From&& from)
+decltype(auto) aot_fn_cast(From&& from)
 {
-    aot_fn_caster<To, From> caster;
-    return caster(std::forward<From>(from));
+    aot_fn_caster<To, std::decay_t<From>> caster;
+    return caster.do_cast(std::forward<From>(from));
 }
 
 } // namespace aot

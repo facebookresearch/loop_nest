@@ -22,6 +22,7 @@
 
 int main()
 {
+    using facebook::sysml::aot::aot_fn_cast;
     using facebook::sysml::aot::avx2;
     using facebook::sysml::aot::avx2_plus;
     using facebook::sysml::aot::avx512;
@@ -40,40 +41,44 @@ int main()
         int AcBr = 333;
         int BcCc = 333;
 
-        auto fn = facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
-                      // The first argument is the loop order in the form of
-                      // {dimension, stride}.  For now the outer dimension
-                      // has to divide the stride.  This is effectively the
-                      // same as Halide's split into outer and inner
-                      // variable, but can have arbitray number of splits.
-                      {{"AcBr", 512},
-                       //{"ArCr", std::is_same_v<CT_ISA, avx2> ? 12 : 28},
-                       {"BcCc", std::is_same_v<CT_ISA, avx2> ? 8 : 16},
-                       {"AcBr", 1},
-                       {"ArCr", 1},
-                       {"BcCc", 1}},
-                      // The second argument is a map of the dimension sizes
-                      {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
-                      // Vars of C (other variables are reduction variables)
-                      {"ArCr", "BcCc"},
-                      // Variables of A
-                      {"ArCr", "AcBr"},
-                      // Variables of B
-                      {"AcBr", "BcCc"},
-                      // C's strides for each variable.  Note that the
-                      // strides data is a superset of the previous argument
-                      // (variables of C).  I'm still deciding on the final
-                      // design, possibly allowing for null strides that
-                      // will just deduce them from the sizes, or some
-                      // special structs indicating the layout (ie
-                      // row-major, col-major).  In this case the vars have
-                      // to be ordered though... Many decisions to make...
-                      {{"ArCr", 1}, {"BcCc", ArCr}},
-                      // A's strides for each variable
-                      {{"ArCr", 1}, {"AcBr", ArCr}},
-                      // B's strides for each variable
-                      {{"AcBr", 1}, {"BcCc", AcBr}}, 32)
-                      .get_shared();
+        auto fnx = facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+                       // The first argument is the loop order in the form of
+                       // {dimension, stride}.  For now the outer dimension
+                       // has to divide the stride.  This is effectively the
+                       // same as Halide's split into outer and inner
+                       // variable, but can have arbitray number of splits.
+                       {{"AcBr", 512},
+                        //{"ArCr", std::is_same_v<CT_ISA, avx2> ? 12 : 28},
+                        {"BcCc", std::is_same_v<CT_ISA, avx2> ? 8 : 16},
+                        {"AcBr", 1},
+                        {"ArCr", 1},
+                        {"BcCc", 1}},
+                       // The second argument is a map of the dimension sizes
+                       {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
+                       // Vars of C (other variables are reduction variables)
+                       {"ArCr", "BcCc"},
+                       // Variables of A
+                       {"ArCr", "AcBr"},
+                       // Variables of B
+                       {"AcBr", "BcCc"},
+                       // C's strides for each variable.  Note that the
+                       // strides data is a superset of the previous argument
+                       // (variables of C).  I'm still deciding on the final
+                       // design, possibly allowing for null strides that
+                       // will just deduce them from the sizes, or some
+                       // special structs indicating the layout (ie
+                       // row-major, col-major).  In this case the vars have
+                       // to be ordered though... Many decisions to make...
+                       {{"ArCr", 1}, {"BcCc", ArCr}},
+                       // A's strides for each variable
+                       {{"ArCr", 1}, {"AcBr", ArCr}},
+                       // B's strides for each variable
+                       {{"AcBr", 1}, {"BcCc", AcBr}}, 32)
+                       .get_unique();
+
+        auto fny = aot_fn_cast<void(int)>(std::move(fnx));
+        auto fn  = aot_fn_cast<void(float*, float const*, float const*, int)>(
+            std::move(fny));
 
         fn.save_to_file("zi.asm");
         fn.register_perf("fn1");
