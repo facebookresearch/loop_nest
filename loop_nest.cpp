@@ -37,9 +37,9 @@ int main()
         // int AcBr = 16;
         // int BcCc = 16;
 
-        int ArCr = 333;
-        int AcBr = 333;
-        int BcCc = 333;
+        int ArCr = 256;
+        int AcBr = 256;
+        int BcCc = 256;
 
         auto fnx = facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
                        // The first argument is the loop order in the form of
@@ -47,9 +47,10 @@ int main()
                        // has to divide the stride.  This is effectively the
                        // same as Halide's split into outer and inner
                        // variable, but can have arbitray number of splits.
-                       {{"AcBr", 512},
-                        //{"ArCr", std::is_same_v<CT_ISA, avx2> ? 12 : 28},
-                        {"BcCc", std::is_same_v<CT_ISA, avx2> ? 8 : 16},
+                       {{"AcBr", 256},
+                        {"ArCr", 3},
+                        {"BcCc", 16},
+                        {"AcBr", 1},
                         {"AcBr", 1},
                         {"ArCr", 1},
                         {"BcCc", 1}},
@@ -69,11 +70,11 @@ int main()
                        // special structs indicating the layout (ie
                        // row-major, col-major).  In this case the vars have
                        // to be ordered though... Many decisions to make...
-                       {{"ArCr", 1}, {"BcCc", ArCr}},
+                       {{"ArCr", BcCc}, {"BcCc", 1}},
                        // A's strides for each variable
-                       {{"ArCr", 1}, {"AcBr", ArCr}},
+                       {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", 1}, {"BcCc", AcBr}}, 32)
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, 1024)
                        .get_unique();
 
         auto fny = aot_fn_cast<void(int)>(std::move(fnx));
@@ -90,18 +91,18 @@ int main()
         auto CJ = CN;
 
         baseline_MM(ArCr, AcBr, BcCc, 1, ArCr, 1, AcBr, 1, ArCr, A.data(),
-                    B.data(), CN.data(), 1);
+                    B.data(), CN.data(), 0);
 
         // apply_relu(CN.data(), CN.data() + CN.size());
 
-        fn(CJ.data(), A.data(), B.data(), 1);
+        fn(CJ.data(), A.data(), B.data(), 0);
 
         std::cout << "MAXABSDIFF: "
                   << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
 
         auto secs = measureFastestWithWarmup(
-            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10, 100);
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10, 1000);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
 

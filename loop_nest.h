@@ -1294,6 +1294,31 @@ private:
         std::optional<int>                                    tail_mask)
 
     {
+
+        // TODO(zi) Implement the new strategies when possible. With
+        // all in-reg arguments for the FMAs
+
+        // INPROGRESS - some analysis code is commented out below
+
+        // std::map<memory_argument, int> freq;
+        // for (auto const& f : fmas)
+        // {
+        //     ++freq[f.src1];
+        //     ++freq[f.src2];
+        // }
+
+        // std::set<int> degrees;
+        // for (auto const& p : freq)
+        // {
+        //     degrees.insert(p.second);
+        // }
+
+        // std::cout << "DEGREES:";
+        // for (auto const d : degrees)
+        //     std::cout << ' ' << d;
+        // std::cout << std::endl;
+
+
         // Assignment of vector registers
         Vmm arg1_register, arg2_register;
         Vmm arg_A_strides, arg_B_strides;
@@ -1415,9 +1440,7 @@ private:
                                  ptr[addressers.at(addr.traits->reg.getIdx())
                                          ->get_address(addr.offset * 4)]);
 
-                    // reusing arg2_register as temporary
-                    vxorpd(arg2_register, arg2_register, arg2_register);
-                    vblendvps(arg1_reg, arg1_reg, arg2_register, ymm_tail_mask);
+                    vpand(arg1_reg, arg1_reg, ymm_tail_mask);
                 }
                 else
                 {
