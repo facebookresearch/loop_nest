@@ -1318,7 +1318,6 @@ private:
         //     std::cout << ' ' << d;
         // std::cout << std::endl;
 
-
         // Assignment of vector registers
         Vmm arg1_register, arg2_register;
         Vmm arg_A_strides, arg_B_strides;
@@ -1370,6 +1369,16 @@ private:
 
         assert(next_vector_register <= auxiliary_registers);
 
+        bool prefer_first_broadcast = false;
+
+        if ((A_traits.access == VECTOR_PACKED &&
+             B_traits.access != VECTOR_PACKED) ||
+            (A_traits.access != VECTOR_PACKED &&
+             B_traits.access == VECTOR_PACKED))
+        {
+            // prefer_first_broadcast = true;
+        }
+
         most_frequent_queue<memory_argument> queue;
 
         for (auto const& p : addressers)
@@ -1420,12 +1429,20 @@ private:
 
         for (; queue.size() > 0; ++current)
         {
+            auto addr = queue.top();
+
+            if (addr.traits->access == VECTOR_PACKED && prefer_first_broadcast)
+            {
+                --current;
+                queue.skip();
+                continue;
+            }
+
+            queue.pop();
+
             issue_delayed_ops[current % cycle]();
 
             auto arg1_reg = arg1_registers[current % cycle];
-
-            auto addr = queue.top();
-            queue.pop();
 
             LN_LOG(INFO) << tabs.back() << "LOAD " << addr.readable() << " ["
                          << addr.mask << "]\n";

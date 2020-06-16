@@ -26,6 +26,103 @@ int main()
     using facebook::sysml::aot::avx2;
     using facebook::sysml::aot::avx2_plus;
     using facebook::sysml::aot::avx512;
+    // 2D convolution on NCHW16c layout example:
+    // O(g_out, c_out, o_h, o_w) = I(g_in, c_in, o_h + k_h, ow + k_w) *
+    //                             K(g_in, g_out, c_in, c_out, k_h, k_w)
+    // if (0)
+    {
+        int GIN  = 128 / 16;
+        int CIN  = 16;
+        int GOUT = 128 / 16;
+        int COUT = 16;
+        int OS   = 56;
+        int KS   = 3;
+        int IS   = OS + KS - 1;
+
+        auto fn = facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+                      {{"g_out", 1}, //
+                       {"c_out", 16},
+                       {"o_w", 3},
+                       {"o_h", 4},
+                       {"g_in", 1},
+                       {"c_in", 1},
+                       {"o_w", 3},    //
+                       {"o_w", 1},    //
+                       {"o_h", 1},    //
+                       {"k_h", 1},    //
+                       {"k_w", 1},    //
+                       {"c_out", 1}}, //
+                      // The second argument is a map of the dimension sizes
+                      {{"g_out", GOUT},
+                       {"c_out", COUT},
+                       {"o_w", OS},
+                       {"k_w", KS},
+                       {"g_in", GIN},
+                       {"c_in", CIN},
+                       {"o_h", OS},
+                       {"k_h", KS}},
+                      // Vars of C (other variables are reduction variables)
+                      {"g_out", "c_out", "o_w", "o_h"},
+                      // Variables of A, note that i_w and i_h are not used
+                      {"g_in", "c_in", "i_w", "i_h"},
+                      // Variables of B
+                      {"g_out", "g_in", "c_in", "c_out", "k_w", "k_h"},
+                      // C's strides for each variable
+                      {{"g_out", OS * OS * COUT},
+                       {"o_h", OS * COUT},
+                       {"o_w", COUT},
+                       {"c_out", 1}},
+                      // A's strides for each variable Note how we
+                      // provide strides for i/k_h and i/k_w, this is
+                      // because the access to A is based on output
+                      // and reduction variables
+                      {{"g_in", IS * IS * CIN},
+                       {"o_h", IS * CIN},
+                       {"k_h", IS * CIN},
+                       {"o_w", CIN},
+                       {"k_w", CIN},
+                       {"c_in", 1}},
+                      // B's strides for each variable
+                      {{"g_in", COUT * KS * KS * CIN * GOUT},
+                       {"g_out", COUT * KS * KS * CIN},
+                       {"c_in", COUT * KS * KS},
+                       {"k_h", COUT * KS},
+                       {"k_w", COUT},
+                       {"c_out", 1}})
+                      .get_shared();
+
+        fn.save_to_file("zi.asm");
+        fn.register_perf("fn9");
+
+        auto A  = getRandomVector<float>(GIN * CIN * IS * IS);
+        auto B  = getRandomVector<float>(GOUT * GIN * COUT * CIN * KS * KS);
+        auto CN = std::vector<float>(GOUT * COUT * OS * OS);
+        auto CJ = std::vector<float>(GOUT * COUT * OS * OS);
+
+        baseline_Conv_NCHW8c(GOUT, COUT, GIN, CIN, OS, OS, KS, KS, A.data(),
+                             B.data(), CN.data());
+
+        fn(CJ.data(), A.data(), B.data(), 0);
+
+        // apply_relu(CN.data(), CN.data() + CN.size());
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS,
+                                CN.data())
+                  << "\n";
+
+        auto secs = measureFastestWithWarmup(
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 1, 1000);
+
+        double gflops =
+            2.0 * GIN * GOUT * CIN * COUT * OS * OS * KS * KS / 1000000000;
+
+        std::cout << "gflops: " << gflops << "\n";
+
+        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
+    }
+
+    return 0;
 
     // WOW this is actually pretty efficient!
     // Playing with weird schedules
@@ -111,102 +208,6 @@ int main()
         bench_implementation_fmas_per_cycle(
             fn, AcBr * ArCr, AcBr * BcCc, ArCr * BcCc,
             1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
-    }
-
-    // return 0;
-
-    // 2D convolution on NCHW16c layout example:
-    // O(g_out, c_out, o_h, o_w) = I(g_in, c_in, o_h + k_h, ow + k_w) *
-    //                             K(g_in, g_out, c_in, c_out, k_h, k_w)
-    // if (0)
-    {
-        int GIN  = 128 / 16;
-        int CIN  = 16;
-        int GOUT = 128 / 16;
-        int COUT = 16;
-        int OS   = 56;
-        int KS   = 3;
-        int IS   = OS + KS - 1;
-
-        auto fn = facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
-                      {{"g_out", 1}, //
-                       {"o_w", 28},
-                       {"o_h", 1},
-                       {"g_in", 1},
-                       {"c_in", 1},
-                       {"o_w", 1}, //
-                       //{"o_w", 1},    //
-                       {"k_h", 1},    //
-                       {"k_w", 1},    //
-                       {"c_out", 1}}, //
-                      // The second argument is a map of the dimension sizes
-                      {{"g_out", GOUT},
-                       {"c_out", COUT},
-                       {"o_w", OS},
-                       {"k_w", KS},
-                       {"g_in", GIN},
-                       {"c_in", CIN},
-                       {"o_h", OS},
-                       {"k_h", KS}},
-                      // Vars of C (other variables are reduction variables)
-                      {"g_out", "c_out", "o_w", "o_h"},
-                      // Variables of A, note that i_w and i_h are not used
-                      {"g_in", "c_in", "i_w", "i_h"},
-                      // Variables of B
-                      {"g_out", "g_in", "c_in", "c_out", "k_w", "k_h"},
-                      // C's strides for each variable
-                      {{"g_out", OS * OS * COUT},
-                       {"o_h", OS * COUT},
-                       {"o_w", COUT},
-                       {"c_out", 1}},
-                      // A's strides for each variable Note how we
-                      // provide strides for i/k_h and i/k_w, this is
-                      // because the access to A is based on output
-                      // and reduction variables
-                      {{"g_in", IS * IS * CIN},
-                       {"o_h", IS * CIN},
-                       {"k_h", IS * CIN},
-                       {"o_w", CIN},
-                       {"k_w", CIN},
-                       {"c_in", 1}},
-                      // B's strides for each variable
-                      {{"g_in", COUT * KS * KS * CIN * GOUT},
-                       {"g_out", COUT * KS * KS * CIN},
-                       {"c_in", COUT * KS * KS},
-                       {"k_h", COUT * KS},
-                       {"k_w", COUT},
-                       {"c_out", 1}})
-                      .get_shared();
-
-        fn.save_to_file("zi.asm");
-        fn.register_perf("fn9");
-
-        auto A  = getRandomVector<float>(GIN * CIN * IS * IS);
-        auto B  = getRandomVector<float>(GOUT * GIN * COUT * CIN * KS * KS);
-        auto CN = std::vector<float>(GOUT * COUT * OS * OS);
-        auto CJ = std::vector<float>(GOUT * COUT * OS * OS);
-
-        baseline_Conv_NCHW8c(GOUT, COUT, GIN, CIN, OS, OS, KS, KS, A.data(),
-                             B.data(), CN.data());
-
-        fn(CJ.data(), A.data(), B.data(), 0);
-
-        // apply_relu(CN.data(), CN.data() + CN.size());
-
-        std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS,
-                                CN.data())
-                  << "\n";
-
-        auto secs = measureFastestWithWarmup(
-            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 1, 100);
-
-        double gflops =
-            2.0 * GIN * GOUT * CIN * COUT * OS * OS * KS * KS / 1000000000;
-
-        std::cout << "gflops: " << gflops << "\n";
-
-        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
     }
 
     // return 0;
