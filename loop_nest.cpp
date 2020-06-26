@@ -112,7 +112,7 @@ int main()
                   << "\n";
 
         auto secs = measureFastestWithWarmup(
-            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 1, 1000);
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 1, 10);
 
         double gflops =
             2.0 * GIN * GOUT * CIN * COUT * OS * OS * KS * KS / 1000000000;
@@ -122,7 +122,7 @@ int main()
         std::cout << "GFLOPS: " << (gflops / secs) << "\n";
     }
 
-    return 0;
+    // return 0;
 
     // WOW this is actually pretty efficient!
     // Playing with weird schedules

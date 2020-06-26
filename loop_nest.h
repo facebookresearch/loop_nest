@@ -611,16 +611,16 @@ private:
     {
         Vmm    arg_C_strides;
         int    next_vector_register = 0;
-        OpMask tail_k_mask          = k2;
-        OpMask full_k_mask          = k3;
+        OpMask tail_k_mask          = k2; // Just use k0
+        OpMask full_k_mask          = k0;
         OpMask temp_k_mask          = k4;
 
         if (C_traits.access == VECTOR_STRIDED)
         {
             arg_C_strides = Vmm(next_vector_register++);
             vmovups(arg_C_strides, ptr[rip + C_access_strides_label]);
-            mov(r12, (1 << vector_size) - 1);
-            kmovw(full_k_mask, r12.cvt32());
+            //mov(r12, (1 << vector_size) - 1);
+            //kmovw(full_k_mask, r12.cvt32());
         }
 
         if (tail_mask)
@@ -737,6 +737,7 @@ private:
     void issue_C_loads(std::set<memory_argument> const& loads,
                        bool                             issue_first_alpha_logic)
     {
+        // TODO (relax)
         std::optional<int> tail_mask;
 
         for (auto const& c : loads)
@@ -788,7 +789,7 @@ private:
         Vmm    arg_C_strides;
         int    next_vector_register = 0;
         OpMask tail_k_mask          = k2;
-        OpMask full_k_mask          = k3;
+        OpMask full_k_mask          = k0;
         OpMask temp_k_mask          = k4;
 
         if (issue_max_alpha_logic && elementwise)
@@ -819,8 +820,8 @@ private:
         {
             arg_C_strides = Vmm(next_vector_register++);
             vmovups(arg_C_strides, ptr[rip + C_access_strides_label]);
-            mov(r12, (1 << vector_size) - 1); // TODO (this is probably already
-            kmovw(full_k_mask, r12.cvt32());  // initialized during
+            // mov(r12, (1 << vector_size) - 1); // TODO (this is probably already
+            // kmovw(full_k_mask, r12.cvt32());  // initialized during
                                               // loads)? Add logic to
                                               // check that, and skip
                                               // if not necessary
@@ -1027,10 +1028,10 @@ private:
     {
         // Assignment of vector registers
         Vmm arg1_register, arg2_register;
-        Vmm arg_A_strides, arg_B_strides;
+        Vmm arg_A_strides, arg_B_strides; // TODO (if same, use same register)
 
         OpMask tail_k_mask = k2;
-        OpMask full_k_mask = k3;
+        OpMask full_k_mask = k0;
         OpMask temp_k_mask = k4;
 
         int next_vector_register = 0;
@@ -1048,19 +1049,18 @@ private:
 
         if (B_traits.access == VECTOR_STRIDED)
         {
-
             tensor_strides["B"] = arg_B_strides = Vmm(next_vector_register++);
             vmovups(arg_B_strides, ptr[rip + B_access_strides_label]);
         }
 
         assert(next_vector_register <= auxiliary_registers);
 
-        if (A_traits.access == VECTOR_STRIDED ||
-            B_traits.access == VECTOR_STRIDED)
-        {
-            mov(r12, (1 << vector_size) - 1);
-            kmovw(full_k_mask, r12.cvt32());
-        }
+        // if (A_traits.access == VECTOR_STRIDED ||
+        //     B_traits.access == VECTOR_STRIDED)
+        // {
+        //     mov(r12, (1 << vector_size) - 1);
+        //     kmovw(full_k_mask, r12.cvt32());
+        // }
 
         int mask_size = -1;
 
@@ -1729,6 +1729,7 @@ private:
             (is_B_vectorized ? (is_B_gathered ? VECTOR_STRIDED : VECTOR_PACKED)
                              : SCALAR);
 
+        // TODO remove redundant information.
         C_traits = {"C",
                     C_access_kind,
                     CReg_,
@@ -2523,6 +2524,8 @@ public:
                       << "vectorized\n";
         // At least one tensor has to be vectorized.  Otherwise the
         // innermost loop is over a dummy variable.
+
+        // TODO (nicer error message).
         assert(is_C_vectorized || is_B_vectorized || is_A_vectorized);
 
         vectorized_var = order.back().first;
