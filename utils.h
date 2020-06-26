@@ -5,6 +5,8 @@
 #include <random>
 #include <vector>
 
+#include "AlignedVec.h"
+
 template <class Float>
 void apply_relu(Float* Begin, float* End)
 {
@@ -41,9 +43,9 @@ Float maxAbsDiffVerbose(Float const* LBegin, Float const* LEnd,
 }
 
 template <class Float>
-std::vector<Float> getRandomVector(unsigned size, unsigned extra_elements = 16)
+aligned_vector<Float> getRandomVector(unsigned size, unsigned extra_elements = 16)
 {
-    std::vector<Float> res(size + extra_elements);
+    aligned_vector<Float> res(size + extra_elements);
 
     std::random_device rd;
     std::mt19937       gen(345);
@@ -133,7 +135,7 @@ void check_correctness(BaseLineImpl&& baseline_fn, JITImpl&& jit_fn, int A_size,
     auto A = getRandomVector<float>(A_size);
     auto B = getRandomVector<float>(B_size);
 
-    auto CN = std::vector<float>(C_size);
+    auto CN = aligned_vector<float>(C_size);
     auto CJ = std::vector<float>(C_size);
 
     baseline_fn(CN.data(), A.data(), B.data());

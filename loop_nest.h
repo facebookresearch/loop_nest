@@ -1369,16 +1369,6 @@ private:
 
         assert(next_vector_register <= auxiliary_registers);
 
-        bool prefer_first_broadcast = false;
-
-        if ((A_traits.access == VECTOR_PACKED &&
-             B_traits.access != VECTOR_PACKED) ||
-            (A_traits.access != VECTOR_PACKED &&
-             B_traits.access == VECTOR_PACKED))
-        {
-            // prefer_first_broadcast = true;
-        }
-
         most_frequent_queue<memory_argument> queue;
 
         for (auto const& p : addressers)
@@ -1429,20 +1419,12 @@ private:
 
         for (; queue.size() > 0; ++current)
         {
-            auto addr = queue.top();
-
-            if (addr.traits->access == VECTOR_PACKED && prefer_first_broadcast)
-            {
-                --current;
-                queue.skip();
-                continue;
-            }
-
-            queue.pop();
-
             issue_delayed_ops[current % cycle]();
 
             auto arg1_reg = arg1_registers[current % cycle];
+
+            auto addr = queue.top();
+            queue.pop();
 
             LN_LOG(INFO) << tabs.back() << "LOAD " << addr.readable() << " ["
                          << addr.mask << "]\n";
@@ -1457,7 +1439,9 @@ private:
                                  ptr[addressers.at(addr.traits->reg.getIdx())
                                          ->get_address(addr.offset * 4)]);
 
-                    vpand(arg1_reg, arg1_reg, ymm_tail_mask);
+                    // reusing arg2_register as temporary
+                    vxorpd(arg2_register, arg2_register, arg2_register);
+                    vblendvps(arg1_reg, arg1_reg, arg2_register, ymm_tail_mask);
                 }
                 else
                 {
@@ -2488,6 +2472,110 @@ private:
                           unroll_stage, addressers, true, 1, true);
     }
 
+private:
+    std::int64_t effective_flops_, masked_out_flops_;
+    std::int64_t A_memory_, B_memory_, C_memory_, total_memory_;
+
+    void compute_effective_flops()
+    {
+        // effective FLOPs are defined as FLOPs that
+        // result in values that are actually used (i.e. not masked out
+        // operations)
+        std::int64_t flops = 2;
+        for (auto const& s : sizes)
+        {
+            if (C_strides.count(s.first) || B_strides.count(s.first) ||
+                A_strides.count(s.first))
+                flops *= s.second;
+        }
+        effective_flops_ = flops;
+    }
+
+    void compute_masked_out_flops()
+    {
+        // when the innermost loop (vectorized dimension) doesn't fill up a
+        // vector register there are lanes that are masked out, we count the
+        // FLOPs resulting from these masked out lanes
+        std::pair<std::string, int> innermost = order.back();
+        // compute the bound for the innermost loop, since this determines the
+        // number of elements vectorized identify bound by looking at stride for
+        // prior split (if any)
+        auto matches_innermost = [&innermost](auto const& dim) {
+            return dim.first == innermost.first;
+        };
+        auto parent_iter =
+            std::find_if(++order.rbegin(), order.rend(), matches_innermost);
+
+        int innermost_bound;
+        if (parent_iter == order.rend())
+        {
+            // there was no split before, so bound is size of dimension
+            innermost_bound = sizes.at(innermost.first);
+        }
+        else
+        {
+            innermost_bound = parent_iter->second;
+        }
+
+        if ((innermost_bound % vector_size) == 0)
+        {
+            masked_out_flops_ = 0;
+            return;
+        }
+
+        int masked_out_per_register =
+            vector_size - (innermost_bound % vector_size);
+        std::string  vectorized_dimension = innermost.first;
+        std::int64_t flops                = 2;
+
+        for (auto const& s : sizes)
+        {
+            if (C_strides.count(s.first) || B_strides.count(s.first) ||
+                A_strides.count(s.first))
+            {
+                if (s.first == vectorized_dimension)
+                {
+                    flops *=
+                        masked_out_per_register * (s.second / innermost_bound);
+                }
+                else
+                {
+                    flops *= s.second;
+                }
+            }
+        }
+        masked_out_flops_ = flops;
+    }
+
+    void compute_memory()
+    {
+        std::int64_t C_memory_approx = 1;
+        std::int64_t A_memory_approx = 1;
+        std::int64_t B_memory_approx = 1;
+
+        for (auto const& s : sizes)
+        {
+            if (C_strides.count(s.first))
+                C_memory_approx += (s.second - 1) * C_strides.at(s.first);
+            if (A_strides.count(s.first))
+                A_memory_approx += (s.second - 1) * A_strides.at(s.first);
+            if (B_strides.count(s.first))
+                B_memory_approx += (s.second - 1) * B_strides.at(s.first);
+        }
+        // in bytes
+        C_memory_     = C_memory_approx * 4;
+        A_memory_     = A_memory_approx * 4;
+        B_memory_     = B_memory_approx * 4;
+        total_memory_ = C_memory_ + A_memory_ + B_memory_;
+    }
+
+public:
+    std::int64_t get_effective_flops() const { return effective_flops_; }
+
+    std::int64_t get_masked_out_flops() const { return masked_out_flops_; }
+
+    std::int64_t get_total_memory() const { return total_memory_; }
+
 public:
     FMA_loop_nest_jitter(
         std::vector<std::pair<std::string, int>> const& _order,
@@ -2530,6 +2618,11 @@ public:
 
         vectorized_var = order.back().first;
         LN_LOG(DEBUG) << "Vectorized along: " << vectorized_var << "\n";
+
+        // compute and set approximate FLOPs and memory
+        compute_effective_flops();
+        compute_masked_out_flops();
+        compute_memory();
 
         set_tensor_traits();
 
