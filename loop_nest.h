@@ -13,6 +13,7 @@
 
 #include "address_packer.h"
 #include "code_generator.h"
+#include "common.h"
 #include "elementwise_operation.h"
 #include "isa.h"
 #include "log.h"
@@ -104,65 +105,6 @@ private:
     std::vector<Reg64> addressing_registers = {r8,  r9,  r10, r11,
                                                r13, r14, r15, rbx};
 
-    enum access_kind
-    {
-        SCALAR,
-        VECTOR_PACKED,
-        VECTOR_STRIDED
-    };
-
-    struct loop_descriptor
-    {
-        std::string var;
-        int         end;
-        int         delta;
-    };
-
-    struct tensor_traits
-    {
-        std::string name;
-        access_kind access;
-        Reg64       reg;
-        Label*      stridesLabel;
-        int         innermost_stride;
-        int         access_len;
-    };
-
-    struct memory_argument
-    {
-        int                  offset;
-        tensor_traits const* traits;
-        int                  mask;
-
-        // We are not comparing the mask
-
-        bool operator<(memory_argument const& o) const
-        {
-            return std::tie(offset, traits->name) <
-                   std::tie(o.offset, o.traits->name);
-        }
-
-        bool operator==(memory_argument const& o) const
-        {
-            return std::tie(offset, traits->name) ==
-                   std::tie(o.offset, o.traits->name);
-        }
-
-        std::string readable() const
-        {
-            assert(traits);
-            return traits->name + "[" + std::to_string(offset) + ":" +
-                   std::to_string(traits->access == SCALAR ? 1 : vector_size) +
-                   "]{" + std::to_string(traits->innermost_stride) + "}";
-        }
-    };
-
-    struct fma_operation
-    {
-        memory_argument            dest, src1, src2;
-        std::map<std::string, int> coordinates;
-    };
-
     static void print_ld(loop_descriptor const& l)
     {
         LN_LOG(INFO) << "Loop over " << l.var << " from 0 to " << l.end
@@ -173,14 +115,15 @@ private:
     // that allows for easy debugging
     std::vector<std::string> tabs = {""};
 
-    struct in_register_tensor_pointer_type
-    {
-        std::string                name;
-        Reg64                      reg;
-        std::map<std::string, int> strides;
-    };
-
     std::vector<in_register_tensor_pointer_type> in_register_tensor_pointers;
+
+    using memory_argument = memory_argument_type<vector_size>;
+
+    struct fma_operation
+    {
+        memory_argument            dest, src1, src2;
+        std::map<std::string, int> coordinates;
+    };
 
 private:
     // Here we put some default unroll limit.
@@ -619,8 +562,8 @@ private:
         {
             arg_C_strides = Vmm(next_vector_register++);
             vmovups(arg_C_strides, ptr[rip + C_access_strides_label]);
-            //mov(r12, (1 << vector_size) - 1);
-            //kmovw(full_k_mask, r12.cvt32());
+            // mov(r12, (1 << vector_size) - 1);
+            // kmovw(full_k_mask, r12.cvt32());
         }
 
         if (tail_mask)
@@ -820,11 +763,11 @@ private:
         {
             arg_C_strides = Vmm(next_vector_register++);
             vmovups(arg_C_strides, ptr[rip + C_access_strides_label]);
-            // mov(r12, (1 << vector_size) - 1); // TODO (this is probably already
-            // kmovw(full_k_mask, r12.cvt32());  // initialized during
-                                              // loads)? Add logic to
-                                              // check that, and skip
-                                              // if not necessary
+            // mov(r12, (1 << vector_size) - 1); // TODO (this is probably
+            // already kmovw(full_k_mask, r12.cvt32());  // initialized during
+            // loads)? Add logic to
+            // check that, and skip
+            // if not necessary
         }
 
         assert(next_vector_register <= auxiliary_registers);
