@@ -13,6 +13,7 @@
 
 #include "address_packer.h"
 #include "code_generator.h"
+#include "common.h"
 #include "elementwise_operation.h"
 #include "isa.h"
 #include "log.h"
@@ -93,75 +94,21 @@ private:
     auto at_stack_offset(int off) { return rsp + (stack_offset - off) * 8; }
 
 private:
-    Reg64 CReg_     = rdi;
-    Reg64 AReg_     = rsi;
-    Reg64 BReg_     = rdx;
-    Reg64 AlphaReg_ = rcx;
-    Reg64 loopReg_  = rax;
+    Reg64              CReg_     = rdi;
+    Reg64              AReg_     = rsi;
+    Reg64              BReg_     = rdx;
+    Reg64              AlphaReg_ = rcx;
+    Reg64              loopReg_  = rax;
+    std::vector<Reg64> elementwiseReg_;
 
     Label maskLabel_;
 
+    // Note that we remove from the start of this sequence
+    // to provide addressing registers for elementwise followed tensors
+    // following:
+    // https://en.wikipedia.org/wiki/X86_calling_conventions#System_V_AMD64_ABI
     std::vector<Reg64> addressing_registers = {r8,  r9,  r10, r11,
                                                r13, r14, r15, rbx};
-
-    enum access_kind
-    {
-        SCALAR,
-        VECTOR_PACKED,
-        VECTOR_STRIDED
-    };
-
-    struct loop_descriptor
-    {
-        std::string var;
-        int         end;
-        int         delta;
-    };
-
-    struct tensor_traits
-    {
-        std::string name;
-        access_kind access;
-        Reg64       reg;
-        Label*      stridesLabel;
-        int         innermost_stride;
-        int         access_len;
-    };
-
-    struct memory_argument
-    {
-        int                  offset;
-        tensor_traits const* traits;
-        int                  mask;
-
-        // We are not comparing the mask
-
-        bool operator<(memory_argument const& o) const
-        {
-            return std::tie(offset, traits->name) <
-                   std::tie(o.offset, o.traits->name);
-        }
-
-        bool operator==(memory_argument const& o) const
-        {
-            return std::tie(offset, traits->name) ==
-                   std::tie(o.offset, o.traits->name);
-        }
-
-        std::string readable() const
-        {
-            assert(traits);
-            return traits->name + "[" + std::to_string(offset) + ":" +
-                   std::to_string(traits->access == SCALAR ? 1 : vector_size) +
-                   "]{" + std::to_string(traits->innermost_stride) + "}";
-        }
-    };
-
-    struct fma_operation
-    {
-        memory_argument            dest, src1, src2;
-        std::map<std::string, int> coordinates;
-    };
 
     static void print_ld(loop_descriptor const& l)
     {
@@ -173,14 +120,15 @@ private:
     // that allows for easy debugging
     std::vector<std::string> tabs = {""};
 
-    struct in_register_tensor_pointer_type
-    {
-        std::string                name;
-        Reg64                      reg;
-        std::map<std::string, int> strides;
-    };
-
     std::vector<in_register_tensor_pointer_type> in_register_tensor_pointers;
+
+    using memory_argument = memory_argument_type<vector_size>;
+
+    struct fma_operation
+    {
+        memory_argument            dest, src1, src2;
+        std::map<std::string, int> coordinates;
+    };
 
 private:
     // Here we put some default unroll limit.
@@ -190,15 +138,20 @@ private:
     std::vector<std::pair<std::string, int>> order;
     std::map<std::string, int> const&        sizes;
 
-    std::shared_ptr<elementwise_operation> elementwise;
+    std::shared_ptr<elementwise_operation<ISA>> elementwise_preop;
+    std::shared_ptr<elementwise_operation<ISA>> elementwise_postop;
 
     std::set<std::string> const& C_formula;
     std::set<std::string> const& A_formula;
     std::set<std::string> const& B_formula;
 
-    std::map<std::string, int> C_strides;
-    std::map<std::string, int> A_strides;
-    std::map<std::string, int> B_strides;
+    std::map<std::string, int>              C_strides;
+    std::map<std::string, int>              A_strides;
+    std::map<std::string, int>              B_strides;
+    std::vector<std::map<std::string, int>> elementwise_preop_strides;
+    std::vector<std::map<std::string, int>> elementwise_postop_strides;
+    // concatenation of preop followed by postop strides
+    std::vector<std::map<std::string, int>> elementwise_strides;
 
     int nest_depth;
 
@@ -219,14 +172,16 @@ private:
 
     // Labels holding strides along LSD of vectorized tensors that are
     // not packed.
-    Label C_access_strides_label;
-    Label A_access_strides_label;
-    Label B_access_strides_label;
+    Label                               C_access_strides_label;
+    Label                               A_access_strides_label;
+    Label                               B_access_strides_label;
+    std::vector<std::shared_ptr<Label>> elementwise_labels;
 
     // Tensor traits
-    tensor_traits C_traits;
-    tensor_traits A_traits;
-    tensor_traits B_traits;
+    tensor_traits              C_traits;
+    tensor_traits              A_traits;
+    tensor_traits              B_traits;
+    std::vector<tensor_traits> elementwise_traits;
 
     // The name of the variable in the innermost loop (along which the
     // vectorization is performed)
@@ -263,6 +218,66 @@ private:
     std::map<std::string, int> current_coordinate_cursor;
 
 private:
+    void allocate_elementwise_addressing_registers()
+    {
+        // TODO(j): for now we assume at most 2 followed
+        // tensors for simplicity
+        // We allocate the first 2 registers (r8 and r9), which
+        // will point to the 5th and 6th arguments in the function
+        // generated (as per x86 64 ABI)
+
+        assert(elementwise_strides.size() <= 2);
+        for (int i = 0; i < elementwise_strides.size(); i++)
+        {
+            Reg64 reg = addressing_registers[0];
+            elementwiseReg_.push_back(reg);
+            addressing_registers.erase(addressing_registers.begin());
+        }
+    }
+
+    void allocate_elementwise_labels()
+    {
+        // create labels for each elementwise followed tensor
+        // Note that we create for all, but only
+        // issue embedded constants later if vectorized and strided
+        for (int i = 0; i < elementwise_strides.size(); i++)
+        {
+            std::shared_ptr<Label> label = std::make_shared<Label>();
+            elementwise_labels.push_back(label);
+        }
+    }
+
+    void initialize_elementwise_ops()
+    {
+        if (elementwise_preop != nullptr)
+        {
+            std::vector<tensor_traits> elementwise_preop_traits;
+            for (int i = 0; i < elementwise_preop_strides.size(); i++)
+            {
+                elementwise_preop_traits.push_back(elementwise_traits[i]);
+            }
+            elementwise_preop->initialize(elementwise_preop_strides,
+                                          elementwise_preop_traits,
+                                          &maskLabel_);
+        }
+
+        if (elementwise_postop != nullptr)
+        {
+            std::vector<tensor_traits> elementwise_postop_traits;
+            int num_preop = elementwise_preop_strides.size();
+
+            for (int i = num_preop;
+                 i < num_preop + elementwise_postop_strides.size(); i++)
+            {
+                elementwise_postop_traits.push_back(elementwise_traits[i]);
+            }
+
+            elementwise_postop->initialize(elementwise_postop_strides,
+                                           elementwise_postop_traits,
+                                           &maskLabel_);
+        }
+    }
+
     bool
     is_inside_current_limits(std::map<std::string, int> const& coordinate) const
     {
@@ -301,14 +316,16 @@ private:
                 for (int i = 0; i < fullIterations; ++i)
                 {
                     ret.insert(memory_argument{get_cursor_offset(C_strides),
-                                               &C_traits, vector_size});
+                                               &C_traits, vector_size,
+                                               current_coordinate_cursor});
                     current_coordinate_cursor[loop.var] += vector_size;
                 }
 
                 if (rest)
                 {
                     ret.insert(memory_argument{get_cursor_offset(C_strides),
-                                               &C_traits, rest});
+                                               &C_traits, rest,
+                                               current_coordinate_cursor});
                 }
 
                 current_coordinate_cursor[loop.var] = saved_coordinate;
@@ -316,7 +333,8 @@ private:
             else
             {
                 ret.insert(memory_argument{get_cursor_offset(C_strides),
-                                           &C_traits, vector_size});
+                                           &C_traits, vector_size,
+                                           current_coordinate_cursor});
             }
         }
         else
@@ -611,16 +629,16 @@ private:
     {
         Vmm    arg_C_strides;
         int    next_vector_register = 0;
-        OpMask tail_k_mask          = k2; // Just use k0
-        OpMask full_k_mask          = k0;
+        OpMask tail_k_mask          = k2;
+        OpMask full_k_mask          = k3;
         OpMask temp_k_mask          = k4;
 
         if (C_traits.access == VECTOR_STRIDED)
         {
             arg_C_strides = Vmm(next_vector_register++);
             vmovups(arg_C_strides, ptr[rip + C_access_strides_label]);
-            //mov(r12, (1 << vector_size) - 1);
-            //kmovw(full_k_mask, r12.cvt32());
+            mov(r12, (1 << vector_size) - 1);
+            kmovw(full_k_mask, r12.cvt32());
         }
 
         if (tail_mask)
@@ -734,6 +752,120 @@ private:
         }
     }
 
+    template <class R = ISA>
+    std::enable_if_t<std::is_same_v<R, avx512>>
+    issue_C_elementwise_preop(std::set<memory_argument> const& loads,
+                              std::optional<int>               tail_mask)
+    {
+        OpMask tail_k_mask = k2;
+        OpMask full_k_mask = k3;
+        OpMask temp_k_mask = k4;
+
+        switch (C_traits.access)
+        {
+        case VECTOR_STRIDED:
+            /* fall through to vector packed case */
+        case VECTOR_PACKED:
+        {
+            std::vector<Vmm> auxillary = {Vmm(0), Vmm(1)};
+
+            if (tail_mask)
+            {
+                mov(r12, (1 << (*tail_mask)) - 1);
+                kmovw(tail_k_mask, r12.cvt32());
+
+                assert(C_traits.access_len != 1);
+            }
+
+            std::vector<std::pair<memory_argument, Vmm>> loads_and_regs;
+            for (auto const& c : loads)
+            {
+                loads_and_regs.push_back({c, C_VMMs[c][0]});
+            }
+
+            elementwise_preop->process_batch(
+                this, loads_and_regs, auxillary, {full_k_mask, temp_k_mask},
+                C_traits.access, R(),
+                tail_mask ? std::optional<OpMask>(tail_k_mask) : std::nullopt);
+        }
+        break;
+
+        case SCALAR:
+        {
+            std::vector<Xmm> auxillary = {xmm0, xmm1};
+
+            std::vector<std::pair<memory_argument, Xmm>> loads_and_regs;
+            for (auto const& c : loads)
+            {
+                loads_and_regs.push_back({c, Xmm(C_VMMs[c][0].getIdx())});
+            }
+
+            elementwise_preop->process_batch(this, loads_and_regs, {xmm0, xmm1},
+                                             C_traits.access, R());
+        }
+        break;
+        }
+    }
+
+    template <class R = ISA>
+    std::enable_if_t<std::is_same_v<R, avx2>>
+    issue_C_elementwise_preop(std::set<memory_argument> const& loads,
+                              std::optional<int>               tail_mask)
+    {
+        switch (C_traits.access)
+        {
+        case VECTOR_STRIDED:
+            /* fall through to vector packed case */
+        case VECTOR_PACKED:
+        {
+            // Vmm0 and Vmm1 are kept free by convention as auxillary
+            std::vector<Vmm> auxillary = {Vmm(0), Vmm(1)};
+            Ymm              ymm_tail_mask;
+
+            // may have others available too
+            for (int i = first_unused_vmm_register;
+                 i < isa_traits<ISA>::total_vector_registers; i++)
+            {
+                auxillary.push_back(Vmm(i));
+            }
+
+            if (tail_mask)
+            {
+                ymm_tail_mask = auxillary.back();
+                vmovups(ymm_tail_mask,
+                        ptr[rip + maskLabel_ + 4 * (8 - (*tail_mask))]);
+                auxillary.pop_back();
+            }
+
+            std::vector<std::pair<memory_argument, Vmm>> loads_and_regs;
+            for (auto const& c : loads)
+            {
+                loads_and_regs.push_back({c, C_VMMs[c][0]});
+            }
+
+            elementwise_preop->process_batch(
+                this, loads_and_regs, auxillary, C_traits.access, R(),
+                tail_mask ? std::optional<Ymm>(ymm_tail_mask) : std::nullopt);
+        }
+        break;
+
+        case SCALAR:
+        {
+            std::vector<Xmm> auxillary = {xmm0, xmm1};
+
+            std::vector<std::pair<memory_argument, Xmm>> loads_and_regs;
+            for (auto const& c : loads)
+            {
+                loads_and_regs.push_back({c, Xmm(C_VMMs[c][0].getIdx())});
+            }
+
+            elementwise_preop->process_batch(this, loads_and_regs, {xmm0, xmm1},
+                                             C_traits.access, R());
+        }
+        break;
+        }
+    }
+
     void issue_C_loads(std::set<memory_argument> const& loads,
                        bool                             issue_first_alpha_logic)
     {
@@ -768,9 +900,28 @@ private:
             }
 
             jmp(doneInitLabel, T_NEAR);
+
             L(loadDataLabel);
 
             issue_C_loads(loads, tail_mask);
+
+            if (elementwise_preop != nullptr)
+            {
+                Label donePreOp;
+
+                cmp(AlphaReg_, 1);
+                jne(donePreOp, T_NEAR);
+
+                for (auto const& c : loads)
+                {
+                    LN_LOG(INFO)
+                        << tabs.back() << elementwise_preop->name() << " "
+                        << c.readable() << " at (" << 0 << ")\n";
+                }
+
+                issue_C_elementwise_preop(loads, tail_mask);
+                L(donePreOp);
+            }
 
             L(doneInitLabel);
         }
@@ -789,10 +940,10 @@ private:
         Vmm    arg_C_strides;
         int    next_vector_register = 0;
         OpMask tail_k_mask          = k2;
-        OpMask full_k_mask          = k0;
+        OpMask full_k_mask          = k3;
         OpMask temp_k_mask          = k4;
 
-        if (issue_max_alpha_logic && elementwise)
+        if (issue_max_alpha_logic && elementwise_postop)
         {
             if (C_traits.access == VECTOR_PACKED ||
                 C_traits.access == VECTOR_STRIDED)
@@ -801,16 +952,33 @@ private:
                 cmp(AlphaReg_, max_alpha - 1);
                 jl(not_last_label, T_NEAR);
 
-                // TODO(zi): Better use of auxiliary array and extra classes
-                elementwise->initialize_vector(this, {Vmm(0)}, R());
+                // // TODO(zi): Better use of auxiliary array and extra classes
+                std::vector<std::pair<memory_argument, Xbyak::Zmm>>
+                    stores_and_regs;
 
                 for (auto const& c : stores)
                 {
                     C_VMMs[c].reduce(*this);
-                    LN_LOG(INFO) << tabs.back() << "RELU " << c.readable()
-                                 << " at (" << max_alpha << ")\n";
-                    elementwise->process_vector(this, C_VMMs[c][0], {}, R());
+                    stores_and_regs.push_back({c, C_VMMs[c][0]});
+
+                    LN_LOG(INFO)
+                        << tabs.back() << elementwise_postop->name() << " "
+                        << c.readable() << " at (" << max_alpha << ")\n";
                 }
+
+                if (tail_mask)
+                {
+                    mov(r12, (1 << (*tail_mask)) - 1);
+                    kmovw(tail_k_mask, r12.cvt32());
+
+                    assert(C_traits.access_len != 1);
+                }
+
+                elementwise_postop->process_batch(
+                    this, stores_and_regs, {Vmm(0), Vmm(1)},
+                    {full_k_mask, temp_k_mask}, C_traits.access, R(),
+                    tail_mask ? std::optional<OpMask>(tail_k_mask)
+                              : std::nullopt);
 
                 L(not_last_label);
             }
@@ -820,11 +988,11 @@ private:
         {
             arg_C_strides = Vmm(next_vector_register++);
             vmovups(arg_C_strides, ptr[rip + C_access_strides_label]);
-            // mov(r12, (1 << vector_size) - 1); // TODO (this is probably already
-            // kmovw(full_k_mask, r12.cvt32());  // initialized during
-                                              // loads)? Add logic to
-                                              // check that, and skip
-                                              // if not necessary
+            mov(r12, (1 << vector_size) - 1); // TODO (this is probably already
+            kmovw(full_k_mask, r12.cvt32());  // initialized during
+            // loads)? Add logic to
+            // check that, and skip
+            // if not necessary
         }
 
         assert(next_vector_register <= auxiliary_registers);
@@ -876,12 +1044,17 @@ private:
                 vpermilps(xmm1, xmm0, 177);
                 vaddps(xmm0, xmm0, xmm1);
 
-                if (issue_max_alpha_logic && elementwise)
+                if (issue_max_alpha_logic && elementwise_postop)
                 {
                     cmp(AlphaReg_, max_alpha - 1);
                     jl(not_last_label);
 
-                    elementwise->process_scalar(this, xmm0, {xmm1}, R());
+                    LN_LOG(INFO)
+                        << tabs.back() << elementwise_postop->name() << " "
+                        << c.readable() << " at (" << max_alpha << ")\n";
+
+                    elementwise_postop->process_batch(this, {{c, xmm0}}, {xmm1},
+                                                      C_traits.access, R());
                     L(not_last_label);
                 }
 
@@ -917,7 +1090,7 @@ private:
         Ymm ymm_tail_mask;
         int next_vector_register = 0;
 
-        if (issue_max_alpha_logic && elementwise)
+        if (issue_max_alpha_logic && elementwise_postop)
         {
             if (C_traits.access == VECTOR_PACKED ||
                 C_traits.access == VECTOR_STRIDED)
@@ -926,16 +1099,40 @@ private:
                 cmp(AlphaReg_, max_alpha - 1);
                 jl(not_last_label, T_NEAR);
 
-                elementwise->initialize_vector(this, {Vmm(0)}, R());
+                std::vector<std::pair<memory_argument, Xbyak::Ymm>>
+                    stores_and_regs;
 
                 for (auto const& c : stores)
                 {
                     C_VMMs[c].reduce(*this);
+                    stores_and_regs.push_back({c, C_VMMs[c][0]});
+
                     LN_LOG(INFO)
-                        << tabs.back() << "NONLINEARITY " << c.readable()
-                        << " at (" << max_alpha << ")\n";
-                    elementwise->process_vector(this, C_VMMs[c][0], {}, R());
+                        << tabs.back() << elementwise_postop->name() << " "
+                        << c.readable() << " at (" << max_alpha << ")\n";
                 }
+
+                // Ymm0 and Ymm1 are kept free by convention as auxillary
+                std::vector<Vmm> auxillary = {Vmm(0), Vmm(1)};
+                // may have others available too
+                for (int i = first_unused_vmm_register;
+                     i < isa_traits<ISA>::total_vector_registers; i++)
+                {
+                    auxillary.push_back(Vmm(i));
+                }
+
+                if (tail_mask)
+                {
+                    ymm_tail_mask = auxillary.back();
+                    vmovups(ymm_tail_mask,
+                            ptr[rip + maskLabel_ + 4 * (8 - (*tail_mask))]);
+                    auxillary.pop_back();
+                }
+
+                elementwise_postop->process_batch(
+                    this, stores_and_regs, auxillary, C_traits.access, R(),
+                    tail_mask ? std::optional<Vmm>(ymm_tail_mask)
+                              : std::nullopt);
 
                 L(not_last_label);
             }
@@ -971,12 +1168,17 @@ private:
                 vpermilps(xmm1, xmm0, 177);
                 vaddps(xmm0, xmm0, xmm1);
 
-                if (issue_max_alpha_logic && elementwise)
+                if (issue_max_alpha_logic && elementwise_postop)
                 {
                     cmp(AlphaReg_, max_alpha - 1);
                     jl(not_last_label);
 
-                    elementwise->process_scalar(this, xmm0, {xmm1}, R());
+                    LN_LOG(INFO)
+                        << tabs.back() << elementwise_postop->name() << " "
+                        << c.readable() << " at (" << max_alpha << ")\n";
+
+                    elementwise_postop->process_batch(this, {{c, xmm0}}, {xmm1},
+                                                      C_traits.access, R());
                     L(not_last_label);
                 }
 
@@ -1031,7 +1233,7 @@ private:
         Vmm arg_A_strides, arg_B_strides; // TODO (if same, use same register)
 
         OpMask tail_k_mask = k2;
-        OpMask full_k_mask = k0;
+        OpMask full_k_mask = k3;
         OpMask temp_k_mask = k4;
 
         int next_vector_register = 0;
@@ -1055,12 +1257,12 @@ private:
 
         assert(next_vector_register <= auxiliary_registers);
 
-        // if (A_traits.access == VECTOR_STRIDED ||
-        //     B_traits.access == VECTOR_STRIDED)
-        // {
-        //     mov(r12, (1 << vector_size) - 1);
-        //     kmovw(full_k_mask, r12.cvt32());
-        // }
+        if (A_traits.access == VECTOR_STRIDED ||
+            B_traits.access == VECTOR_STRIDED)
+        {
+            mov(r12, (1 << vector_size) - 1);
+            kmovw(full_k_mask, r12.cvt32());
+        }
 
         int mask_size = -1;
 
@@ -1654,6 +1856,22 @@ private:
             }
         }
 
+        // elementwise tensors
+        for (int i = 0; i < elementwise_traits.size(); i++)
+        {
+            tensor_traits elem_traits = elementwise_traits[i];
+            if (elem_traits.access != VECTOR_STRIDED)
+            {
+                continue;
+            }
+
+            L(*(elementwise_labels[i]));
+            for (int j = 0; j < vector_size; j++)
+            {
+                dd(j * elem_traits.innermost_stride * 4 /* bytes */);
+            }
+        }
+
         // Will be used as a mask for AVX2
         if (std::is_same_v<ISA, avx2>)
         {
@@ -1739,6 +1957,42 @@ private:
                       << "LSD packed\n";
 
         LN_LOG(DEBUG) << "C_access_len is: " << C_traits.access_len << "\n";
+    }
+
+    void set_elementwise_tensor_traits()
+    {
+
+        for (int i = 0; i < elementwise_strides.size(); i++)
+        {
+            std::map<std::string, int> strides = elementwise_strides[i];
+
+            std::string name          = "elementwise_arg_" + std::to_string(i);
+            bool        is_vectorized = is_C_vectorized;
+            if ((strides.count(order.back().first) == 0) ||
+                (strides.at(order.back().first) == 0))
+            {
+                // if the vectorized dimension doesn't exist
+                // (either not specified or explicitly stated as 0)
+                // for the followed elementwise tensors
+                // we do scalar loads (potentially w/ broadcast)
+                is_vectorized = false;
+            }
+            bool is_gathered =
+                is_vectorized && strides.at(order.back().first) != 1;
+            access_kind access =
+                (is_vectorized ? (is_gathered ? VECTOR_STRIDED : VECTOR_PACKED)
+                               : SCALAR);
+            int access_stride =
+                is_gathered ? strides.at(order.back().first) : 1;
+
+            tensor_traits tt{name,
+                             access,
+                             elementwiseReg_[i],
+                             elementwise_labels[i].get(),
+                             access_stride,
+                             is_vectorized ? vector_size : 1};
+            elementwise_traits.push_back(tt);
+        }
     }
 
     void set_available_vector_registers()
@@ -1837,6 +2091,17 @@ private:
         in_register_tensor_pointers.push_back({"A_Tensor", AReg_, A_strides});
         in_register_tensor_pointers.push_back({"B_Tensor", BReg_, B_strides});
         in_register_tensor_pointers.push_back({"C_Tensor", CReg_, C_strides});
+    }
+
+    void set_in_register_elementwise_tensor_pointers()
+    {
+        for (int i = 0; i < elementwise_strides.size(); i++)
+        {
+            std::map<std::string, int> strides = elementwise_strides[i];
+            tensor_traits              traits  = elementwise_traits[i];
+            in_register_tensor_pointers.push_back(
+                {traits.name, traits.reg, strides});
+        }
     }
 
     // Returns the first loop that can hold C in register file, and
@@ -2586,17 +2851,26 @@ public:
         std::map<std::string, int> const&               C_strides,
         std::map<std::string, int> const&               A_strides,
         std::map<std::string, int> const&               B_strides,
-        std::optional<int> user_fma_unroll_limit           = std::nullopt,
-        std::shared_ptr<elementwise_operation> elementwise = nullptr)
+        std::optional<int> user_fma_unroll_limit = std::nullopt,
+        std::shared_ptr<elementwise_operation<ISA>> elementwise_preop = nullptr,
+        std::vector<std::map<std::string, int>> const&
+                                                    elementwise_preop_strides = {},
+        std::shared_ptr<elementwise_operation<ISA>> elementwise_postop =
+            nullptr,
+        std::vector<std::map<std::string, int>> const&
+            elementwise_postop_strides = {})
         : order(_order)
         , sizes(sizes)
-        , elementwise(elementwise)
+        , elementwise_preop(elementwise_preop)
+        , elementwise_postop(elementwise_postop)
         , C_formula(C_formula)
         , A_formula(A_formula)
         , B_formula(B_formula)
         , C_strides(C_strides)
         , A_strides(A_strides)
         , B_strides(B_strides)
+        , elementwise_preop_strides(elementwise_preop_strides)
+        , elementwise_postop_strides(elementwise_postop_strides)
         , nest_depth(_order.size())
         , max_fmas_unrolled(user_fma_unroll_limit ? *user_fma_unroll_limit
                                                   : default_max_fmas_unrolled)
@@ -2624,11 +2898,25 @@ public:
         compute_masked_out_flops();
         compute_memory();
 
+        elementwise_strides.insert(elementwise_strides.end(),
+                                   elementwise_preop_strides.begin(),
+                                   elementwise_preop_strides.end());
+        elementwise_strides.insert(elementwise_strides.end(),
+                                   elementwise_postop_strides.begin(),
+                                   elementwise_postop_strides.end());
+
+        allocate_elementwise_addressing_registers();
+        allocate_elementwise_labels();
+
         set_tensor_traits();
+        set_elementwise_tensor_traits();
 
         set_available_vector_registers();
 
         set_in_register_tensor_pointers();
+        set_in_register_elementwise_tensor_pointers();
+
+        initialize_elementwise_ops();
 
         int first_loop_that_can_hold_C, unroll_stage,
             total_required_fma_operations;

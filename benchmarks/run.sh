@@ -5,6 +5,9 @@ export LD_LIBRARY_PATH=${HALIDE_PATH}/bin
 
 SRC_DIR="../"
 
+# make sure halide flags are set off
+unset HL_DEBUG_CODEGEN
+
 run_halide() {
     avx=$1
     echo "Running Halide:${avx}"
@@ -13,6 +16,7 @@ run_halide() {
     -I ${HALIDE_PATH}/include -I${SRC_DIR}/xbyak  \
     -L ${HALIDE_PATH}/bin -lHalide -lpthread -ldl  -std=c++17   \
     -DCT_ISA="${avx}" \
+    -O3 \
     -o "translate_to_halide_${avx}.out" \
     && "./translate_to_halide_${avx}.out" > "halide_${avx}_results.txt"
 }
@@ -29,6 +33,7 @@ run_loop_nest() {
     -Wno-sign-compare \
     -DCT_ISA="${avx}" \
     -DNDEBUG=1 \
+    -O3 \
     -o "loop_nest_${avx}.out" \
     && "./loop_nest_${avx}.out" > "loop_nest_${avx}_results.txt"
 }

@@ -11,7 +11,6 @@
 #include "Halide.h"
 
 #include "baselines.h"
-#include "elementwise_operation.h"
 #include "isa.h"
 #include "utils.h"
 
@@ -22,12 +21,17 @@ namespace sysml
 namespace aot
 {
 
+// post-ops
+class halide_elementwise_op {};
+class halide_relu_op: public halide_elementwise_op {};
+inline std::shared_ptr<halide_elementwise_op> const halide_relu = std::make_shared<halide_relu_op>();
+
 template <class ISA>
 class LoopNestToHalide
 {
 private:
     // loop_nest inputs
-    std::shared_ptr<facebook::sysml::aot::elementwise_operation> elementwise;
+    std::shared_ptr<halide_elementwise_op> elementwise;
     std::vector<std::pair<std::string, int>>                     order;
     std::map<std::string, int>                                   sizes;
 
@@ -285,6 +289,17 @@ private:
                             << size << ");\n";
             }
         }
+        std::vector<int> C_s;
+        for (auto it: C_strides) { C_s.push_back(it.second); }
+        std::sort(C_s.begin(), C_s.end());
+        for (int i = 0; i < C.dimensions(); ++i){
+          C.output_buffer().dim(i).set_min(0);
+          C.output_buffer().dim(i).set_stride(C_s[i]);
+          if (i+1 < C_s.size()) {
+            int extent = C_s[i+1] / C_s[i];
+            C.output_buffer().dim(i).set_extent(extent);
+          }
+        }
         return C;
     }
 
@@ -385,7 +400,7 @@ private:
 
         C(C_dims) += A_expr * B_expr;
 
-        if (elementwise == facebook::sysml::aot::elementwise_relu)
+        if (elementwise == facebook::sysml::aot::halide_relu)
         {
             C(C_dims) = max(0.0f, C(C_dims));
             halide_code << "C(" << C_dims_str.str() << ") = max(0.0f, C("
@@ -631,8 +646,7 @@ public:
         std::map<std::string, int> const&               A_strides,
         std::map<std::string, int> const&               B_strides,
         std::optional<int> user_fma_unroll_limit = std::nullopt,
-        std::shared_ptr<facebook::sysml::aot::elementwise_operation>
-            elementwise = nullptr)
+        std::shared_ptr<halide_elementwise_op> elementwise = nullptr)
         : order(_order)
         , sizes(sizes)
         , elementwise(elementwise)
