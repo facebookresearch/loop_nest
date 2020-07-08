@@ -9,6 +9,8 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <sstream>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -34,47 +36,51 @@ public:
     // set up information for followed tensors
     // called in loop_nest jitter constructor (after that elementwise is
     // stateless)
-    virtual void initialize(
-        std::vector<std::map<std::string, int>>, // followed tensor strides
-        std::vector<tensor_traits>,              // followed tensor traits
-        Xbyak::Label* // possible label for avx2 full mask
-        ) = 0;
+    virtual void
+    initialize(std::vector<std::map<std::string, int>> const&, // followed
+                                                               // tensor strides
+               std::vector<tensor_traits> const&, // followed tensor traits
+               Xbyak::Label* // possible label for avx2 full mask
+               ) = 0;
 
     // vectorized processing
     virtual void process_batch(
         Xbyak::CodeGenerator*,
-        std::vector<std::pair<memory_argument, Xbyak::Zmm>>, // mem and register
-        std::vector<Xbyak::Zmm>,    // auxillary vector registers
-        std::vector<Xbyak::Opmask>, // auxillary k registers
-        access_kind,                // C access kind (strided/packed)
+        std::vector<std::pair<memory_argument, Xbyak::Zmm>> const&, // mem and
+                                                                    // register
+        std::vector<Xbyak::Zmm> const&,    // auxiliary vector registers
+        std::vector<Xbyak::Opmask> const&, // auxiliary k registers
+        access_kind,                       // C access kind (strided/packed)
         avx512,
         std::optional<Xbyak::Opmask> // tail mask register
-        ) = 0;
+    ) const = 0;
 
     virtual void
     process_batch(Xbyak::CodeGenerator*,
                   std::vector<std::pair<memory_argument,
-                                        Xbyak::Ymm>>, // mem and register
-                  std::vector<Xbyak::Ymm>,            // auxillary registers
+                                        Xbyak::Ymm>> const&, // mem and register
+                  std::vector<Xbyak::Ymm> const&, // auxiliary registers
                   access_kind, // C access kind (strided/packed)
                   avx2,
                   std::optional<Xbyak::Ymm> // tail maks register
-                  ) = 0;
+    ) const = 0;
 
     // scalar processing
     virtual void process_batch(
         Xbyak::CodeGenerator*,
-        std::vector<std::pair<memory_argument, Xbyak::Xmm>>, // mem and register
-        std::vector<Xbyak::Xmm>, // auxillary registers
-        access_kind,             // C access kind
-        avx512) = 0;
+        std::vector<std::pair<memory_argument, Xbyak::Xmm>> const&, // mem and
+                                                                    // register
+        std::vector<Xbyak::Xmm> const&, // auxiliary registers
+        access_kind,                    // C access kind
+        avx512) const = 0;
 
     virtual void process_batch(
         Xbyak::CodeGenerator*,
-        std::vector<std::pair<memory_argument, Xbyak::Xmm>>, // mem and register
-        std::vector<Xbyak::Xmm>, // auxillary registers for constants
-        access_kind,             // C access kind
-        avx2) = 0;
+        std::vector<std::pair<memory_argument, Xbyak::Xmm>> const&, // mem and
+                                                                    // register
+        std::vector<Xbyak::Xmm> const&, // auxiliary registers for constants
+        access_kind,                    // C access kind
+        avx2) const = 0;
 };
 
 template <class ISA>
@@ -87,77 +93,84 @@ private:
 public:
     std::string name() { return "ReLu"; }
 
-    void initialize(std::vector<std::map<std::string, int>>  = {},
-                    std::vector<tensor_traits> tensor_traits = {},
-                    Xbyak::Label*              label = Xbyak::Label()) override
+    void initialize(std::vector<std::map<std::string, int>> const& = {},
+                    std::vector<tensor_traits> const&              = {},
+                    Xbyak::Label* = nullptr) override
     {
         // no state in relu
     }
 
-    void process_batch(
-        Xbyak::CodeGenerator*                               cg,
-        std::vector<std::pair<memory_argument, Xbyak::Zmm>> mems_and_regs,
-        std::vector<Xbyak::Zmm> auxillary, std::vector<Xbyak::Opmask> aux_kregs,
-        access_kind                  access, avx512,
-        std::optional<Xbyak::Opmask> tail_k_mask = std::nullopt) override
+    void
+    process_batch(Xbyak::CodeGenerator* cg,
+                  std::vector<std::pair<memory_argument, Xbyak::Zmm>> const&
+                                                 mems_and_regs,
+                  std::vector<Xbyak::Zmm> const& auxiliary,
+                  std::vector<Xbyak::Opmask> const&, access_kind access, avx512,
+                  std::optional<Xbyak::Opmask> = std::nullopt) const override
     {
         assert(access == VECTOR_PACKED || access == VECTOR_STRIDED);
-        assert(auxillary.size());
-        int auxillary_index = auxillary[0].getIdx();
-        assert(auxillary_index >= 0 && auxillary_index < 32);
+        assert(auxiliary.size());
+        int auxiliary_index = auxiliary[0].getIdx();
+        assert(auxiliary_index >= 0 && auxiliary_index < 32);
 
-        cg->vxorpd(auxillary[0], auxillary[0], auxillary[0]);
+        cg->vxorpd(auxiliary[0], auxiliary[0], auxiliary[0]);
 
         for (auto const& e : mems_and_regs)
         {
-            cg->vmaxps(e.second, e.second, Xbyak::Zmm(auxillary_index));
+            cg->vmaxps(e.second, e.second, Xbyak::Zmm(auxiliary_index));
         }
     }
 
     void process_batch(
-        Xbyak::CodeGenerator*                               cg,
-        std::vector<std::pair<memory_argument, Xbyak::Ymm>> mems_and_regs,
-        std::vector<Xbyak::Ymm> auxillary, access_kind access, avx2,
-        std::optional<Xbyak::Ymm> tail_mask = std::nullopt) override
+        Xbyak::CodeGenerator* cg,
+        std::vector<std::pair<memory_argument, Xbyak::Ymm>> const&
+                                       mems_and_regs,
+        std::vector<Xbyak::Ymm> const& auxiliary, access_kind access, avx2,
+        std::optional<Xbyak::Ymm> /* tail_mask */ = std::nullopt) const override
     {
         assert(access == VECTOR_PACKED || access == VECTOR_STRIDED);
-        assert(auxillary.size());
-        int auxillary_index = auxillary[0].getIdx();
-        assert(auxillary_index >= 0 && auxillary_index < 16);
+        assert(auxiliary.size());
+        int auxiliary_index = auxiliary[0].getIdx();
+        assert(auxiliary_index >= 0 && auxiliary_index < 16);
 
-        cg->vxorpd(auxillary[0], auxillary[0], auxillary[0]);
+        cg->vxorpd(auxiliary[0], auxiliary[0], auxiliary[0]);
 
         for (auto const& e : mems_and_regs)
         {
-            cg->vmaxps(e.second, e.second, Xbyak::Ymm(auxillary_index));
+            cg->vmaxps(e.second, e.second, Xbyak::Ymm(auxiliary_index));
         }
     }
 
-    void process_batch(
-        Xbyak::CodeGenerator*                               cg,
-        std::vector<std::pair<memory_argument, Xbyak::Xmm>> mems_and_regs,
-        std::vector<Xbyak::Xmm> auxillary, access_kind kind, avx512) override
+    void
+    process_batch(Xbyak::CodeGenerator* cg,
+                  std::vector<std::pair<memory_argument, Xbyak::Xmm>> const&
+                                                 mems_and_regs,
+                  std::vector<Xbyak::Xmm> const& auxiliary, access_kind kind,
+                  avx512) const override
     {
 
         assert(kind == SCALAR);
-        assert(auxillary.size() > 0);
-        assert(auxillary[0].getIdx() < 16);
+        assert(auxiliary.size() > 0);
+        assert(auxiliary[0].getIdx() < 16);
         assert(mems_and_regs.size() == 1);
-        cg->xorpd(auxillary[0], auxillary[0]);
-        cg->maxps(mems_and_regs[0].second, auxillary[0]);
+        cg->xorpd(auxiliary[0], auxiliary[0]);
+        cg->maxps(mems_and_regs[0].second, auxiliary[0]);
     }
 
-    void process_batch(
-        Xbyak::CodeGenerator*                               cg,
-        std::vector<std::pair<memory_argument, Xbyak::Xmm>> mems_and_regs,
-        std::vector<Xbyak::Xmm> auxillary, access_kind kind, avx2) override
+    void
+    process_batch(Xbyak::CodeGenerator* cg,
+                  std::vector<std::pair<memory_argument, Xbyak::Xmm>> const&
+                                                 mems_and_regs,
+                  std::vector<Xbyak::Xmm> const& auxiliary, access_kind kind,
+                  avx2) const override
     {
         assert(kind == SCALAR);
-        process_batch(cg, mems_and_regs, auxillary, kind, avx512());
+        process_batch(cg, mems_and_regs, auxiliary, kind, avx512());
     }
 };
 
-void push_ymms_to_stack(Xbyak::CodeGenerator* cg, std::vector<Xbyak::Ymm> regs)
+inline void push_ymms_to_stack(Xbyak::CodeGenerator*          cg,
+                               std::vector<Xbyak::Ymm> const& regs)
 {
     // store to the red zone
     // https://en.wikipedia.org/wiki/Red_zone_(computing)
@@ -175,7 +188,8 @@ void push_ymms_to_stack(Xbyak::CodeGenerator* cg, std::vector<Xbyak::Ymm> regs)
     }
 }
 
-void pop_ymms_from_stack(Xbyak::CodeGenerator* cg, std::vector<Xbyak::Ymm> regs)
+inline void pop_ymms_from_stack(Xbyak::CodeGenerator*          cg,
+                                std::vector<Xbyak::Ymm> const& regs)
 {
     // load from the red zone
     // https://en.wikipedia.org/wiki/Red_zone_(computing)
@@ -225,8 +239,8 @@ public:
 
     std::string name() { return op_name; }
 
-    void initialize(std::vector<std::map<std::string, int>> t_strides_,
-                    std::vector<tensor_traits>              t_traits_,
+    void initialize(std::vector<std::map<std::string, int>> const& t_strides_,
+                    std::vector<tensor_traits> const&              t_traits_,
                     Xbyak::Label* avx2_full_mask_) override
     {
         t_strides      = t_strides_;
@@ -238,14 +252,18 @@ public:
     }
 
     void process_batch(
-        Xbyak::CodeGenerator*                               cg,
-        std::vector<std::pair<memory_argument, Xbyak::Zmm>> mems_and_regs,
-        std::vector<Xbyak::Zmm> auxillary, std::vector<Xbyak::Opmask> kregs,
-        access_kind                  C_access, avx512,
-        std::optional<Xbyak::Opmask> tail_mask = std::nullopt) override
+        Xbyak::CodeGenerator* cg,
+        std::vector<std::pair<memory_argument, Xbyak::Zmm>> const&
+                                          mems_and_regs,
+        std::vector<Xbyak::Zmm> const&    auxillaries,
+        std::vector<Xbyak::Opmask> const& in_kregs, access_kind C_access,
+        avx512,
+        std::optional<Xbyak::Opmask> tail_mask = std::nullopt) const override
     {
+        auto auxiliary = auxillaries;
+        auto kregs     = in_kregs;
         assert(C_access == VECTOR_PACKED || C_access == VECTOR_STRIDED);
-        assert(auxillary.size());
+        assert(auxiliary.size());
 
         tensor_traits other_traits               = t_traits[0];
         access_kind   other_access               = other_traits.access;
@@ -253,8 +271,8 @@ public:
         Xbyak::Label* other_stride_label         = other_traits.stridesLabel;
         std::map<std::string, int> other_strides = t_strides[0];
 
-        Xbyak::Zmm other_data_reg = auxillary.back();
-        auxillary.pop_back();
+        Xbyak::Zmm other_data_reg = auxiliary.back();
+        auxiliary.pop_back();
 
         // if other vector is strided
         Xbyak::Zmm arg_other_strides;
@@ -271,9 +289,9 @@ public:
 
         if (other_access == VECTOR_STRIDED)
         {
-            assert(auxillary.size());
-            arg_other_strides = auxillary.back();
-            auxillary.pop_back();
+            assert(auxiliary.size());
+            arg_other_strides = auxiliary.back();
+            auxiliary.pop_back();
             cg->vmovups(arg_other_strides,
                         cg->ptr[cg->rip + (*other_stride_label)]);
 
@@ -332,14 +350,15 @@ public:
     }
 
     void process_batch(
-        Xbyak::CodeGenerator*                               cg,
-        std::vector<std::pair<memory_argument, Xbyak::Ymm>> mems_and_regs,
-        std::vector<Xbyak::Ymm> auxillary, access_kind C_access, avx2,
-        std::optional<Xbyak::Ymm> tail_mask = std::nullopt) override
+        Xbyak::CodeGenerator* cg,
+        std::vector<std::pair<memory_argument, Xbyak::Ymm>> const&
+                                       mems_and_regs,
+        std::vector<Xbyak::Ymm> const& auxiliary, access_kind C_access, avx2,
+        std::optional<Xbyak::Ymm> tail_mask = std::nullopt) const override
     {
 
         assert(C_access == VECTOR_PACKED || C_access == VECTOR_STRIDED);
-        assert(auxillary.size());
+        assert(auxiliary.size());
 
         tensor_traits other_traits               = t_traits[0];
         access_kind   other_access               = other_traits.access;
@@ -347,10 +366,10 @@ public:
         Xbyak::Label* other_stride_label         = other_traits.stridesLabel;
         std::map<std::string, int> other_strides = t_strides[0];
 
-        std::vector<Xbyak::Ymm> remaining_auxillary_ymm = auxillary;
+        std::vector<Xbyak::Ymm> remaining_auxiliary_ymm = auxiliary;
 
-        Xbyak::Ymm other_data_reg = remaining_auxillary_ymm.back();
-        remaining_auxillary_ymm.pop_back();
+        Xbyak::Ymm other_data_reg = remaining_auxiliary_ymm.back();
+        remaining_auxiliary_ymm.pop_back();
 
         // set by caller since need knowledge of C and iteration
         Xbyak::Ymm ymm_tail_mask;
@@ -371,7 +390,7 @@ public:
             // for use as full mask, temp mask, and strided
             int extra_needed = 3;
             // start out with any left over registers provided by the user
-            extra_needed -= remaining_auxillary_ymm.size();
+            extra_needed -= remaining_auxiliary_ymm.size();
             // if we need extra, we'll have to spill
             std::vector<Xbyak::Ymm> extra_registers;
 
@@ -383,7 +402,7 @@ public:
 
                 // registers provided by the user are already accounted for
                 // so can't use those
-                for (auto const& e : auxillary)
+                for (auto const& e : auxiliary)
                 {
                     avx2_registers[e.getIdx()] = occupied;
                 }
@@ -417,18 +436,18 @@ public:
             spilled_registers = extra_registers;
             push_ymms_to_stack(cg, spilled_registers);
 
-            remaining_auxillary_ymm.insert(remaining_auxillary_ymm.end(),
+            remaining_auxiliary_ymm.insert(remaining_auxiliary_ymm.end(),
                                            extra_registers.begin(),
                                            extra_registers.end());
 
-            ymm_full_mask = remaining_auxillary_ymm.back();
-            remaining_auxillary_ymm.pop_back();
+            ymm_full_mask = remaining_auxiliary_ymm.back();
+            remaining_auxiliary_ymm.pop_back();
 
-            ymm_temp_mask = remaining_auxillary_ymm.back();
-            remaining_auxillary_ymm.pop_back();
+            ymm_temp_mask = remaining_auxiliary_ymm.back();
+            remaining_auxiliary_ymm.pop_back();
 
-            arg_other_strides = remaining_auxillary_ymm.back();
-            remaining_auxillary_ymm.pop_back();
+            arg_other_strides = remaining_auxiliary_ymm.back();
+            remaining_auxiliary_ymm.pop_back();
 
             cg->vmovups(ymm_full_mask, cg->ptr[cg->rip + (*avx2_full_mask)]);
             cg->vmovups(arg_other_strides,
@@ -483,11 +502,12 @@ public:
         }
     }
 
-    void process_batch(
-        Xbyak::CodeGenerator*                               cg,
-        std::vector<std::pair<memory_argument, Xbyak::Xmm>> mems_and_regs,
-        std::vector<Xbyak::Xmm> auxillary, access_kind C_access,
-        avx512) override
+    void
+    process_batch(Xbyak::CodeGenerator* cg,
+                  std::vector<std::pair<memory_argument, Xbyak::Xmm>> const&
+                      mems_and_regs,
+                  std::vector<Xbyak::Xmm> const& /* auxiliary */,
+                  access_kind C_access, avx512) const override
     {
         tensor_traits              other_traits   = t_traits[0];
         access_kind                other_access   = other_traits.access;
@@ -508,10 +528,12 @@ public:
         }
     }
 
-    void process_batch(
-        Xbyak::CodeGenerator*                               cg,
-        std::vector<std::pair<memory_argument, Xbyak::Xmm>> mems_and_regs,
-        std::vector<Xbyak::Xmm> auxillary, access_kind C_access, avx2) override
+    void
+    process_batch(Xbyak::CodeGenerator* cg,
+                  std::vector<std::pair<memory_argument, Xbyak::Xmm>> const&
+                      mems_and_regs,
+                  std::vector<Xbyak::Xmm> const& /* auxiliary */,
+                  access_kind C_access, avx2) const override
     {
         tensor_traits              other_traits   = t_traits[0];
         access_kind                other_access   = other_traits.access;
@@ -558,6 +580,111 @@ inline std::shared_ptr<elementwise_operation<ISA>> const elementwise_multiply =
         [](Xbyak::CodeGenerator* cg, const Xbyak::Xmm& dest,
            const Xbyak::Operand& o1,
            const Xbyak::Operand& o2) { cg->vmulss(dest, o1, o2); });
+
+template <class ISA, class... ISAs>
+class composed_elementwise : public elementwise_operation<ISA>
+{
+private:
+    static_assert((std::is_same_v<ISA, ISAs> && ...));
+    std::vector<std::shared_ptr<elementwise_operation<ISA>>> operations;
+    std::string                                              op_name;
+
+private:
+    static constexpr int vector_size = isa_traits<ISA>::vector_size;
+    using memory_argument            = memory_argument_type<vector_size>;
+
+public:
+    composed_elementwise(
+        std::shared_ptr<elementwise_operation<ISA>> const& first,
+        std::shared_ptr<elementwise_operation<ISAs>> const&... rest)
+        : operations({first, rest...})
+    {
+        std::ostringstream oss;
+        assert(operations.size());
+        oss << operations[0]->name();
+        for (std::size_t i = 0; i < operations.size(); ++i)
+        {
+            oss << "," << operations[i]->name();
+        }
+        op_name = oss.str();
+    }
+
+    std::string name() { return op_name; }
+
+    void initialize(std::vector<std::map<std::string, int>> const& map = {},
+                    std::vector<tensor_traits> const& tensor_traits    = {},
+                    Xbyak::Label*                     label = nullptr) override
+    {
+        for (auto& op : operations)
+        {
+            op->initialize(map, tensor_traits, label);
+        }
+    }
+
+    void process_batch(
+        Xbyak::CodeGenerator* cg,
+        std::vector<std::pair<memory_argument, Xbyak::Zmm>> const&
+                                          mems_and_regs,
+        std::vector<Xbyak::Zmm> const&    auxiliary,
+        std::vector<Xbyak::Opmask> const& aux_kregs, access_kind access, avx512,
+        std::optional<Xbyak::Opmask> tail_k_mask = std::nullopt) const override
+    {
+        for (auto& op : operations)
+        {
+            op->process_batch(cg, mems_and_regs, auxiliary, aux_kregs, access,
+                              avx512(), tail_k_mask);
+        }
+    }
+
+    void process_batch(
+        Xbyak::CodeGenerator* cg,
+        std::vector<std::pair<memory_argument, Xbyak::Ymm>> const&
+                                       mems_and_regs,
+        std::vector<Xbyak::Ymm> const& auxiliary, access_kind access, avx2,
+        std::optional<Xbyak::Ymm> tail_mask = std::nullopt) const override
+    {
+        for (auto& op : operations)
+        {
+            op->process_batch(cg, mems_and_regs, auxiliary, access, avx2(),
+                              tail_mask);
+        }
+    }
+
+    void
+    process_batch(Xbyak::CodeGenerator* cg,
+                  std::vector<std::pair<memory_argument, Xbyak::Xmm>> const&
+                                                 mems_and_regs,
+                  std::vector<Xbyak::Xmm> const& auxiliary, access_kind kind,
+                  avx512) const override
+    {
+        for (auto& op : operations)
+        {
+            op->process_batch(cg, mems_and_regs, auxiliary, kind, avx512());
+        }
+    }
+
+    void
+    process_batch(Xbyak::CodeGenerator* cg,
+                  std::vector<std::pair<memory_argument, Xbyak::Xmm>> const&
+                                                 mems_and_regs,
+                  std::vector<Xbyak::Xmm> const& auxiliary, access_kind kind,
+                  avx2) const override
+    {
+        for (auto& op : operations)
+        {
+            op->process_batch(cg, mems_and_regs, auxiliary, kind, avx2());
+        }
+    }
+};
+
+template <class ISA, class... ISAs>
+inline std::shared_ptr<elementwise_operation<ISA>>
+compose(std::shared_ptr<elementwise_operation<ISA>> const& first,
+        std::shared_ptr<elementwise_operation<ISAs>> const&... rest)
+{
+    static_assert((std::is_same_v<ISA, ISAs> && ...));
+    return std::make_shared<composed_elementwise<ISA, ISAs...>>(first, rest...);
+}
 
 } // namespace aot
 } // namespace sysml

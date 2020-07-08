@@ -27,6 +27,9 @@ int main()
     using facebook::sysml::aot::avx2_plus;
     using facebook::sysml::aot::avx512;
 
+    using facebook::sysml::aot::elementwise_bias;
+    using facebook::sysml::aot::elementwise_relu;
+
     {
         std::cout << "Example 1 (packed, no tail masking)" << std::endl;
 
@@ -69,7 +72,8 @@ int main()
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
                        {{"AcBr", BcCc}, {"BcCc", 1}}, 1024, nullptr, {},
-                       facebook::sysml::aot::elementwise_bias<CT_ISA>,
+                       compose(elementwise_bias<CT_ISA>,
+                               elementwise_relu<CT_ISA>),
                        {
                            {{"BcCc", 1}},
                        })
@@ -91,6 +95,7 @@ int main()
         baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
                     B.data(), CN.data(), 0);
         baseline_matrix_bias(ArCr, BcCc, BcCc, 1, 0, 1, CN.data(), bias.data());
+        apply_relu(CN.data(), CN.data() + ArCr * BcCc);
 
         fn(CJ.data(), A.data(), B.data(), 0, bias.data());
 

@@ -808,7 +808,7 @@ private:
     }
 
     template <class R = ISA>
-    std::enable_if_t<std::is_same_v<R, avx2>>
+    std::enable_if_t<std::is_same_v<R, avx2> || std::is_same_v<R, avx2_plus>>
     issue_C_elementwise_preop(std::set<memory_argument> const& loads,
                               std::optional<int>               tail_mask)
     {
@@ -1590,7 +1590,7 @@ private:
         // TODO(zi) issue mask only when required (for avx512 as well)
         auto const ensure_initalized_mask = [&](int mask) {
             assert(tail_mask && "Tail mask was not detected");
-            assert(mask = *tail_mask);
+            assert(mask == *tail_mask);
 
             if (mask_size == -1)
             {
