@@ -43,10 +43,17 @@ struct tensor_traits
 template <int vector_size>
 struct memory_argument_type
 {
-    int                  offset;
-    tensor_traits const* traits;
-    int                  mask;
+    int                        offset;
+    tensor_traits const*       traits;
+    int                        mask;
+    std::map<std::string, int> coordinates;
 
+    memory_argument_type(int offset, tensor_traits const* traits, int mask,
+                         std::map<std::string, int> coordinates = {})
+        : offset(offset)
+        , traits(traits)
+        , mask(mask)
+        , coordinates(coordinates){};
     // We are not comparing the mask
 
     bool operator<(memory_argument_type const& o) const
@@ -76,6 +83,17 @@ struct in_register_tensor_pointer_type
     Xbyak::Reg64               reg;
     std::map<std::string, int> strides;
 };
+
+inline int get_cursor_offset(std::map<std::string, int> coordinates,
+                             std::map<std::string, int> strides)
+{
+    int off = 0;
+    for (auto const& s : strides)
+    {
+        off += coordinates[s.first] * s.second;
+    }
+    return off;
+}
 
 } // namespace aot
 } // namespace sysml

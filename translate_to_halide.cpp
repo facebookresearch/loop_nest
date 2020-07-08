@@ -301,7 +301,7 @@ int main()
             {{"ArCr", 0}, {"AcBr", 0}},
             // B's strides for each variable
             {{"AcBr", 1}, {"BcCc", AcBr}}, 512,
-            facebook::sysml::aot::elementwise_relu);
+            facebook::sysml::aot::halide_relu);
 
         float A  = 1.f;
         auto  B  = getRandomVector<float>(AcBr * BcCc);
@@ -376,7 +376,7 @@ int main()
             {{"ArCr", 1}, {"AcBr", ArCr}},
             // B's strides for each variable
             {{"AcBr", 1}, {"BcCc", AcBr}}, 512,
-            facebook::sysml::aot::elementwise_relu);
+            facebook::sysml::aot::halide_relu);
 
         auto A = getRandomVector<float>(AcBr * ArCr);
         auto B = getRandomVector<float>(AcBr * BcCc);
@@ -436,7 +436,7 @@ int main()
             // A's strides for each variable
             {{"r", k * 2}, {"k", 2}},
             // B's strides for each variable
-            {{"k", 2}}, 1024, facebook::sysml::aot::elementwise_relu);
+            {{"k", 2}}, 1024, facebook::sysml::aot::halide_relu);
 
         auto A = getRandomVector<float>(AcBr * ArCr * 2);
         auto B = getRandomVector<float>(AcBr * BcCc * 2);
@@ -520,7 +520,7 @@ int main()
             {{"ArCr", AcBr}, {"AcBr", 1}},
             // B's strides for each variable
             {{"AcBr", BcCc}, {"BcCc", 1}}, 512,
-            facebook::sysml::aot::elementwise_relu);
+            facebook::sysml::aot::halide_relu);
 
         auto A = getRandomVector<float>(AcBr * ArCr);
         auto B = getRandomVector<float>(AcBr * BcCc);
@@ -599,7 +599,7 @@ int main()
             {{"ArCr", AcBr}, {"AcBr", 1}},
             // B's strides for each variable
             {{"AcBr", BcCc}, {"BcCc", 1}}, 2,
-            facebook::sysml::aot::elementwise_relu);
+            facebook::sysml::aot::halide_relu);
 
         auto A = getRandomVector<float>(AcBr * ArCr);
         auto B = getRandomVector<float>(AcBr * BcCc);
@@ -732,7 +732,7 @@ int main()
             {{"ArCr", AcBr}, {"AcBr", 1}},
             // B's strides for each variable
             {{"AcBr", 1}, {"BcCc", AcBr}}, 1024,
-            facebook::sysml::aot::elementwise_relu);
+            facebook::sysml::aot::halide_relu);
 
         auto A = getRandomVector<float>(AcBr * ArCr);
         auto B = getRandomVector<float>(AcBr * BcCc);
@@ -963,7 +963,7 @@ int main()
              {"KZ", 1}},
             // B's strides for each variable
             {{"KX", KY * KZ}, {"KY", KZ}, {"KZ", 1}}, 1024,
-            facebook::sysml::aot::elementwise_relu);
+            facebook::sysml::aot::halide_relu);
 
         auto A = getRandomVector<float>(IX * IY * IZ);
         auto B = getRandomVector<float>(KX * KY * KZ);

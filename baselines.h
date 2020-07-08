@@ -42,6 +42,25 @@ void baseline_MM(unsigned ArCr, unsigned AcBr, unsigned BcCc, int ARS, int ACS,
     }
 }
 
+void baseline_matrix_bias(unsigned ArCr, unsigned BcCc, int CRS, int CCS,
+int bias_RS, int bias_CS, float* CData, float const* bias) {
+    for(int arcr = 0; arcr < ArCr; ++arcr) {
+        for(int bccc = 0; bccc < BcCc; ++bccc) {
+            CData[arcr * CRS + bccc * CCS] += bias[arcr * bias_RS + bccc * bias_CS];
+        }
+    }
+}
+
+void baseline_matrix_elementwise_multiply(unsigned ArCr, unsigned BcCc, int CRS, int CCS,
+int other_RS, int other_CS, float* CData, float const* other) {
+    for(int arcr = 0; arcr < ArCr; ++arcr) {
+        for(int bccc = 0; bccc < BcCc; ++bccc) {
+            CData[arcr * CRS + bccc * CCS] *= other[arcr * other_RS + bccc * other_CS];
+        }
+    }
+}
+
+
 void baseline_MM_row_col_major(unsigned ArCr, unsigned AcBr, unsigned BcCc,
                                int LDA, int LDB, int LDC, float const* AData,
                                float const* BData, float* CData)
