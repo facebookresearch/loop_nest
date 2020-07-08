@@ -554,16 +554,16 @@ private:
     {
         Vmm    arg_C_strides;
         int    next_vector_register = 0;
-        OpMask tail_k_mask          = k2; // Just use k0
-        OpMask full_k_mask          = k0;
+        OpMask tail_k_mask          = k2;
+        OpMask full_k_mask          = k3;
         OpMask temp_k_mask          = k4;
 
         if (C_traits.access == VECTOR_STRIDED)
         {
             arg_C_strides = Vmm(next_vector_register++);
             vmovups(arg_C_strides, ptr[rip + C_access_strides_label]);
-            // mov(r12, (1 << vector_size) - 1);
-            // kmovw(full_k_mask, r12.cvt32());
+            mov(r12, (1 << vector_size) - 1);
+            kmovw(full_k_mask, r12.cvt32());
         }
 
         if (tail_mask)
@@ -583,6 +583,7 @@ private:
             switch (C_traits.access)
             {
             case SCALAR:
+                // TODO (zi) Check if this can be done by xoring XMMs.
                 vxorpd(C_VMMs[c][0], C_VMMs[c][0], C_VMMs[c][0]);
                 vmovss(Xmm(C_VMMs[c][0].getIdx()), ptr[CReg_ + c.offset * 4]);
                 break;
@@ -732,7 +733,7 @@ private:
         Vmm    arg_C_strides;
         int    next_vector_register = 0;
         OpMask tail_k_mask          = k2;
-        OpMask full_k_mask          = k0;
+        OpMask full_k_mask          = k3;
         OpMask temp_k_mask          = k4;
 
         if (issue_max_alpha_logic && elementwise)
@@ -763,8 +764,8 @@ private:
         {
             arg_C_strides = Vmm(next_vector_register++);
             vmovups(arg_C_strides, ptr[rip + C_access_strides_label]);
-            // mov(r12, (1 << vector_size) - 1); // TODO (this is probably
-            // already kmovw(full_k_mask, r12.cvt32());  // initialized during
+            mov(r12, (1 << vector_size) - 1); // TODO (this is probably already
+            kmovw(full_k_mask, r12.cvt32());  // initialized during
             // loads)? Add logic to
             // check that, and skip
             // if not necessary
@@ -974,7 +975,7 @@ private:
         Vmm arg_A_strides, arg_B_strides; // TODO (if same, use same register)
 
         OpMask tail_k_mask = k2;
-        OpMask full_k_mask = k0;
+        OpMask full_k_mask = k3;
         OpMask temp_k_mask = k4;
 
         int next_vector_register = 0;
@@ -998,12 +999,12 @@ private:
 
         assert(next_vector_register <= auxiliary_registers);
 
-        // if (A_traits.access == VECTOR_STRIDED ||
-        //     B_traits.access == VECTOR_STRIDED)
-        // {
-        //     mov(r12, (1 << vector_size) - 1);
-        //     kmovw(full_k_mask, r12.cvt32());
-        // }
+        if (A_traits.access == VECTOR_STRIDED ||
+            B_traits.access == VECTOR_STRIDED)
+        {
+            mov(r12, (1 << vector_size) - 1);
+            kmovw(full_k_mask, r12.cvt32());
+        }
 
         int mask_size = -1;
 

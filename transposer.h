@@ -61,17 +61,17 @@ private:
     // vector registers, while avx512 uses Opmask registers, and the
     // corresponding vector registers are not used.  Register renaming
     // will do it's magic on the die.
-    mask_register_type full_mask_reg     = mask_register_type(0);
-    mask_register_type tail_mask_reg     = mask_register_type(1);
-    mask_register_type in_temp_mask_reg  = mask_register_type(2);
-    mask_register_type out_temp_mask_reg = mask_register_type(3);
+    mask_register_type full_mask_reg     = mask_register_type(1);
+    mask_register_type tail_mask_reg     = mask_register_type(2);
+    mask_register_type in_temp_mask_reg  = mask_register_type(3);
+    mask_register_type out_temp_mask_reg = mask_register_type(4);
 
     // Possible regs that store the gather/scatter strides
-    Vmm in_access_strides_reg  = Vmm(4);
-    Vmm out_access_strides_reg = Vmm(5);
+    Vmm in_access_strides_reg  = Vmm(5);
+    Vmm out_access_strides_reg = Vmm(6);
 
     // In/out data through the vector reg
-    Vmm in_out_vmm_reg = Vmm(6);
+    Vmm in_out_vmm_reg = Vmm(0);
 
     int max_unrolled_moves;
 
@@ -203,7 +203,11 @@ private:
                      &in_access_strides_label,
                      in_access_stride,
                      vector_size};
-        out_traits = {"B", out_access_kind, out_reg, &out_access_strides_label,
+        out_traits = {"out",
+                      out_access_kind,
+                      out_reg,
+                      &out_access_strides_label,
+                      out_access_stride,
                       vector_size};
     }
 
@@ -213,8 +217,8 @@ private:
         vmovups(ptr[rsp - 32], ymm);
         for (int i = 0; i < mask; ++i)
         {
-            mov(r12.cvt32(), dword[rsp - 32 + i * 4]);
-            mov(dword[base + i * stride], r12.cvt32());
+            mov(rcx.cvt32(), dword[rsp - 32 + i * 4]);
+            mov(dword[base + i * stride], rcx.cvt32());
         }
     }
 
@@ -494,15 +498,28 @@ private:
                 {
                     vmovups(in_out_vmm_reg, ptr[in_reg + op.src.offset * 4]);
                 }
+
+                LN_LOG(INFO) << tabs.back() << "MOVE in[" << op.src.offset
+                             << " | " << op.src.mask << "] TO REG\n";
                 break;
+
             case VECTOR_STRIDED:
                 mask_reg = (op.src.mask == vector_size) ? full_mask_reg
                                                         : tail_mask_reg;
+
+                // mov(rcx, 0xffff);
+                // kmovw(in_temp_mask_reg, rcx.cvt32());
+
                 kmovw(in_temp_mask_reg, mask_reg);
                 vgatherdps(
                     in_out_vmm_reg | in_temp_mask_reg,
                     ptr[in_reg + op.src.offset * 4 + in_access_strides_reg]);
+
+                LN_LOG(INFO) << tabs.back() << "GATHER in[" << op.src.offset
+                             << ", " << in_strides.at(vectorized_var) << " | "
+                             << op.src.mask << "] TO REG\n";
                 break;
+
             default:
                 assert(false);
             }
@@ -513,16 +530,105 @@ private:
             switch (op.dest.traits->access)
             {
             case VECTOR_PACKED:
-                vmovups(ptr[out_reg + op.dest.offset * 4] | tail_mask_reg,
+                vmovups(ptr[out_reg + op.dest.offset * 4] | mask_reg,
                         in_out_vmm_reg);
+
+                LN_LOG(INFO)
+                    << tabs.back() << "MOVE REG TO out[" << op.dest.offset
+                    << " | " << op.dest.mask << "]\n";
                 break;
+
             case VECTOR_STRIDED:
                 kmovw(out_temp_mask_reg, mask_reg);
                 vscatterdps(
                     ptr[out_reg + op.dest.offset * 4 + out_access_strides_reg] |
                         out_temp_mask_reg,
                     in_out_vmm_reg);
+
+                LN_LOG(INFO)
+                    << tabs.back() << "SCATTER REG TO out[" << op.dest.offset
+                    << ", " << out_strides.at(vectorized_var) << " | "
+                    << op.dest.mask << "]\n";
                 break;
+
+            default:
+                assert(false);
+            }
+        }
+    }
+
+    template <class R = ISA>
+    std::enable_if_t<std::is_same_v<R, avx2>>
+    issue_unrolled_moves(std::vector<move_operation> const& moves)
+    {
+        Ymm mask_reg;
+
+        for (auto const& op : moves)
+        {
+            switch (op.src.traits->access)
+            {
+            case VECTOR_PACKED:
+                if (op.src.mask != vector_size)
+                {
+                    vmaskmovps(in_out_vmm_reg, tail_mask_reg,
+                               ptr[in_reg + op.src.offset * 4]);
+                }
+                else
+                {
+                    vmovups(in_out_vmm_reg, ptr[in_reg + op.src.offset * 4]);
+                }
+                LN_LOG(INFO) << tabs.back() << "MOVE in[" << op.src.offset
+                             << " | " << op.src.mask << "] TO REG\n";
+                break;
+
+            case VECTOR_STRIDED:
+                mask_reg = (op.src.mask == vector_size) ? full_mask_reg
+                                                        : tail_mask_reg;
+
+                vmovaps(in_temp_mask_reg, mask_reg);
+                vgatherdps(
+                    in_out_vmm_reg,
+                    ptr[in_reg + op.src.offset * 4 + in_access_strides_reg],
+                    in_temp_mask_reg);
+
+                LN_LOG(INFO) << tabs.back() << "GATHER in[" << op.src.offset
+                             << ", " << in_strides.at(vectorized_var) << " | "
+                             << op.src.mask << "] TO REG\n";
+
+                break;
+
+            default:
+                assert(false);
+            }
+
+            switch (op.dest.traits->access)
+            {
+            case VECTOR_PACKED:
+                if (op.dest.mask == vector_size)
+                {
+                    vmovups(ptr[out_reg + op.dest.offset * 4], in_out_vmm_reg);
+                }
+                else
+                {
+                    vmaskmovps(ptr[out_reg + op.dest.offset * 4], tail_mask_reg,
+                               in_out_vmm_reg);
+                }
+                LN_LOG(INFO)
+                    << tabs.back() << "MOVE REG TO out[" << op.dest.offset
+                    << " | " << op.dest.mask << "]\n";
+                break;
+
+            case VECTOR_STRIDED:
+                scatter_avx2_register(in_out_vmm_reg, op.dest.mask,
+                                      out_reg + op.dest.offset * 4,
+                                      out_strides.at(vectorized_var) * 4);
+
+                LN_LOG(INFO)
+                    << tabs.back() << "SCATTER REG TO out[" << op.dest.offset
+                    << ", " << out_strides.at(vectorized_var) << " | "
+                    << op.dest.mask << "]\n";
+                break;
+
             default:
                 assert(false);
             }
@@ -661,10 +767,13 @@ private:
         }
         else
         {
+            mov(rcx, (1 << vector_size) - 1);
+            kmovw(full_mask_reg, rcx.cvt32());
+
             if (tail_mask)
             {
-                mov(r12, (1 << tail_mask) - 1);
-                kmovw(tail_mask_reg, r12.cvt32());
+                mov(rcx, (1 << tail_mask) - 1);
+                kmovw(tail_mask_reg, rcx.cvt32());
             }
         }
 
