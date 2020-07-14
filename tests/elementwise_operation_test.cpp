@@ -71,7 +71,8 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 1024, nullptr, {},
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
+                       1024, nullptr, {},
                        compose(elementwise_bias<CT_ISA>,
                                elementwise_relu<CT_ISA>),
                        {
@@ -145,7 +146,8 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 1024, nullptr, {},
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
+                       1024, nullptr, {},
                        facebook::sysml::aot::elementwise_bias<CT_ISA>,
                        {
                            {{"BcCc", 1}},
@@ -217,7 +219,8 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 1024, nullptr, {},
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
+                       1024, nullptr, {},
                        facebook::sysml::aot::elementwise_bias<CT_ISA>,
                        {
                            {{"BcCc", 3}},
@@ -287,7 +290,8 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 20, nullptr, {},
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
+                       20, nullptr, {},
                        facebook::sysml::aot::elementwise_bias<CT_ISA>,
                        {
                            {{"BcCc", 1}},
@@ -357,7 +361,8 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 20, nullptr, {},
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
+                       20, nullptr, {},
                        facebook::sysml::aot::elementwise_bias<CT_ISA>,
                        {
                            {{"ArCr", 0}, {"BcCc", 1}},
@@ -430,8 +435,8 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 1024,
-                       facebook::sysml::aot::elementwise_bias<CT_ISA>,
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
+                       1024, facebook::sysml::aot::elementwise_bias<CT_ISA>,
                        {
                            {{"BcCc", 1}},
                        })
@@ -502,8 +507,8 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 1024,
-                       facebook::sysml::aot::elementwise_bias<CT_ISA>,
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
+                       1024, facebook::sysml::aot::elementwise_bias<CT_ISA>,
                        {
                            {{"BcCc", 1}},
                        })
@@ -575,8 +580,8 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 1024,
-                       facebook::sysml::aot::elementwise_bias<CT_ISA>,
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
+                       1024, facebook::sysml::aot::elementwise_bias<CT_ISA>,
                        {
                            {{"BcCc", 3}},
                        })
@@ -645,8 +650,8 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 20,
-                       facebook::sysml::aot::elementwise_bias<CT_ISA>,
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
+                       20, facebook::sysml::aot::elementwise_bias<CT_ISA>,
                        {
                            {{"BcCc", 1}},
                        })
@@ -715,8 +720,8 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 20,
-                       facebook::sysml::aot::elementwise_bias<CT_ISA>,
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
+                       20, facebook::sysml::aot::elementwise_bias<CT_ISA>,
                        {
                            {{"ArCr", 0}, {"BcCc", 1}},
                        })
@@ -788,8 +793,8 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 1024,
-                       facebook::sysml::aot::elementwise_multiply<CT_ISA>,
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
+                       1024, facebook::sysml::aot::elementwise_multiply<CT_ISA>,
                        {
                            {{"ArCr", 0}, {"BcCc", 0}},
                        })
@@ -861,8 +866,8 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 1024,
-                       facebook::sysml::aot::elementwise_multiply<CT_ISA>,
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
+                       1024, facebook::sysml::aot::elementwise_multiply<CT_ISA>,
                        {
                            {{"ArCr", 0}, {"BcCc", 0}},
                        },
@@ -937,8 +942,8 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 1024,
-                       facebook::sysml::aot::elementwise_multiply<CT_ISA>,
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
+                       1024, facebook::sysml::aot::elementwise_multiply<CT_ISA>,
                        {{{"ArCr", 0}, {"BcCc", 0}}},
                        facebook::sysml::aot::elementwise_bias<CT_ISA>,
                        {
@@ -1012,8 +1017,8 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 20,
-                       facebook::sysml::aot::elementwise_multiply<CT_ISA>,
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
+                       20, facebook::sysml::aot::elementwise_multiply<CT_ISA>,
                        {{{"ArCr", 0}, {"BcCc", 0}}},
                        facebook::sysml::aot::elementwise_bias<CT_ISA>,
                        {

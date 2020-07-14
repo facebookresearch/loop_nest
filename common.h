@@ -5,8 +5,10 @@
 #include "xbyak/xbyak_util.h"
 
 #include <cassert>
+#include <cstring>
 #include <map>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 namespace facebook
@@ -43,13 +45,13 @@ struct tensor_traits
 template <int vector_size>
 struct memory_argument_type
 {
-    int                  offset;
-    tensor_traits const* traits;
-    int                  mask;
+    int                        offset;
+    tensor_traits const*       traits;
+    int                        mask;
     std::map<std::string, int> coordinates;
 
     memory_argument_type(int offset, tensor_traits const* traits, int mask,
-                    std::map<std::string, int> coordinates = {})
+                         std::map<std::string, int> coordinates = {})
         : offset(offset)
         , traits(traits)
         , mask(mask)
@@ -84,8 +86,8 @@ struct in_register_tensor_pointer_type
     std::map<std::string, int> strides;
 };
 
-
-int get_cursor_offset(std::map<std::string, int>  coordinates, std::map<std::string, int>  strides)
+int get_cursor_offset(std::map<std::string, int> coordinates,
+                      std::map<std::string, int> strides)
 {
     int off = 0;
     for (auto const& s : strides)
@@ -93,6 +95,25 @@ int get_cursor_offset(std::map<std::string, int>  coordinates, std::map<std::str
         off += coordinates[s.first] * s.second;
     }
     return off;
+}
+
+// Sourced from https://en.cppreference.com/w/cpp/numeric/bit_cast
+// to enable bit_cast from C++20
+template <class To, class From>
+typename std::enable_if_t<sizeof(To) == sizeof(From) &&
+                              std::is_trivially_copyable_v<From> &&
+                              std::is_trivially_copyable_v<To>,
+                          To>
+// constexpr support needs compiler magic
+bit_cast(const From& src) noexcept
+{
+    static_assert(std::is_trivially_constructible_v<To>,
+                  "This implementation additionally requires destination type "
+                  "to be trivially constructible");
+
+    To dst;
+    std::memcpy(&dst, &src, sizeof(To));
+    return dst;
 }
 
 } // namespace aot

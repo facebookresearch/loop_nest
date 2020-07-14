@@ -45,7 +45,7 @@ public:
 
     // vectorized processing
     virtual void process_batch(
-        Xbyak::CodeGenerator*,
+        Xbyak::CodeGenerator&,
         std::vector<std::pair<memory_argument, Xbyak::Zmm>> const&, // mem and
                                                                     // register
         std::vector<Xbyak::Zmm> const&,    // auxiliary vector registers
@@ -56,7 +56,7 @@ public:
     ) const = 0;
 
     virtual void
-    process_batch(Xbyak::CodeGenerator*,
+    process_batch(Xbyak::CodeGenerator&,
                   std::vector<std::pair<memory_argument,
                                         Xbyak::Ymm>> const&, // mem and register
                   std::vector<Xbyak::Ymm> const&, // auxiliary registers
@@ -67,7 +67,7 @@ public:
 
     // scalar processing
     virtual void process_batch(
-        Xbyak::CodeGenerator*,
+        Xbyak::CodeGenerator&,
         std::vector<std::pair<memory_argument, Xbyak::Xmm>> const&, // mem and
                                                                     // register
         std::vector<Xbyak::Xmm> const&, // auxiliary registers
@@ -75,7 +75,7 @@ public:
         avx512) const = 0;
 
     virtual void process_batch(
-        Xbyak::CodeGenerator*,
+        Xbyak::CodeGenerator&,
         std::vector<std::pair<memory_argument, Xbyak::Xmm>> const&, // mem and
                                                                     // register
         std::vector<Xbyak::Xmm> const&, // auxiliary registers for constants
@@ -101,7 +101,7 @@ public:
     }
 
     void
-    process_batch(Xbyak::CodeGenerator* cg,
+    process_batch(Xbyak::CodeGenerator& cg,
                   std::vector<std::pair<memory_argument, Xbyak::Zmm>> const&
                                                  mems_and_regs,
                   std::vector<Xbyak::Zmm> const& auxiliary,
@@ -113,16 +113,16 @@ public:
         int auxiliary_index = auxiliary[0].getIdx();
         assert(auxiliary_index >= 0 && auxiliary_index < 32);
 
-        cg->vxorpd(auxiliary[0], auxiliary[0], auxiliary[0]);
+        cg.vxorpd(auxiliary[0], auxiliary[0], auxiliary[0]);
 
         for (auto const& e : mems_and_regs)
         {
-            cg->vmaxps(e.second, e.second, Xbyak::Zmm(auxiliary_index));
+            cg.vmaxps(e.second, e.second, Xbyak::Zmm(auxiliary_index));
         }
     }
 
     void process_batch(
-        Xbyak::CodeGenerator* cg,
+        Xbyak::CodeGenerator& cg,
         std::vector<std::pair<memory_argument, Xbyak::Ymm>> const&
                                        mems_and_regs,
         std::vector<Xbyak::Ymm> const& auxiliary, access_kind access, avx2,
@@ -133,16 +133,16 @@ public:
         int auxiliary_index = auxiliary[0].getIdx();
         assert(auxiliary_index >= 0 && auxiliary_index < 16);
 
-        cg->vxorpd(auxiliary[0], auxiliary[0], auxiliary[0]);
+        cg.vxorpd(auxiliary[0], auxiliary[0], auxiliary[0]);
 
         for (auto const& e : mems_and_regs)
         {
-            cg->vmaxps(e.second, e.second, Xbyak::Ymm(auxiliary_index));
+            cg.vmaxps(e.second, e.second, Xbyak::Ymm(auxiliary_index));
         }
     }
 
     void
-    process_batch(Xbyak::CodeGenerator* cg,
+    process_batch(Xbyak::CodeGenerator& cg,
                   std::vector<std::pair<memory_argument, Xbyak::Xmm>> const&
                                                  mems_and_regs,
                   std::vector<Xbyak::Xmm> const& auxiliary, access_kind kind,
@@ -153,12 +153,12 @@ public:
         assert(auxiliary.size() > 0);
         assert(auxiliary[0].getIdx() < 16);
         assert(mems_and_regs.size() == 1);
-        cg->xorpd(auxiliary[0], auxiliary[0]);
-        cg->maxps(mems_and_regs[0].second, auxiliary[0]);
+        cg.xorpd(auxiliary[0], auxiliary[0]);
+        cg.maxps(mems_and_regs[0].second, auxiliary[0]);
     }
 
     void
-    process_batch(Xbyak::CodeGenerator* cg,
+    process_batch(Xbyak::CodeGenerator& cg,
                   std::vector<std::pair<memory_argument, Xbyak::Xmm>> const&
                                                  mems_and_regs,
                   std::vector<Xbyak::Xmm> const& auxiliary, access_kind kind,
@@ -169,7 +169,7 @@ public:
     }
 };
 
-inline void push_ymms_to_stack(Xbyak::CodeGenerator*          cg,
+inline void push_ymms_to_stack(Xbyak::CodeGenerator&          cg,
                                std::vector<Xbyak::Ymm> const& regs)
 {
     // store to the red zone
@@ -179,16 +179,16 @@ inline void push_ymms_to_stack(Xbyak::CodeGenerator*          cg,
     assert(bytes_needed <= 128);
 
     // adjust rsp to provide red zone below it
-    cg->sub(cg->rsp, bytes_needed);
+    cg.sub(cg.rsp, bytes_needed);
 
     for (int i = 0; i < n; i++)
     {
         int offset = (n - i - 1) * 32;
-        cg->vmovups(cg->ptr[cg->rsp + offset], regs[i]);
+        cg.vmovups(cg.ptr[cg.rsp + offset], regs[i]);
     }
 }
 
-inline void pop_ymms_from_stack(Xbyak::CodeGenerator*          cg,
+inline void pop_ymms_from_stack(Xbyak::CodeGenerator&          cg,
                                 std::vector<Xbyak::Ymm> const& regs)
 {
     // load from the red zone
@@ -199,16 +199,16 @@ inline void pop_ymms_from_stack(Xbyak::CodeGenerator*          cg,
     for (int i = 0; i < n; i++)
     {
         int offset = (n - i - 1) * 32;
-        cg->vmovups(regs[i], cg->ptr[cg->rsp + offset]);
+        cg.vmovups(regs[i], cg.ptr[cg.rsp + offset]);
     }
 
-    cg->add(cg->rsp, bytes_needed);
+    cg.add(cg.rsp, bytes_needed);
 }
 
 // operation with a single followed tensor (e.g. adding another tensor,
 // multiplying by other tensor)
 using single_tensor_op =
-    std::function<void(Xbyak::CodeGenerator*, const Xbyak::Xmm&,
+    std::function<void(Xbyak::CodeGenerator&, const Xbyak::Xmm&,
                        const Xbyak::Operand&, const Xbyak::Operand&)>;
 
 template <class ISA>
@@ -252,7 +252,7 @@ public:
     }
 
     void process_batch(
-        Xbyak::CodeGenerator* cg,
+        Xbyak::CodeGenerator& cg,
         std::vector<std::pair<memory_argument, Xbyak::Zmm>> const&
                                           mems_and_regs,
         std::vector<Xbyak::Zmm> const&    auxillaries,
@@ -292,8 +292,8 @@ public:
             assert(auxiliary.size());
             arg_other_strides = auxiliary.back();
             auxiliary.pop_back();
-            cg->vmovups(arg_other_strides,
-                        cg->ptr[cg->rip + (*other_stride_label)]);
+            cg.vmovups(arg_other_strides,
+                       cg.ptr[cg.rip + (*other_stride_label)]);
 
             assert(kregs.size() >= 2);
 
@@ -303,8 +303,8 @@ public:
             full_k_mask = kregs.back();
             kregs.pop_back();
 
-            cg->mov(cg->r12, (1 << vector_size) - 1);
-            cg->kmovw(full_k_mask, cg->r12.cvt32());
+            cg.mov(cg.r12, (1 << vector_size) - 1);
+            cg.kmovw(full_k_mask, cg.r12.cvt32());
         }
 
         for (auto const& e : mems_and_regs)
@@ -320,28 +320,28 @@ public:
             case VECTOR_PACKED:
                 if (c_arg.mask == vector_size)
                 {
-                    cg->vmovups(other_data_reg,
-                                cg->ptr[other_addr_reg + other_offset * 4]);
+                    cg.vmovups(other_data_reg,
+                               cg.ptr[other_addr_reg + other_offset * 4]);
                 }
                 else
                 {
-                    cg->vmovups(other_data_reg | tail_k_mask,
-                                cg->ptr[other_addr_reg + other_offset * 4]);
+                    cg.vmovups(other_data_reg | tail_k_mask,
+                               cg.ptr[other_addr_reg + other_offset * 4]);
                 }
                 break;
 
             case VECTOR_STRIDED:
-                cg->kmovw(
+                cg.kmovw(
                     temp_k_mask, // The mask gets updated in gather
                     (c_arg.mask == vector_size ? full_k_mask : tail_k_mask));
-                cg->vgatherdps(other_data_reg | temp_k_mask,
-                               cg->ptr[other_addr_reg + other_offset * 4 +
-                                       arg_other_strides]);
+                cg.vgatherdps(other_data_reg | temp_k_mask,
+                              cg.ptr[other_addr_reg + other_offset * 4 +
+                                     arg_other_strides]);
                 break;
 
             case SCALAR:
-                cg->vbroadcastss(other_data_reg,
-                                 cg->ptr[other_addr_reg + other_offset * 4]);
+                cg.vbroadcastss(other_data_reg,
+                                cg.ptr[other_addr_reg + other_offset * 4]);
                 break;
             }
 
@@ -350,7 +350,7 @@ public:
     }
 
     void process_batch(
-        Xbyak::CodeGenerator* cg,
+        Xbyak::CodeGenerator& cg,
         std::vector<std::pair<memory_argument, Xbyak::Ymm>> const&
                                        mems_and_regs,
         std::vector<Xbyak::Ymm> const& auxiliary, access_kind C_access, avx2,
@@ -449,9 +449,9 @@ public:
             arg_other_strides = remaining_auxiliary_ymm.back();
             remaining_auxiliary_ymm.pop_back();
 
-            cg->vmovups(ymm_full_mask, cg->ptr[cg->rip + (*avx2_full_mask)]);
-            cg->vmovups(arg_other_strides,
-                        cg->ptr[cg->rip + (*other_stride_label)]);
+            cg.vmovups(ymm_full_mask, cg.ptr[cg.rip + (*avx2_full_mask)]);
+            cg.vmovups(arg_other_strides,
+                       cg.ptr[cg.rip + (*other_stride_label)]);
         }
 
         for (auto const& e : mems_and_regs)
@@ -467,29 +467,29 @@ public:
             case VECTOR_PACKED:
                 if (c_arg.mask == vector_size)
                 {
-                    cg->vmovups(other_data_reg,
-                                cg->ptr[other_addr_reg + other_offset * 4]);
+                    cg.vmovups(other_data_reg,
+                               cg.ptr[other_addr_reg + other_offset * 4]);
                 }
                 else
                 {
-                    cg->vmaskmovps(other_data_reg, ymm_tail_mask,
-                                   cg->ptr[other_addr_reg + other_offset * 4]);
+                    cg.vmaskmovps(other_data_reg, ymm_tail_mask,
+                                  cg.ptr[other_addr_reg + other_offset * 4]);
                 }
                 break;
 
             case VECTOR_STRIDED:
-                cg->vmovups(ymm_temp_mask,
-                            (c_arg.mask == vector_size ? ymm_full_mask
-                                                       : ymm_tail_mask));
-                cg->vgatherdps(other_data_reg,
-                               cg->ptr[other_addr_reg + other_offset * 4 +
-                                       arg_other_strides],
-                               ymm_temp_mask);
+                cg.vmovups(ymm_temp_mask,
+                           (c_arg.mask == vector_size ? ymm_full_mask
+                                                      : ymm_tail_mask));
+                cg.vgatherdps(other_data_reg,
+                              cg.ptr[other_addr_reg + other_offset * 4 +
+                                     arg_other_strides],
+                              ymm_temp_mask);
                 break;
 
             case SCALAR:
-                cg->vbroadcastss(other_data_reg,
-                                 cg->ptr[other_addr_reg + other_offset * 4]);
+                cg.vbroadcastss(other_data_reg,
+                                cg.ptr[other_addr_reg + other_offset * 4]);
                 break;
             }
 
@@ -503,7 +503,7 @@ public:
     }
 
     void
-    process_batch(Xbyak::CodeGenerator* cg,
+    process_batch(Xbyak::CodeGenerator& cg,
                   std::vector<std::pair<memory_argument, Xbyak::Xmm>> const&
                       mems_and_regs,
                   std::vector<Xbyak::Xmm> const& /* auxiliary */,
@@ -524,12 +524,12 @@ public:
                 get_cursor_offset(c_arg.coordinates, other_strides);
 
             scalar_op(cg, c_data_reg, c_data_reg,
-                      cg->ptr[other_addr_reg + other_offset * 4]);
+                      cg.ptr[other_addr_reg + other_offset * 4]);
         }
     }
 
     void
-    process_batch(Xbyak::CodeGenerator* cg,
+    process_batch(Xbyak::CodeGenerator& cg,
                   std::vector<std::pair<memory_argument, Xbyak::Xmm>> const&
                       mems_and_regs,
                   std::vector<Xbyak::Xmm> const& /* auxiliary */,
@@ -550,7 +550,7 @@ public:
                 get_cursor_offset(c_arg.coordinates, other_strides);
 
             scalar_op(cg, c_data_reg, c_data_reg,
-                      cg->ptr[other_addr_reg + other_offset * 4]);
+                      cg.ptr[other_addr_reg + other_offset * 4]);
         }
     }
 };
@@ -563,23 +563,23 @@ template <class ISA>
 inline std::shared_ptr<elementwise_operation<ISA>> const elementwise_bias =
     std::make_shared<single_tensor_elementwise_operation<ISA>>(
         "Add Bias",
-        [](Xbyak::CodeGenerator* cg, const Xbyak::Xmm& dest,
+        [](Xbyak::CodeGenerator& cg, const Xbyak::Xmm& dest,
            const Xbyak::Operand& o1,
-           const Xbyak::Operand& o2) { cg->vaddps(dest, o1, o2); },
-        [](Xbyak::CodeGenerator* cg, const Xbyak::Xmm& dest,
+           const Xbyak::Operand& o2) { cg.vaddps(dest, o1, o2); },
+        [](Xbyak::CodeGenerator& cg, const Xbyak::Xmm& dest,
            const Xbyak::Operand& o1,
-           const Xbyak::Operand& o2) { cg->vaddss(dest, o1, o2); });
+           const Xbyak::Operand& o2) { cg.vaddss(dest, o1, o2); });
 
 template <class ISA>
 inline std::shared_ptr<elementwise_operation<ISA>> const elementwise_multiply =
     std::make_shared<single_tensor_elementwise_operation<ISA>>(
         "Multiply by Other",
-        [](Xbyak::CodeGenerator* cg, const Xbyak::Xmm& dest,
+        [](Xbyak::CodeGenerator& cg, const Xbyak::Xmm& dest,
            const Xbyak::Operand& o1,
-           const Xbyak::Operand& o2) { cg->vmulps(dest, o1, o2); },
-        [](Xbyak::CodeGenerator* cg, const Xbyak::Xmm& dest,
+           const Xbyak::Operand& o2) { cg.vmulps(dest, o1, o2); },
+        [](Xbyak::CodeGenerator& cg, const Xbyak::Xmm& dest,
            const Xbyak::Operand& o1,
-           const Xbyak::Operand& o2) { cg->vmulss(dest, o1, o2); });
+           const Xbyak::Operand& o2) { cg.vmulss(dest, o1, o2); });
 
 template <class ISA, class... ISAs>
 class composed_elementwise : public elementwise_operation<ISA>
@@ -622,7 +622,7 @@ public:
     }
 
     void process_batch(
-        Xbyak::CodeGenerator* cg,
+        Xbyak::CodeGenerator& cg,
         std::vector<std::pair<memory_argument, Xbyak::Zmm>> const&
                                           mems_and_regs,
         std::vector<Xbyak::Zmm> const&    auxiliary,
@@ -637,7 +637,7 @@ public:
     }
 
     void process_batch(
-        Xbyak::CodeGenerator* cg,
+        Xbyak::CodeGenerator& cg,
         std::vector<std::pair<memory_argument, Xbyak::Ymm>> const&
                                        mems_and_regs,
         std::vector<Xbyak::Ymm> const& auxiliary, access_kind access, avx2,
@@ -651,7 +651,7 @@ public:
     }
 
     void
-    process_batch(Xbyak::CodeGenerator* cg,
+    process_batch(Xbyak::CodeGenerator& cg,
                   std::vector<std::pair<memory_argument, Xbyak::Xmm>> const&
                                                  mems_and_regs,
                   std::vector<Xbyak::Xmm> const& auxiliary, access_kind kind,
@@ -664,7 +664,7 @@ public:
     }
 
     void
-    process_batch(Xbyak::CodeGenerator* cg,
+    process_batch(Xbyak::CodeGenerator& cg,
                   std::vector<std::pair<memory_argument, Xbyak::Xmm>> const&
                                                  mems_and_regs,
                   std::vector<Xbyak::Xmm> const& auxiliary, access_kind kind,

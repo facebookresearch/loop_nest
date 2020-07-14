@@ -12,8 +12,10 @@
 #pragma once
 
 #include "address_packer.h"
+#include "arithmetic_operation.h"
 #include "code_generator.h"
 #include "common.h"
+#include "configuration.h"
 #include "elementwise_operation.h"
 #include "isa.h"
 #include "log.h"
@@ -138,6 +140,9 @@ private:
     std::vector<std::pair<std::string, int>> order;
     std::map<std::string, int> const&        sizes;
 
+    //  allows for arbitrary innermost operations
+    std::shared_ptr<operation_pair_base> op_pair;
+
     std::shared_ptr<elementwise_operation<ISA>> elementwise_preop;
     std::shared_ptr<elementwise_operation<ISA>> elementwise_postop;
 
@@ -182,6 +187,9 @@ private:
     tensor_traits              A_traits;
     tensor_traits              B_traits;
     std::vector<tensor_traits> elementwise_traits;
+
+    // stores flags for turning on/off certain loop_nest optimizations
+    OptimizationConfiguration optim_config;
 
     // The name of the variable in the innermost loop (along which the
     // vectorization is performed)
@@ -658,7 +666,7 @@ private:
             switch (C_traits.access)
             {
             case SCALAR:
-                vxorpd(C_VMMs[c][0], C_VMMs[c][0], C_VMMs[c][0]);
+                op_pair->set_to_identity(*this, C_VMMs[c][0]);
                 vmovss(Xmm(C_VMMs[c][0].getIdx()), ptr[CReg_ + c.offset * 4]);
                 break;
 
@@ -678,10 +686,10 @@ private:
                 break;
             }
 
-            // Set auxiliary horizontal vector regs to zero
+            // Set auxiliary horizontal vector regs to identity value
             for (int s = 1; s < C_VMMs[c].size(); ++s)
             {
-                vxorpd(C_VMMs[c][s], C_VMMs[c][s], C_VMMs[c][s]);
+                op_pair->set_to_identity(*this, C_VMMs[c][s]);
             }
         }
     }
@@ -723,7 +731,7 @@ private:
             switch (C_traits.access)
             {
             case SCALAR:
-                vxorpd(C_VMMs[c][0], C_VMMs[c][0], C_VMMs[c][0]);
+                op_pair->set_to_identity(*this, C_VMMs[c][0]);
                 vmovss(Xmm(C_VMMs[c][0].getIdx()), ptr[CReg_ + c.offset * 4]);
                 break;
 
@@ -744,16 +752,16 @@ private:
                 break;
             }
 
-            // Set auxiliary horizontal vector regs to zero
+            // Set auxiliary horizontal vector regs to identity value
             for (int s = 1; s < C_VMMs[c].size(); ++s)
             {
-                vxorpd(C_VMMs[c][s], C_VMMs[c][s], C_VMMs[c][s]);
+                op_pair->set_to_identity(*this, C_VMMs[c][s]);
             }
         }
     }
 
     template <class R = ISA>
-    std::enable_if_t<std::is_same_v<R, avx512>>
+    std::enable_if_t<std::is_same_v<R, avx512> || std::is_same_v<R, avx2_plus>>
     issue_C_elementwise_preop(std::set<memory_argument> const& loads,
                               std::optional<int>               tail_mask)
     {
@@ -784,7 +792,7 @@ private:
             }
 
             elementwise_preop->process_batch(
-                this, loads_and_regs, auxillary, {full_k_mask, temp_k_mask},
+                *this, loads_and_regs, auxillary, {full_k_mask, temp_k_mask},
                 C_traits.access, R(),
                 tail_mask ? std::optional<OpMask>(tail_k_mask) : std::nullopt);
         }
@@ -800,15 +808,15 @@ private:
                 loads_and_regs.push_back({c, Xmm(C_VMMs[c][0].getIdx())});
             }
 
-            elementwise_preop->process_batch(this, loads_and_regs, {xmm0, xmm1},
-                                             C_traits.access, R());
+            elementwise_preop->process_batch(
+                *this, loads_and_regs, {xmm0, xmm1}, C_traits.access, R());
         }
         break;
         }
     }
 
     template <class R = ISA>
-    std::enable_if_t<std::is_same_v<R, avx2> || std::is_same_v<R, avx2_plus>>
+    std::enable_if_t<std::is_same_v<R, avx2>>
     issue_C_elementwise_preop(std::set<memory_argument> const& loads,
                               std::optional<int>               tail_mask)
     {
@@ -844,7 +852,7 @@ private:
             }
 
             elementwise_preop->process_batch(
-                this, loads_and_regs, auxillary, C_traits.access, R(),
+                *this, loads_and_regs, auxillary, C_traits.access, R(),
                 tail_mask ? std::optional<Ymm>(ymm_tail_mask) : std::nullopt);
         }
         break;
@@ -859,8 +867,8 @@ private:
                 loads_and_regs.push_back({c, Xmm(C_VMMs[c][0].getIdx())});
             }
 
-            elementwise_preop->process_batch(this, loads_and_regs, {xmm0, xmm1},
-                                             C_traits.access, R());
+            elementwise_preop->process_batch(
+                *this, loads_and_regs, {xmm0, xmm1}, C_traits.access, R());
         }
         break;
         }
@@ -889,13 +897,15 @@ private:
             cmp(AlphaReg_, 0);
             jg(loadDataLabel, T_NEAR);
 
-            // Same code among all ISAs for initializing registers to zero
+            // Same code among all ISAs for initializing registers to
+            // zero/identity
             for (auto const& c : loads)
             {
-                LN_LOG(INFO) << tabs.back() << "ZERO " << c.readable() << "\n";
+                LN_LOG(INFO)
+                    << tabs.back() << "ZERO(identity) " << c.readable() << "\n";
                 for (int s = 0; s < C_VMMs[c].size(); ++s)
                 {
-                    vxorpd(C_VMMs[c][s], C_VMMs[c][s], C_VMMs[c][s]);
+                    op_pair->set_to_identity(*this, C_VMMs[c][s]);
                 }
             }
 
@@ -958,7 +968,7 @@ private:
 
                 for (auto const& c : stores)
                 {
-                    C_VMMs[c].reduce(*this);
+                    C_VMMs[c].reduce(*this, op_pair);
                     stores_and_regs.push_back({c, C_VMMs[c][0]});
 
                     LN_LOG(INFO)
@@ -975,7 +985,7 @@ private:
                 }
 
                 elementwise_postop->process_batch(
-                    this, stores_and_regs, {Vmm(0), Vmm(1)},
+                    *this, stores_and_regs, {Vmm(0), Vmm(1)},
                     {full_k_mask, temp_k_mask}, C_traits.access, R(),
                     tail_mask ? std::optional<OpMask>(tail_k_mask)
                               : std::nullopt);
@@ -1009,7 +1019,7 @@ private:
         {
             LN_LOG(INFO) << tabs.back() << "STORE " << c.readable() << "\n";
 
-            C_VMMs[c].reduce(*this);
+            C_VMMs[c].reduce(*this, op_pair);
             Label not_last_label;
 
             switch (C_traits.access)
@@ -1021,28 +1031,30 @@ private:
                     vextractf64x4(ymm1, C_VMMs[c][0], 1);
                     if (C_VMMs[c][0].getIdx() < 16)
                     {
-                        vaddps(ymm1, ymm1, Ymm(C_VMMs[c][0].getIdx()));
+                        op_pair->plus(*this, ymm1, ymm1,
+                                      Ymm(C_VMMs[c][0].getIdx()));
                     }
                     else
                     {
-                        vaddps(zmm1, zmm1, C_VMMs[c][0]);
+                        op_pair->plus(*this, zmm1, zmm1, C_VMMs[c][0]);
                     }
 
                     vextractf128(xmm0, ymm1, 1);
-                    vaddps(xmm0, xmm0, xmm1);
+                    op_pair->plus(*this, xmm0, xmm0, xmm1);
                 }
                 else // avx2_plus
                 {
                     vextractf128(xmm0, C_VMMs[c][0], 1);
-                    vaddps(xmm0, xmm0, C_VMMs[c][0]);
+                    op_pair->plus(*this, xmm0, xmm0, C_VMMs[c][0]);
                 }
 
                 // xmm1 = xmm0[1,0]
                 vpermilpd(xmm1, xmm0, 1);
-                vaddps(xmm0, xmm0, xmm1);
+                op_pair->plus(*this, xmm0, xmm0, xmm1);
+
                 // xmm1 = xmm0[1,0,3,2]
                 vpermilps(xmm1, xmm0, 177);
-                vaddps(xmm0, xmm0, xmm1);
+                op_pair->plus(*this, xmm0, xmm0, xmm1);
 
                 if (issue_max_alpha_logic && elementwise_postop)
                 {
@@ -1053,8 +1065,8 @@ private:
                         << tabs.back() << elementwise_postop->name() << " "
                         << c.readable() << " at (" << max_alpha << ")\n";
 
-                    elementwise_postop->process_batch(this, {{c, xmm0}}, {xmm1},
-                                                      C_traits.access, R());
+                    elementwise_postop->process_batch(
+                        *this, {{c, xmm0}}, {xmm1}, C_traits.access, R());
                     L(not_last_label);
                 }
 
@@ -1104,7 +1116,7 @@ private:
 
                 for (auto const& c : stores)
                 {
-                    C_VMMs[c].reduce(*this);
+                    C_VMMs[c].reduce(*this, op_pair);
                     stores_and_regs.push_back({c, C_VMMs[c][0]});
 
                     LN_LOG(INFO)
@@ -1130,7 +1142,7 @@ private:
                 }
 
                 elementwise_postop->process_batch(
-                    this, stores_and_regs, auxillary, C_traits.access, R(),
+                    *this, stores_and_regs, auxillary, C_traits.access, R(),
                     tail_mask ? std::optional<Vmm>(ymm_tail_mask)
                               : std::nullopt);
 
@@ -1151,7 +1163,7 @@ private:
         {
             LN_LOG(INFO) << tabs.back() << "STORE " << c.readable() << "\n";
 
-            C_VMMs[c].reduce(*this);
+            C_VMMs[c].reduce(*this, op_pair);
 
             Label not_last_label;
 
@@ -1159,14 +1171,15 @@ private:
             {
             case SCALAR:
                 vextractf128(xmm0, C_VMMs[c][0], 1);
-                vaddps(xmm0, xmm0, C_VMMs[c][0]);
+                op_pair->plus(*this, xmm0, xmm0, C_VMMs[c][0]);
 
                 // xmm1 = xmm0[1,0]
                 vpermilpd(xmm1, xmm0, 1);
-                vaddps(xmm0, xmm0, xmm1);
+                op_pair->plus(*this, xmm0, xmm0, xmm1);
+
                 // xmm1 = xmm0[1,0,3,2]
                 vpermilps(xmm1, xmm0, 177);
-                vaddps(xmm0, xmm0, xmm1);
+                op_pair->plus(*this, xmm0, xmm0, xmm1);
 
                 if (issue_max_alpha_logic && elementwise_postop)
                 {
@@ -1177,8 +1190,8 @@ private:
                         << tabs.back() << elementwise_postop->name() << " "
                         << c.readable() << " at (" << max_alpha << ")\n";
 
-                    elementwise_postop->process_batch(this, {{c, xmm0}}, {xmm1},
-                                                      C_traits.access, R());
+                    elementwise_postop->process_batch(
+                        *this, {{c, xmm0}}, {xmm1}, C_traits.access, R());
                     L(not_last_label);
                 }
 
@@ -1236,7 +1249,8 @@ private:
         OpMask full_k_mask = k3;
         OpMask temp_k_mask = k4;
 
-        int next_vector_register = 0;
+        // keep Vmm0 available if not fused, to chain ops
+        int next_vector_register = op_pair->can_fuse() ? 0 : 1;
 
         arg1_register = Vmm(next_vector_register++);
         arg2_register = Vmm(next_vector_register++);
@@ -1309,7 +1323,9 @@ private:
             arg1_registers.resize(5);
         }
 
-        int cycle   = arg1_registers.size();
+        int cycle = optim_config.delay_innermost_operations()
+                        ? arg1_registers.size()
+                        : 1;
         int current = 0;
 
         std::vector<std::function<void()>> issue_delayed_ops(cycle, []() {});
@@ -1371,10 +1387,10 @@ private:
                     kmovw(temp_k_mask, tail_k_mask);
                     if (C_traits.access == SCALAR)
                     {
-                        // Need to zero out the register
+                        // Need to zero/identity out the register
                         // as gather doesn't leaves
                         // previous values
-                        vxorpd(arg1_reg, arg1_reg, arg1_reg);
+                        op_pair->set_to_identity(*this, arg1_reg);
                     }
                 }
 
@@ -1443,17 +1459,45 @@ private:
                     switch (src2.traits->access)
                     {
                     case SCALAR:
-                        vfmadd231ps(
-                            C_VMMs[op.dest]++, arg1_reg,
-                            ptr_b[addressers.at(src2.traits->reg.getIdx())
-                                      ->get_address(src2.offset * 4)]);
+                        if (op_pair->can_fuse())
+                        {
+                            op_pair->fuse(
+                                *this, C_VMMs[op.dest]++, arg1_reg,
+                                ptr_b[addressers.at(src2.traits->reg.getIdx())
+                                          ->get_address(src2.offset * 4)]);
+                        }
+                        else
+                        {
+                            Vmm auxiliary = Vmm(0);
+                            Vmm dest      = C_VMMs[op.dest]++;
+
+                            op_pair->multiplies(
+                                *this, auxiliary, arg1_reg,
+                                ptr_b[addressers.at(src2.traits->reg.getIdx())
+                                          ->get_address(src2.offset * 4)]);
+                            op_pair->plus(*this, dest, dest, auxiliary);
+                        }
                         break;
 
                     case VECTOR_PACKED:
-                        vfmadd231ps(
-                            C_VMMs[op.dest]++, arg1_reg,
-                            ptr[addressers.at(src2.traits->reg.getIdx())
-                                    ->get_address(src2.offset * 4)]);
+                        if (op_pair->can_fuse())
+                        {
+                            op_pair->fuse(
+                                *this, C_VMMs[op.dest]++, arg1_reg,
+                                ptr[addressers.at(src2.traits->reg.getIdx())
+                                        ->get_address(src2.offset * 4)]);
+                        }
+                        else
+                        {
+                            Vmm auxiliary = Vmm(0);
+                            Vmm dest      = C_VMMs[op.dest]++;
+
+                            op_pair->multiplies(
+                                *this, auxiliary, arg1_reg,
+                                ptr[addressers.at(src2.traits->reg.getIdx())
+                                        ->get_address(src2.offset * 4)]);
+                            op_pair->plus(*this, dest, dest, auxiliary);
+                        }
                         break;
 
                     case VECTOR_STRIDED:
@@ -1471,7 +1515,20 @@ private:
                                            ->get_address_without_index(
                                                src2.offset * 4) +
                                        tensor_strides[src2.traits->name]]);
-                        vfmadd231ps(C_VMMs[op.dest]++, arg1_reg, arg2_register);
+                        if (op_pair->can_fuse())
+                        {
+                            op_pair->fuse(*this, C_VMMs[op.dest]++, arg1_reg,
+                                          arg2_register);
+                        }
+                        else
+                        {
+                            Vmm auxiliary = Vmm(0);
+                            Vmm dest      = C_VMMs[op.dest]++;
+
+                            op_pair->multiplies(*this, auxiliary, arg1_reg,
+                                                arg2_register);
+                            op_pair->plus(*this, dest, dest, auxiliary);
+                        }
                         break;
                     }
                 }
@@ -1564,6 +1621,12 @@ private:
             requires_temp_ymm = true;
         }
 
+        // Need auxiliary ymm if not fused
+        if (!op_pair->can_fuse())
+        {
+            requires_temp_ymm = true;
+        }
+
         if (requires_temp_ymm)
         {
             ymm_temp_register = Vmm(next_vector_register++);
@@ -1614,7 +1677,9 @@ private:
             arg1_registers.resize(5);
         }
 
-        int cycle   = arg1_registers.size();
+        int cycle = optim_config.delay_innermost_operations()
+                        ? arg1_registers.size()
+                        : 1;
         int current = 0;
 
         std::vector<std::function<void()>> issue_delayed_ops(cycle, []() {});
@@ -1642,7 +1707,7 @@ private:
                                          ->get_address(addr.offset * 4)]);
 
                     // reusing arg2_register as temporary
-                    vxorpd(arg2_register, arg2_register, arg2_register);
+                    op_pair->set_to_identity(*this, arg2_register);
                     vblendvps(arg1_reg, arg1_reg, arg2_register, ymm_tail_mask);
                 }
                 else
@@ -1683,7 +1748,7 @@ private:
                     vmovups(ymm_temp_register, ymm_tail_mask);
                     if (C_traits.access == SCALAR)
                     {
-                        vxorpd(arg1_reg, arg1_reg, arg1_reg);
+                        op_pair->set_to_identity(*this, arg1_reg);
                     }
                 }
 
@@ -1759,14 +1824,41 @@ private:
                             ptr[addressers.at(src2.traits->reg.getIdx())
                                     ->get_address(src2.offset * 4)]);
 
-                        vfmadd231ps(C_VMMs[op.dest]++, arg1_reg, arg2_register);
+                        if (op_pair->can_fuse())
+                        {
+                            op_pair->fuse(*this, C_VMMs[op.dest]++, arg1_reg,
+                                          arg2_register);
+                        }
+                        else
+                        {
+                            Vmm auxiliary = ymm_temp_register;
+                            Vmm dest      = C_VMMs[op.dest]++;
+
+                            op_pair->multiplies(*this, auxiliary, arg1_reg,
+                                                arg2_register);
+                            op_pair->plus(*this, dest, dest, auxiliary);
+                        }
                         break;
 
                     case VECTOR_PACKED:
-                        vfmadd231ps(
-                            C_VMMs[op.dest]++, arg1_reg,
-                            ptr[addressers.at(src2.traits->reg.getIdx())
-                                    ->get_address(src2.offset * 4)]);
+                        if (op_pair->can_fuse())
+                        {
+                            op_pair->fuse(
+                                *this, C_VMMs[op.dest]++, arg1_reg,
+                                ptr[addressers.at(src2.traits->reg.getIdx())
+                                        ->get_address(src2.offset * 4)]);
+                        }
+                        else
+                        {
+                            Vmm auxiliary = ymm_temp_register;
+                            Vmm dest      = C_VMMs[op.dest]++;
+
+                            op_pair->multiplies(
+                                *this, auxiliary, arg1_reg,
+                                ptr[addressers.at(src2.traits->reg.getIdx())
+                                        ->get_address(src2.offset * 4)]);
+                            op_pair->plus(*this, dest, dest, auxiliary);
+                        }
                         break;
 
                     case VECTOR_STRIDED:
@@ -1785,8 +1877,20 @@ private:
                                                src2.offset * 4) +
                                        tensor_strides[src2.traits->name]],
                                    ymm_temp_register);
+                        if (op_pair->can_fuse())
+                        {
+                            op_pair->fuse(*this, C_VMMs[op.dest]++, arg1_reg,
+                                          arg2_register);
+                        }
+                        else
+                        {
+                            Vmm auxiliary = ymm_temp_register;
+                            Vmm dest      = C_VMMs[op.dest]++;
 
-                        vfmadd231ps(C_VMMs[op.dest]++, arg1_reg, arg2_register);
+                            op_pair->multiplies(*this, auxiliary, arg1_reg,
+                                                arg2_register);
+                            op_pair->plus(*this, dest, dest, auxiliary);
+                        }
                         break;
                     }
                 }
@@ -1885,6 +1989,12 @@ private:
                 dd(0);
             }
         }
+    }
+
+    void issue_arithmetic_epilogue()
+    {
+        align_to(4);
+        op_pair->issue_epilogue(*this);
     }
 
     void set_tensor_traits()
@@ -1997,7 +2107,6 @@ private:
 
     void set_available_vector_registers()
     {
-
         auxiliary_registers = 2;
 
         bool requires_temp_ymm = false;
@@ -2009,6 +2118,7 @@ private:
         // instruction, or when the compute requires a horizontal - to
         // make sure we don't accumulate to masked out lanes of the
         // vector register.
+
         if ((B_traits.access == VECTOR_STRIDED ||
              A_traits.access == VECTOR_STRIDED || C_traits.access == SCALAR) &&
             (sizes.at(vectorized_var) % vector_size) &&
@@ -2040,8 +2150,22 @@ private:
             }
         }
 
+        if (std::is_same_v<ISA, avx2> && !op_pair->can_fuse())
+        {
+            // keep around temporary register when not fused
+            requires_temp_ymm = true;
+        }
+
         if (requires_temp_ymm)
         {
+            ++auxiliary_registers;
+        }
+
+        if ((std::is_same_v<ISA, avx512> ||
+             std::is_same_v<ISA, avx2_plus>)&&!op_pair->can_fuse())
+        {
+            // we don't have a temporary ymm, so we
+            // explicitly increase auxiliary registers
             ++auxiliary_registers;
         }
 
@@ -2323,7 +2447,8 @@ private:
             int per_register = 1;
 
             if (collected_load_store.size() < available_registers &&
-                inner_fma_operations > 100)
+                inner_fma_operations > 100 &&
+                optim_config.split_vector_registers())
             {
                 per_register =
                     available_registers / collected_load_store.size();
@@ -2337,6 +2462,7 @@ private:
                 C_VMMs[c] = multi_zmm(per_register, next);
                 next += per_register;
             }
+
             assert(next <= isa_traits<ISA>::total_vector_registers);
 
             return next;
@@ -2405,9 +2531,28 @@ private:
         return {first_loop_that_can_hold_C, inner_fma_operations};
     }
 
+    std::map<int, std::shared_ptr<address_packer>> create_null_addressers()
+    {
+        assert(!optim_config.use_address_packer());
+
+        std::map<int, std::shared_ptr<address_packer>> addressers;
+
+        addressers[AReg_.getIdx()] =
+            std::make_shared<null_address_packer>(this, AReg_);
+        addressers[BReg_.getIdx()] =
+            std::make_shared<null_address_packer>(this, BReg_);
+
+        return addressers;
+    }
+
     std::map<int, std::shared_ptr<address_packer>>
     create_addressers(std::vector<fma_operation> unrolled_fmas)
     {
+        if (!optim_config.use_address_packer())
+        {
+            return create_null_addressers();
+        }
+
         struct address_load
         {
             int   offset;
@@ -2851,6 +2996,7 @@ public:
         std::map<std::string, int> const&               C_strides,
         std::map<std::string, int> const&               A_strides,
         std::map<std::string, int> const&               B_strides,
+        std::shared_ptr<operation_pair_base>            op_pair,
         std::optional<int> user_fma_unroll_limit = std::nullopt,
         std::shared_ptr<elementwise_operation<ISA>> elementwise_preop = nullptr,
         std::vector<std::map<std::string, int>> const&
@@ -2858,9 +3004,11 @@ public:
         std::shared_ptr<elementwise_operation<ISA>> elementwise_postop =
             nullptr,
         std::vector<std::map<std::string, int>> const&
-            elementwise_postop_strides = {})
+                                                 elementwise_postop_strides = {},
+        std::optional<OptimizationConfiguration> optim_config = std::nullopt)
         : order(_order)
         , sizes(sizes)
+        , op_pair(op_pair)
         , elementwise_preop(elementwise_preop)
         , elementwise_postop(elementwise_postop)
         , C_formula(C_formula)
@@ -2877,6 +3025,8 @@ public:
         , is_C_vectorized(C_strides.count(order.back().first) == 1)
         , is_A_vectorized(A_strides.count(order.back().first) == 1)
         , is_B_vectorized(B_strides.count(order.back().first) == 1)
+        , optim_config(optim_config ? *optim_config
+                                    : OptimizationConfiguration())
     {
         LN_LOG(DEBUG) << "C is " << (is_C_vectorized ? "" : "NOT ")
                       << "vectorized\n"
@@ -2968,6 +3118,7 @@ public:
         ret();
 
         issue_embedded_constants();
+        issue_arithmetic_epilogue();
     }
 };
 
