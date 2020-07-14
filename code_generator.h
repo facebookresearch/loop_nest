@@ -93,19 +93,20 @@ private:
     {
         assert(!xbyak_allocator_adapter::is_inplace());
         ready();
-        std::size_t size = getSize();
+        std::size_t size = getSize() * sizeof(xbyak_buffer_type);
         auto        ptr  = xbyak_allocator_adapter::release(
             const_cast<xbyak_buffer_type*>(getCode()));
         return T(ptr, size, get_deleter());
     }
 
 public:
+    using Label = Xbyak::Label;
+    using Reg64 = Xbyak::Reg64;
+
 #if !defined(LOOP_NEST_ARM)
     using Xmm    = Xbyak::Xmm;
     using Ymm    = Xbyak::Ymm;
     using Zmm    = Xbyak::Zmm;
-    using Reg64  = Xbyak::Reg64;
-    using Label  = Xbyak::Label;
     using OpMask = Xbyak::Opmask;
 
     auto argument_address(std::size_t N) const
@@ -121,6 +122,15 @@ public:
             nop(alignment - static_cast<unsigned>(getSize() % alignment));
         }
     }
+
+#else
+
+    using VReg = Xbyak::VReg;
+    using SReg = Xbyak::SReg;
+    using DReg = Xbyak::DReg;
+    using WReg = Xbyak::WReg;
+    using XReg = Xbyak::XReg;
+
 #endif
 
     explicit basic_code_generator(
@@ -148,7 +158,7 @@ public:
     {
         assert(xbyak_allocator_adapter::is_inplace());
         ready();
-        std::size_t size = getSize();
+        std::size_t size = getSize() * sizeof(xbyak_buffer_type);
         auto        ptr  = const_cast<xbyak_buffer_type*>(getCode());
         return aot_fn_ref<Signature>(ptr, size);
     }

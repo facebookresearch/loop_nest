@@ -1,8 +1,6 @@
 #pragma once
 
-#define XBYAK_NO_OP_NAMES
-#include "xbyak/xbyak.h"
-#include "xbyak/xbyak_util.h"
+#include "xbyak.h"
 
 #include <cassert>
 #include <map>
@@ -34,7 +32,7 @@ struct tensor_traits
 {
     std::string   name;
     access_kind   access;
-    Xbyak::Reg64  reg;
+    Xbyak::Reg64  reg = Xbyak::Reg64(0);
     Xbyak::Label* stridesLabel;
     int           innermost_stride;
     int           access_len;
