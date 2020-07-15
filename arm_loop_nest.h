@@ -583,7 +583,7 @@ private:
             add_imm(base, offset);
         }
 
-        if (mask != 4)
+        if (mask == 4)
         {
             ld1r(vreg.s4, ptr(base));
         }
@@ -766,28 +766,16 @@ private:
     void issue_C_loads(std::set<memory_argument> const& loads,
                        bool                             issue_first_alpha_logic)
     {
-        // TODO (relax)
-        std::optional<int> tail_mask;
-
-        for (auto const& c : loads)
-        {
-            if (c.mask != vector_size)
-            {
-                assert(!tail_mask || *tail_mask == c.mask);
-                tail_mask = c.mask;
-            }
-        }
-
+        // if (false && issue_first_alpha_logic)
         if (false && issue_first_alpha_logic)
-        // if (issue_first_alpha_logic)
         {
             auto loadDataLabel = make_label();
             auto doneInitLabel = make_label();
 
             cmp(AlphaReg_, 0);
-            bne(*loadDataLabel);
+            b(Xbyak::EQ, *loadDataLabel);
+            L(*loadDataLabel);
 
-            // Same code among all ISAs for initializing registers to zero
             for (auto const& c : loads)
             {
                 LN_LOG(INFO) << tabs.back() << "ZERO " << c.readable() << "\n";
@@ -797,11 +785,9 @@ private:
                 }
             }
 
-            b(*doneInitLabel);
+            // b(*doneInitLabel);
 
-            L(*loadDataLabel);
-
-            issue_C_loads(loads);
+            // issue_C_loads(loads);
 
             // if (elementwise_preop != nullptr)
             // {
@@ -857,6 +843,8 @@ private:
                                C_traits.innermost_stride * 4);
                 break;
             }
+
+            sub_imm(CReg_, c.offset * 4);
         }
     }
 

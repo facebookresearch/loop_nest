@@ -81,7 +81,17 @@ public:
         // //eors(x0, x0, x0);
         // cmp(x0, 0);
 
-        ld1(v1.s4, ptr(x0));
+        ld1(v1.s4, ptr(x1));
+
+        ld1(v2.s4, ptr(x0));
+        ld1(v3.s[0], ptr(x0));
+        ld1(v3.s[1], ptr(x0));
+        ld1(v3.s[2], ptr(x0));
+        ld1(v3.s[3], ptr(x0));
+        //ld1(v3.s[0], ptr(x1));
+
+        fmla(v1.s4, v3.s4, v2.s4);
+
         st1(v1.s4, ptr(x1));
 
         ret();

@@ -23,24 +23,25 @@
 int main()
 {
     using facebook::sysml::aot::aarch64;
-    using facebook::sysml::aot::avx2;
     using facebook::sysml::aot::aot_fn_cast;
+    using facebook::sysml::aot::avx2;
 
     // WOW this is actually pretty efficient!
     // Playing with weird schedules
     // Matrix-Matrix product
     // C(r, c) = A(r, k) * B(k, c)
     // if (0)
+    for (int ArCr = 123; ArCr <= 123; ++ArCr)
     {
-        std::cout << "Benchmark: 1" << std::endl;
+        std::cout << "Benchmark: 1" << ArCr << std::endl;
 
         // int ArCr = 16;
         // int AcBr = 16;
         // int BcCc = 16;
 
-        int ArCr = 1;
-        int AcBr = 1;
-        int BcCc = 4;
+        // int ArCr = 1;
+        int AcBr = 112;
+        int BcCc = 123;
 
         auto gen_loop_nest = [&]() {
             return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
@@ -49,9 +50,7 @@ int main()
                        // has to divide the stride.  This is effectively the
                        // same as Halide's split into outer and inner
                        // variable, but can have arbitray number of splits.
-                       {{"AcBr", 1},
-                        {"ArCr", 1},
-                        {"BcCc", 1}},
+                       {{"AcBr", 1}, {"ArCr", 1}, {"BcCc", 1}},
                        // The second argument is a map of the dimension sizes
                        {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
                        // Vars of C (other variables are reduction variables)
@@ -72,12 +71,12 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 1024)
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, 128)
                 .get_unique();
         };
 
-        auto compile_secs = measureFastestWithWarmup(gen_loop_nest, 0, 1);
-        std::cout << "Compile: " << compile_secs << std::endl;
+        // auto compile_secs = measureFastestWithWarmup(gen_loop_nest, 0, 1);
+        // std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fnx = gen_loop_nest();
         auto fny = aot_fn_cast<void(int)>(std::move(fnx));
@@ -90,15 +89,26 @@ int main()
         auto A = getRandomVector<float>(AcBr * ArCr);
         auto B = getRandomVector<float>(AcBr * BcCc);
 
-        auto CN = getRandomVector<float>(ArCr * BcCc);
-        auto CJ = CN;
+        auto CN   = getRandomVector<float>(ArCr * BcCc);
+        auto CJ   = CN;
+        auto orig = CN;
 
-        baseline_MM(ArCr, AcBr, BcCc, 1, ArCr, 1, AcBr, 1, ArCr, A.data(),
-                    B.data(), CN.data(), 0);
+        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
+                    B.data(), CN.data(), 1);
 
         // apply_relu(CN.data(), CN.data() + CN.size());
 
         fn(CJ.data(), A.data(), B.data(), 0);
+
+        // for (int arcr = 0; arcr < ArCr; ++arcr)
+        //     for (int bccc = 0; bccc < BcCc; ++bccc)
+        //     {
+        //         std::cout << A[arcr] << " * " << B[bccc] << " + "
+        //                   << orig[bccc + arcr * BcCc] << " = "
+        //                   << (A[arcr] * B[bccc] + orig[bccc + arcr * BcCc])
+        //                   << " ? " << CN[bccc + arcr * BcCc] << " ? "
+        //                   << CJ[bccc + arcr * BcCc] << "\n";
+        //     }
 
         std::cout << "MAXABSDIFF: "
                   << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
@@ -116,8 +126,7 @@ int main()
             1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
     }
 
-    return 0;
-
+    // return 0;
 
     // WOW this is actually pretty efficient!
     // Playing with weird schedules
@@ -190,8 +199,8 @@ int main()
         auto CN = getRandomVector<float>(ArCr * BcCc);
         auto CJ = CN;
 
-        baseline_MM(ArCr, AcBr, BcCc, 1, ArCr, 1, AcBr, 1, ArCr, A.data(),
-                    B.data(), CN.data(), 0);
+        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
+                    B.data(), CN.data(), 1);
 
         // apply_relu(CN.data(), CN.data() + CN.size());
 

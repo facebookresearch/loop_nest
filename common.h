@@ -71,7 +71,8 @@ struct memory_argument_type
         assert(traits);
         return traits->name + "[" + std::to_string(offset) + ":" +
                std::to_string(traits->access == SCALAR ? 1 : vector_size) +
-               "]{" + std::to_string(traits->innermost_stride) + "}";
+               "]{" + std::to_string(traits->innermost_stride) + "}{" +
+               std::to_string(mask) + "}";
     }
 };
 
