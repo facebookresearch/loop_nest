@@ -37,7 +37,6 @@ We compare:
 
 TODO:
 * Halide needs to use Buffer not ImageParam (which is slower)
-* Halide should be built with LLVM assertions turned off
 * remaining operators
 * oneDNN
 * Halide should use autotuning

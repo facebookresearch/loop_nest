@@ -31,7 +31,9 @@ We compare:
 * TCCG (https://github.com/HPAC/tccg)
 
 TODO:
-* Currently polly is the original polly (associated with the appropriate
-checkout of LLVM) but *not* the polly from the paper. It fails to successfully build, so need to debug that.
+* Using the latest polly, rather than the one from the paper.
+It looks like the latest polly has these changes merged (based on their performance graph),
+but currently performance is bad for everything except standard matrix multiplication
+(despite the paper showing different operators)
 * loop_nest should use our own search for schedules rather than hard-coded schedule
 

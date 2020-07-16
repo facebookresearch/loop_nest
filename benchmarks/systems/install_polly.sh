@@ -23,6 +23,7 @@ git checkout -b building-polly
 # TODO: for some reason replacing polly is actually breaking things
 # despite the instructions from the paper's repo
 # so for now we're technically using standard Polly...
+# and using it from the main polly repo (not this checkedout version)
 # rm -rf polly/
 # cp -r ../polly/ polly/
 popd
