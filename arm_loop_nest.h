@@ -895,12 +895,13 @@ private:
             {
             case SCALAR:
                 broadcast_scalar(arg1_reg, addr.traits->reg, addr.offset * 4,
-                                 addr.mask);
+                                 vector_size);
                 break;
 
             case VECTOR_PACKED:
                 load_vector(arg1_reg, addr.traits->reg, addr.offset * 4,
-                            addr.mask);
+                            C_traits.access == SCALAR ? addr.mask
+                                                      : vector_size);
                 break;
 
             case VECTOR_STRIDED:

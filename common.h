@@ -56,14 +56,14 @@ struct memory_argument_type
 
     bool operator<(memory_argument_type const& o) const
     {
-        return std::tie(offset, traits->name) <
-               std::tie(o.offset, o.traits->name);
+        return std::tie(offset, mask, traits->name) <
+               std::tie(o.offset, mask, o.traits->name);
     }
 
     bool operator==(memory_argument_type const& o) const
     {
-        return std::tie(offset, traits->name) ==
-               std::tie(o.offset, o.traits->name);
+        return std::tie(offset, mask, traits->name) ==
+               std::tie(o.offset, mask, o.traits->name);
     }
 
     std::string readable() const

@@ -26,6 +26,101 @@ int main()
     using facebook::sysml::aot::aot_fn_cast;
     using facebook::sysml::aot::avx2;
 
+    // Playing with weird schedules
+    // Matrix-Matrix product
+    // C(r, c) = A(r, k) * B(k, c)
+    // if (0)
+    {
+        std::cout << "Benchmark: 7" << std::endl;
+
+        int ArCr = 333;
+        int AcBr = 333;
+        int BcCc = 333;
+
+        auto gen_loop_nest = [&]() {
+            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+                       // The first argument is the loop order in the form of
+                       // {dimension, stride}.  For now the outer dimension
+                       // has to divide the stride.  This is effectively the
+                       // same as Halide's split into outer and inner
+                       // variable, but can have arbitray number of splits.
+                       {{"ArCr", 123},
+                        {"AcBr", 123},
+                        {"ArCr", 17},
+                        {"AcBr", 17},
+                        {"ArCr", 7},
+                        {"AcBr", 7},
+                        {"ArCr", 3},
+                        {"AcBr", 3},
+                        {"ArCr", 2},
+                        {"AcBr", 2},
+
+                        {"AcBr", 1}, // inner loops, should handle
+                                     // differently later
+                        {"ArCr", 1},
+                        {"BcCc", 112}, // TODO DEBUG NOT INJECTING THE LOOP!!!!!
+                        {"BcCc", 1}},
+                       // The second argument is a map of the dimension sizes
+                       {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
+                       // Vars of C (other variables are reduction variables)
+                       {"ArCr", "BcCc"},
+                       // Variables of A
+                       {"ArCr", "AcBr"},
+                       // Variables of B
+                       {"AcBr", "BcCc"},
+                       // C's strides for each variable.  Note that the
+                       // strides data is a superset of the previous argument
+                       // (variables of C).  I'm still deciding on the final
+                       // design, possibly allowing for null strides that
+                       // will just deduce them from the sizes, or some
+                       // special structs indicating the layout (ie
+                       // row-major, col-major).  In this case the vars have
+                       // to be ordered though... Many decisions to make...
+                       {{"ArCr", BcCc}, {"BcCc", 1}},
+                       // A's strides for each variable
+                       {{"ArCr", AcBr}, {"AcBr", 1}},
+                       // B's strides for each variable
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, 16)
+                .get_shared();
+        };
+
+        auto compile_secs = measureFastestWithWarmup(gen_loop_nest, 0, 1);
+        std::cout << "Compile: " << compile_secs << std::endl;
+
+        auto fn = gen_loop_nest();
+        fn.save_to_file("zi.asm");
+        // fn.register_perf("fn1");
+
+        auto A = getRandomVector<float>(AcBr * ArCr);
+        auto B = getRandomVector<float>(AcBr * BcCc);
+
+        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto CJ = CN;
+
+        baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, A.data(), B.data(),
+                    CN.data(), 1);
+
+        fn(CJ.data(), A.data(), B.data(), 1);
+        // apply_relu(CN.data(), CN.data() + CN.size());
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << "\n";
+
+        auto secs = measureFastestWithWarmup(
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10, 10);
+
+        double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
+
+        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
+
+        bench_implementation_fmas_per_cycle(
+            fn, AcBr * ArCr, AcBr * BcCc, ArCr * BcCc,
+            1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
+    }
+
+    // return 0;
+
     // WOW this is actually pretty efficient!
     // Playing with weird schedules
     // Matrix-Matrix product
@@ -35,8 +130,8 @@ int main()
         std::cout << "Benchmark: 5" << std::endl;
 
         int ArCr = 1;
-        int AcBr = 2;
-        int BcCc = 5;
+        int AcBr = 333;
+        int BcCc = 333;
 
         // int ArCr = 333;
         // int AcBr = 333;
@@ -114,7 +209,7 @@ int main()
             1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
     }
 
-    return 0;
+    // return 0;
 
     // Simple reduction of matrix columns using the FMA loop nest
     // The trick is to use a fake tensor "A" - that is a tensor with
@@ -662,101 +757,6 @@ int main()
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
 
         std::cout << "GFLOPS: " << (gflops / secs) << "\n";
-    }
-
-    // return 0;
-
-    // Playing with weird schedules
-    // Matrix-Matrix product
-    // C(r, c) = A(r, k) * B(k, c)
-    // if (0)
-    {
-        std::cout << "Benchmark: 7" << std::endl;
-
-        int ArCr = 333;
-        int AcBr = 333;
-        int BcCc = 333;
-
-        auto gen_loop_nest = [&]() {
-            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
-                       // The first argument is the loop order in the form of
-                       // {dimension, stride}.  For now the outer dimension
-                       // has to divide the stride.  This is effectively the
-                       // same as Halide's split into outer and inner
-                       // variable, but can have arbitray number of splits.
-                       {{"ArCr", 123},
-                        {"AcBr", 123},
-                        {"ArCr", 17},
-                        {"AcBr", 17},
-                        {"ArCr", 7},
-                        {"AcBr", 7},
-                        {"ArCr", 3},
-                        {"AcBr", 3},
-                        {"ArCr", 2},
-                        {"AcBr", 2},
-
-                        {"AcBr", 1}, // inner loops, should handle
-                                     // differently later
-                        {"ArCr", 1},
-                        {"BcCc", 112}, // TODO DEBUG NOT INJECTING THE LOOP!!!!!
-                        {"BcCc", 1}},
-                       // The second argument is a map of the dimension sizes
-                       {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
-                       // Vars of C (other variables are reduction variables)
-                       {"ArCr", "BcCc"},
-                       // Variables of A
-                       {"ArCr", "AcBr"},
-                       // Variables of B
-                       {"AcBr", "BcCc"},
-                       // C's strides for each variable.  Note that the
-                       // strides data is a superset of the previous argument
-                       // (variables of C).  I'm still deciding on the final
-                       // design, possibly allowing for null strides that
-                       // will just deduce them from the sizes, or some
-                       // special structs indicating the layout (ie
-                       // row-major, col-major).  In this case the vars have
-                       // to be ordered though... Many decisions to make...
-                       {{"ArCr", BcCc}, {"BcCc", 1}},
-                       // A's strides for each variable
-                       {{"ArCr", AcBr}, {"AcBr", 1}},
-                       // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 512)
-                .get_shared();
-        };
-
-        auto compile_secs = measureFastestWithWarmup(gen_loop_nest, 0, 1);
-        std::cout << "Compile: " << compile_secs << std::endl;
-
-        auto fn = gen_loop_nest();
-        fn.save_to_file("zi.asm");
-        // fn.register_perf("fn1");
-
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
-
-        auto CN = getRandomVector<float>(ArCr * BcCc);
-        auto CJ = CN;
-
-        baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, A.data(), B.data(),
-                    CN.data(), 1);
-
-        fn(CJ.data(), A.data(), B.data(), 1);
-        // apply_relu(CN.data(), CN.data() + CN.size());
-
-        std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
-                  << "\n";
-
-        auto secs = measureFastestWithWarmup(
-            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10, 10);
-
-        double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
-
-        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
-
-        bench_implementation_fmas_per_cycle(
-            fn, AcBr * ArCr, AcBr * BcCc, ArCr * BcCc,
-            1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
     }
 
     // return 0;
