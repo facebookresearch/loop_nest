@@ -1,6 +1,6 @@
 #include "code_generator.h"
-#include "multi_vreg.h"
 #include "math.h"
+#include "multi_vreg.h"
 
 #include <algorithm>
 #include <cassert>
@@ -70,7 +70,6 @@ public:
 
         // // st1(v1.s4, ptr(x1));
 
-
         // sub(sp, sp, 256);
         // mov(w2, 16);
         // str(w2, ptr(sp, 32));
@@ -88,7 +87,7 @@ public:
         ld1(v3.s[1], ptr(x0));
         ld1(v3.s[2], ptr(x0));
         ld1(v3.s[3], ptr(x0));
-        //ld1(v3.s[0], ptr(x1));
+        // ld1(v3.s[0], ptr(x1));
 
         fmla(v1.s4, v3.s4, v2.s4);
 
@@ -98,25 +97,58 @@ public:
     }
 };
 
+struct CodeWorks : Xbyak_aarch64::CodeGeneratorAArch64
+{
+    CodeWorks()
+        : Xbyak_aarch64::CodeGeneratorAArch64(65536)
+    {
+        Xbyak::LabelAArch64 l;
+        b(l);
+        L_aarch64(l);
+    }
+};
+
+struct CodeBroken : Xbyak_aarch64::CodeGeneratorAArch64
+{
+    CodeBroken()
+        : Xbyak_aarch64::CodeGeneratorAArch64(65536, Xbyak_aarch64::AutoGrow)
+    {
+        Xbyak::LabelAArch64 l;
+        b(l);
+        L_aarch64(l);
+    }
+};
+
 int main()
 {
-    float A[16] = {2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f, 9.f,
-                   2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f, 9.f};
-    float B[16] = {2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f, 9.f,
-                   2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f, 9.f};
-    float C[16] = {0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f,
-                   0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f};
-
-    // auto fn = test().get_shared();
-    // fn.save_to_file("zi.asm");
-    // fn(A, B, C);
-
-    auto fn = test2().get_shared();
-    fn.save_to_file("zi.asm");
-    std::cout << "FN: " << fn(A, C) << "\n";
-
-    for (int i = 0; i < 8; ++i)
     {
-        std::cout << "C[" << i << "] = " << C[i] << "\n";
+        CodeWorks c;
+        c.ready();
+        std::cout << "Works" << std::endl;
+    }
+    {
+        CodeBroken c;
+        c.ready();
     }
 }
+
+// float A[16] = {2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f, 9.f,
+//                    2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f, 9.f};
+//     float B[16] = {2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f, 9.f,
+//                    2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f, 9.f};
+//     float C[16] = {0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f,
+//                    0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f};
+
+//     // auto fn = test().get_shared();
+//     // fn.save_to_file("zi.asm");
+//     // fn(A, B, C);
+
+//     auto fn = test2().get_shared();
+//     fn.save_to_file("zi.asm");
+//     std::cout << "FN: " << fn(A, C) << "\n";
+
+//     for (int i = 0; i < 8; ++i)
+//     {
+//         std::cout << "C[" << i << "] = " << C[i] << "\n";
+//     }
+// }

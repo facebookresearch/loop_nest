@@ -78,8 +78,6 @@ private:
     template <typename T>
     void mov_imm(const XReg& dst, T imm, const XReg& tmp)
     {
-        /* This add_imm function allows dst == src,
-           but tmp must be different from src */
         assert(dst.getIdx() != tmp.getIdx());
 
         int64_t  bit_ptn = static_cast<int64_t>(imm);
@@ -442,7 +440,7 @@ private:
         if (imm == 0)
             return;
 
-        base::add_imm(srcdst, srcdst, imm, xtmp1, xtmp2);
+        base::add_imm(srcdst, srcdst, imm, xtmp1);
     }
 
     template <class T>
@@ -451,7 +449,7 @@ private:
         if (imm == 0)
             return;
 
-        base::sub_imm(srcdst, srcdst, imm, xtmp1, xtmp2);
+        base::sub_imm(srcdst, srcdst, imm, xtmp1);
     }
 
     // Collects all (unrolled) FMAs below a certain loop in the nest.
@@ -766,15 +764,12 @@ private:
     void issue_C_loads(std::set<memory_argument> const& loads,
                        bool                             issue_first_alpha_logic)
     {
-        // if (false && issue_first_alpha_logic)
-        if (false && issue_first_alpha_logic)
+        if (issue_first_alpha_logic)
         {
             auto loadDataLabel = make_label();
             auto doneInitLabel = make_label();
 
-            cmp(AlphaReg_, 0);
-            b(Xbyak::EQ, *loadDataLabel);
-            L(*loadDataLabel);
+            cbnz(AlphaReg_, *loadDataLabel);
 
             for (auto const& c : loads)
             {
@@ -785,29 +780,12 @@ private:
                 }
             }
 
-            // b(*doneInitLabel);
+            b(*doneInitLabel);
 
-            // issue_C_loads(loads);
+            L_aarch64(*loadDataLabel);
+            issue_C_loads(loads);
 
-            // if (elementwise_preop != nullptr)
-            // {
-            //     Label donePreOp;
-
-            //     cmp(AlphaReg_, 1);
-            //     b(Xbyak::NE, donePreOp);
-
-            //     for (auto const& c : loads)
-            //     {
-            //         LN_LOG(INFO)
-            //             << tabs.back() << elementwise_preop->name() << " "
-            //             << c.readable() << " at (" << 0 << ")\n";
-            //     }
-
-            //     issue_C_elementwise_preop(loads, tail_mask);
-            //     L(donePreOp);
-            // }
-
-            L(*doneInitLabel);
+            L_aarch64(*doneInitLabel);
         }
         else
         {
@@ -1472,7 +1450,7 @@ private:
             {
                 mov_imm(loopReg_, full_iterations);
                 auto loopLabel = make_label();
-                L(*loopLabel);
+                L_aarch64(*loopLabel);
 
                 // --------------------------------------------------
                 // RECURSION
@@ -1505,11 +1483,11 @@ private:
 
                 sub_imm(loopReg_, 1);
                 cmp(loopReg_, 0);
-                bne(*loopLabel);
+                b(Xbyak::NE, *loopLabel);
 
                 // adr(x15, loopLabel);
                 // br(x15);
-                // L(doneLabel);
+                // L_aarch64(doneLabel);
             }
             else if (full_iterations == 1)
             {

@@ -100,10 +100,9 @@ private:
     }
 
 public:
-    using Label = Xbyak::Label;
-    using Reg64 = Xbyak::Reg64;
-
 #if !defined(LOOP_NEST_ARM)
+    using Reg64  = Xbyak::Reg64;
+    using Label  = Xbyak::Label;
     using Xmm    = Xbyak::Xmm;
     using Ymm    = Xbyak::Ymm;
     using Zmm    = Xbyak::Zmm;
@@ -125,11 +124,13 @@ public:
 
 #else
 
-    using VReg = Xbyak::VReg;
-    using SReg = Xbyak::SReg;
-    using DReg = Xbyak::DReg;
-    using WReg = Xbyak::WReg;
-    using XReg = Xbyak::XReg;
+    using Reg64 = Xbyak::XReg;
+    using Label = Xbyak::LabelAArch64;
+    using VReg  = Xbyak::VReg;
+    using SReg  = Xbyak::SReg;
+    using DReg  = Xbyak::DReg;
+    using WReg  = Xbyak::WReg;
+    using XReg  = Xbyak::XReg;
 
 #endif
 

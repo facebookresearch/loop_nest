@@ -61,6 +61,13 @@ aligned_vector<Float> getRandomVector(unsigned size,
     return res;
 }
 
+template <class Float>
+aligned_vector<Float> getZeroVector(unsigned size, unsigned extra_elements = 16)
+{
+    aligned_vector<Float> res(size + extra_elements);
+    return res;
+}
+
 template <class Fn>
 double measureFastestWithWarmup(Fn&& fn, int warmupIterations,
                                 int measuredIterations = 1)
