@@ -675,7 +675,7 @@ private:
         {
             add_imm(base, stride);
             offset += stride;
-            st1(vreg.s4[1], ptr(base));
+            st1(vreg.s4[i], ptr(base));
         }
 
         if (offset)
@@ -703,7 +703,7 @@ private:
         {
             add_imm(base, stride);
             offset += stride;
-            ld1(vreg.s4[1], ptr(base));
+            ld1(vreg.s4[i], ptr(base));
         }
 
         if (offset)
@@ -1482,8 +1482,7 @@ private:
                 Label doneLabel;
 
                 sub_imm(loopReg_, 1);
-                cmp(loopReg_, 0);
-                b(Xbyak::NE, *loopLabel);
+                cbnz(loopReg_, *loopLabel);
 
                 // adr(x15, loopLabel);
                 // br(x15);
