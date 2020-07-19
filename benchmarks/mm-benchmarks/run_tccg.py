@@ -13,10 +13,9 @@ def generate_cfg_file(size):
     j = {}
     k = {}
     """.format(size, size, size)
-    input_file = tempfile.NamedTemporaryFile(mode="w", delete=True)
-    input_file.write(code)
-    input_file.flush()
-    return input_file
+    with tempfile.NamedTemporaryFile(mode="w", delete=False) as input_file:
+        input_file.write(code)
+        return input_file.name
 
 
 def run_tccg(tccg_root, arch, input_path, output_path):
@@ -77,18 +76,18 @@ def run_experiments(tccg_root_dir, sizes, archs, output_dir):
     summary_log = []
 
     for size in sizes:
-        input_file = generate_cfg_file(size)
+        input_file_name = generate_cfg_file(size)
         for arch in archs:
             output_path = os.path.join(output_dir,
                                        "mm-{}-{}.txt".format(size, arch))
             print("Running", output_path)
-            ret = run_tccg(tccg_root_dir, arch, input_file.name, output_path)
+            ret = run_tccg(tccg_root_dir, arch, input_file_name, output_path)
             if ret != 0:
                 print("TCCG failed on", output_path)
             benchmark_name = "(+)(*){}".format(size)
             summary_log.append(
                 (size, arch, benchmark_name, extract_gflops(output_path)))
-        input_file.close()
+        os.remove(input_file_name)
 
     dump_summary(summary_log, os.path.join(output_dir, "summary.csv"))
 
@@ -117,6 +116,6 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except Exception as err:
+    except Exception as err: # noqa F841
         import pdb
         pdb.post_mortem()

@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 
-# Installing Polly fork used in 
+# Installing Polly fork used in
 # *High-Performance Generalized Tensor Operations: A Compiler-Oriented Approach* (Gareev et al) (TACO 2018)
 # https://bitbucket.org/gareevroman/polly-groman-fork/src/groman-fork/
 
 HOME=/mnt/ssd1/josepablocam/
 
-pushd ${HOME}
+pushd ${HOME} || exit 1
 
 # Copy this particular fork of polly
 git clone https://bitbucket.org/gareevroman/polly-groman-fork.git polly
 
 # Install LLVM dependency
 git clone https://github.com/llvm/llvm-project.git llvm-project-polly
-pushd llvm-project-polly
+pushd llvm-project-polly || exit 1
 
 # specific version required by this fork of polly
 git checkout 217704f7a88244b6fc63008dc4518bf2cf2b3301
@@ -26,18 +26,12 @@ git checkout -b building-polly
 # and using it from the main polly repo (not this checkedout version)
 # rm -rf polly/
 # cp -r ../polly/ polly/
-popd
+popd || exit 1
 
 mkdir llvm-build-polly
-pushd llvm-build-polly
+pushd llvm-build-polly || exit 1
 cmake -DLLVM_ENABLE_PROJECTS='polly;clang' ../llvm-project-polly/llvm && make
 # check if install worked
 make check-polly
 
-popd
-
-
-
-
-
-
+popd || exit 1

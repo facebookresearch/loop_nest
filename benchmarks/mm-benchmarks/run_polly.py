@@ -38,17 +38,17 @@ int main()
     init_array();
 
     auto start = std::chrono::high_resolution_clock::now();
-        
+
     for(i=0; i<N; i++)  {{
         for(j=0; j<N; j++)  {{
             C[i][j] = {identity};
             for(k=0; k<N; k++) {{
-		float temp = {multiplies_op};
-		C[i][j] = {plus_op};
-		}}
+        float temp = {multiplies_op};
+        C[i][j] = {plus_op};
+        }}
         }}
     }}
-   
+
    auto end = std::chrono::high_resolution_clock::now();
    auto new_time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
    std::cout << "Time: " << (static_cast<double>(new_time) / 1e9) << std::endl;
@@ -77,7 +77,7 @@ def get_op_str(op, left, right):
     elif op == "+":
         return "{} + {}".format(left, right)
     else:
-        raise Exception("Unhandled op={}".format(multipies_op))
+        raise Exception("Unhandled op={}".format(op))
 
 
 def get_multiplies_op_str(multiplies_op):
@@ -99,12 +99,11 @@ def generate_cpp_file(op_pair, size):
         identity=get_identity_value(plus_op),
         multiplies_op=get_multiplies_op_str(multiplies_op),
         plus_op=get_plus_op_str(plus_op))
-    input_file = tempfile.NamedTemporaryFile(mode="w",
+    with tempfile.NamedTemporaryFile(mode="w",
                                              suffix=".cpp",
-                                             delete=True)
-    input_file.write(code)
-    input_file.flush()
-    return input_file
+                                             delete=False) as input_file:
+        input_file.write(code)
+        return input_file.name
 
 
 def run_polly(llvm_root, arch, input_path, output_path):
@@ -162,14 +161,14 @@ def run_experiments(llvm_root_dir, sizes, op_pairs, archs, output_dir):
     for size in sizes:
         num_gflops = (size * size * size * 2.0) / 1e9
         for op_pair in op_pairs:
-            input_file = generate_cpp_file(op_pair, size)
+            input_file_name = generate_cpp_file(op_pair, size)
             for arch in archs:
                 output_path = os.path.join(
                     output_dir,
                     "mm-{}-{}-{}-{}.txt".format(size, op_pair[0], op_pair[1],
                                                 arch))
                 print("Running", output_path)
-                ret = run_polly(llvm_root_dir, arch, input_file.name,
+                ret = run_polly(llvm_root_dir, arch, input_file_name,
                                 output_path)
                 if ret != 0:
                     print("Polly failed on", output_path)
@@ -178,7 +177,7 @@ def run_experiments(llvm_root_dir, sizes, op_pairs, archs, output_dir):
                                                      size)
                 summary_log.append((op_pair[0], op_pair[1], size, arch,
                                     benchmark_name, gflops))
-        input_file.close()
+            os.remove(input_file_name)
 
     dump_summary(summary_log, os.path.join(output_dir, "summary.csv"))
 
@@ -219,6 +218,6 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except Exception as err:
+    except Exception as err: # noqa F841
         import pdb
         pdb.post_mortem()

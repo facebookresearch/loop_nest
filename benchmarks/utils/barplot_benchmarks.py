@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import re
 from argparse import ArgumentParser
 
 import matplotlib.pyplot as plt
@@ -60,9 +59,16 @@ def get_args():
         help="Field to plot",
     )
     parser.add_argument(
-        "--filter",
+        "--filter_field",
         type=str,
-        help="Janky code-based filtering...careful this just calls eval",
+        nargs="+",
+        help="Fields to filter on",
+    )
+    parser.add_argument(
+        "--filter_value",
+        type=str,
+        nargs="+",
+        help="Field values to filter on",
     )
     parser.add_argument(
         "--denominator",
@@ -101,8 +107,9 @@ def main():
     # drop any row with missing value (i.e. we didn't measure it)
     combined_df = combined_df[~pd.isnull(combined_df[args.field])]
 
-    if args.filter:
-        combined_df = eval(args.filter, globals(), {"df": combined_df})
+    if args.filter_field:
+        for f, v in zip(args.filter_field, args.filter_value):
+            combined_df = combined_df[combined_df[f].astype(str) == v]
 
     isas = combined_df.isa.unique()
     plots = []
@@ -136,7 +143,7 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except Exception as err:
+    except Exception as err: # noqa F841
         import pdb
 
         pdb.post_mortem()

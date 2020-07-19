@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 OUTDIR="intern-slides/"
-mkdir  ${OUTDIR}
+mkdir ${OUTDIR}
 
 # Halide/loop_nest compile times
 python3 utils/barplot_benchmarks.py \
@@ -10,7 +10,7 @@ python3 utils/barplot_benchmarks.py \
 	--denominator "loop_nest" \
 	--ylabel "Compile Time Ratio" \
 	--title "Relative Compile Time" \
-	--output ${OUTDIR}/halide_compile.pdf
+	--output "${OUTDIR}/halide_compile.pdf"
 
 
 # Halide/loop_nest running time
@@ -21,7 +21,7 @@ python3 utils/barplot_benchmarks.py \
 	--ylabel "GFLOPS Ratio" \
 	--title "Relative GFLOPS" \
 	--add_unit_line \
-	--output ${OUTDIR}/halide_runtime.pdf
+	--output "${OUTDIR}/halide_runtime.pdf"
 
 # GEMM
 python3 utils/barplot_benchmarks.py \
@@ -29,8 +29,9 @@ python3 utils/barplot_benchmarks.py \
 	--field gflops \
 	--ylabel GFLOPS \
 	--title "Comparison MM" \
-	--filter "df[df['plus_op'] == '+']" \
-	--output ${OUTDIR}/gemm_runtime.pdf
+	--filter_field "plus_op" \
+	--filter_value "+" \
+	--output "${OUTDIR}/gemm_runtime.pdf"
 
 
 
@@ -38,7 +39,7 @@ python3 utils/barplot_benchmarks.py \
 python3 utils/barplot_benchmarks.py \
 	--input operator-benchmarks/*results/summary.csv \
 	--field gflops \
-	--output ${OUTDIR}/operator_runtime.pdf
+	--output "${OUTDIR}/operator_runtime.pdf"
 
 
 tar cvf intern-slides.tar intern-slides/

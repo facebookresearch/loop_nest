@@ -3,7 +3,6 @@ from argparse import ArgumentParser
 import csv
 import os
 import subprocess
-import tempfile
 
 CASES = {
     "reg-block": (False, False, False),
@@ -100,8 +99,7 @@ def run_experiments(loop_nest_root, cpp_file, archs, output_dir):
 
 def get_args():
     parser = ArgumentParser(
-        description=
-        "Run optimization ablations for NN operator benchmarks for loop_nest")
+        description="Run optimization ablations for NN operator benchmarks for loop_nest")
     parser.add_argument("--loop_nest",
                         type=str,
                         help="Path to loop_nest root directory")
@@ -129,6 +127,6 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except Exception as err:
+    except Exception as err: # noqa F841
         import pdb
         pdb.post_mortem()

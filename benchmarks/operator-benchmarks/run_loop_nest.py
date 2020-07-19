@@ -3,7 +3,6 @@ from argparse import ArgumentParser
 import csv
 import os
 import subprocess
-import tempfile
 
 
 def run_loop_nest(loop_nest_root, arch, input_path, output_path):
@@ -109,6 +108,6 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except Exception as err:
+    except Exception as err: # noqa F841
         import pdb
         pdb.post_mortem()

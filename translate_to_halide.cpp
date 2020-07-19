@@ -14,7 +14,7 @@
 
 // export HALIDE_PATH=~/Halide/
 // export LD_LIBRARY_PATH=${HALIDE_PATH}/bin
-// g++ translate_to_halide.cpp -g
+// g++ translate_to_halide.cpp -g \
 // -I ${HALIDE_PATH}/include -I./xbyak \
 // -L ${HALIDE_PATH}/bin -lHalide -lpthread -ldl \
 // -std=c++17 \
@@ -80,7 +80,7 @@ int main()
         auto CN = getRandomVector<float>(ArCr * BcCc);
         auto CJ = CN;
 
-        baseline_MM(ArCr, AcBr, BcCc, 1, ArCr, 1, AcBr, 1, ArCr, A.data(),
+        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
                     B.data(), CN.data(), 0);
 
         auto compile      = [&fn]() { fn.compile_jit(); };

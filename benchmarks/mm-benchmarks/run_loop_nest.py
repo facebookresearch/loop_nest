@@ -3,7 +3,6 @@ from argparse import ArgumentParser
 import csv
 import os
 import subprocess
-import tempfile
 
 
 def get_op(op):
@@ -18,7 +17,7 @@ def get_op(op):
 
 
 def run_loop_nest(loop_nest_root, size, arch, op_pair, input_path,
-                  output_path):
+                  output_path,):
     cmd = [
         "g++", "-Wall", "-Wpedantic", "-Wno-sign-compare", "-std=c++17",
         "-I {}/xbyak".format(loop_nest_root), "-I {}".format(loop_nest_root),
@@ -26,7 +25,7 @@ def run_loop_nest(loop_nest_root, size, arch, op_pair, input_path,
         "-DPLUS_OP={}".format(get_op(op_pair[0])),
         "-DMULTIPLIES_OP={}".format(get_op(op_pair[1])), input_path, "-o",
         "test.out", "&&", "./test.out",
-        str(size)
+        str(size),
     ]
 
     with open(output_path, "w") as fout:
@@ -58,7 +57,7 @@ def dump_summary(summary_log, output_path):
         writer = csv.writer(fout, delimiter=",")
         writer.writerow([
             "system", "plus_op", "multiplies_op", "size", "isa", "benchmark",
-            "compile", "gflops"
+            "compile", "gflops",
         ])
         for entry in summary_log:
             writer.writerow(defaults + entry)
@@ -76,14 +75,14 @@ def run_experiments(loop_nest_root, cpp_file, sizes, op_pairs, archs,
                                                 arch))
                 print("Running loop_nest on", output_path)
                 ret = run_loop_nest(loop_nest_root, size, arch, op_pair,
-                                    cpp_file, output_path)
+                                    cpp_file, output_path,)
                 if ret != 0:
                     print("loop_nest failed on", output_path)
                 compile_time, gflops = extract_results(output_path)
                 benchmark_name = "({})({}){}".format(op_pair[0], op_pair[1],
-                                                     size)
+                                                     size,)
                 summary_log.append((op_pair[0], op_pair[1], size, arch,
-                                    benchmark_name, compile_time, gflops))
+                                    benchmark_name, compile_time, gflops,))
 
     dump_summary(summary_log, os.path.join(output_dir, "summary.csv"))
 
@@ -124,12 +123,12 @@ def main():
     op_pairs = list(zip(args.plus_op, args.multiplies_op))
 
     run_experiments(args.loop_nest, args.cpp, args.size, op_pairs, args.arch,
-                    args.output_dir)
+                    args.output_dir,)
 
 
 if __name__ == "__main__":
     try:
         main()
-    except Exception as err:
+    except Exception as err: # noqa F841
         import pdb
         pdb.post_mortem()

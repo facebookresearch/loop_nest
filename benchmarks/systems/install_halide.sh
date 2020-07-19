@@ -3,12 +3,12 @@
 # Installing Halide
 
 HOME=/mnt/ssd1/josepablocam/
-popd ${HOME}
+popd ${HOME} || exit 1
 
 # Install LLVM dependency (from source so we can turn off assertions)
 git clone https://github.com/llvm/llvm-project.git --depth 1 -b release/10.x llvm-project-halide
 mkdir llvm-build-halide
-pushd llvm-build-halide
+pushd llvm-build-halide || exit 1
 
 # build LLVM with assertions off (important for compile time)
 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../llvm-install-halide \
@@ -19,15 +19,15 @@ cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../llvm-install-halide \
         ../llvm-project-halide/llvm
 
 cmake --build . --target install
-popd
+popd || exit 1
 
-export LLVM_CONFIG=${HOME}/llvm-install-halide/bin/llvm-config
+export LLVM_CONFIG="${HOME}/llvm-install-halide/bin/llvm-config"
 
 git clone https://github.com/halide/Halide.git
-pushd Halide
+pushd Halide || exit 1
 make
 # run jit tests
 make run_tests
-popd
+popd || exit 1
 
-popd
+popd || exit 1
