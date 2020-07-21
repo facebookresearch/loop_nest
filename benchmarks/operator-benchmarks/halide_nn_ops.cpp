@@ -187,7 +187,7 @@ int main() {
         // A's strides for each variable
         {{"r", k * 2}, {"k", 2}},
         // B's strides for each variable
-        {{"k", 2}}, 1024, facebook::sysml::aot::halide_relu);
+        {{"k", 2}}, 1024);
 
     auto A = getRandomVector<float>(AcBr * ArCr * 2);
     auto B = getRandomVector<float>(AcBr * BcCc * 2);
@@ -203,7 +203,6 @@ int main() {
     std::cout << "Compile: " << compile_secs << std::endl;
 
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
-    apply_relu(CN.data(), CN.data() + CN.size());
 
     std::cout << "MAXABSDIFF: "
               << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
@@ -423,8 +422,7 @@ int main() {
          {"KY", IZ},
          {"KZ", 1}},
         // B's strides for each variable
-        {{"KX", KY * KZ}, {"KY", KZ}, {"KZ", 1}}, 1024,
-        facebook::sysml::aot::halide_relu);
+        {{"KX", KY * KZ}, {"KY", KZ}, {"KZ", 1}}, 1024);
 
     auto A = getRandomVector<float>(IX * IY * IZ);
     auto B = getRandomVector<float>(KX * KY * KZ);
@@ -439,7 +437,6 @@ int main() {
     std::cout << "Compile: " << compile_secs << std::endl;
 
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
-    apply_relu(CN.data(), CN.data() + CN.size());
 
     std::cout << "MAXABSDIFF: "
               << maxAbsDiff(CJ.data(), CJ.data() + OX * OY * OZ, CN.data())

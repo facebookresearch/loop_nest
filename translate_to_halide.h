@@ -2,6 +2,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cstdlib>
 #include <map>
 #include <set>
 #include <sstream>
@@ -414,7 +415,7 @@ private:
 
         if (elementwise == facebook::sysml::aot::halide_relu)
         {
-            C(C_dims) = max(0.0f, C(C_dims));
+            C(C_dims) = Halide::max(0.0f, C(C_dims));
             halide_code << "C(" << C_dims_str.str() << ") = max(0.0f, C("
                         << C_dims_str.str() << "));\n";
         }
@@ -457,7 +458,7 @@ private:
             int   unrolls = std::ceil(extent / stride);
             instructions_unrolled *= unrolls;
 
-            if (instructions_unrolled <= default_max_fmas_unrolled)
+            if (instructions_unrolled <= max_fmas_unrolled)
             {
                 C.update(0).unroll(*it);
 
@@ -630,6 +631,22 @@ private:
     }
 
 private:
+    void set_jit_target_features()
+    {
+        if (std::is_same_v<ISA, avx512>)
+        {
+            halide_target.set_feature(Halide::Target::Feature::AVX512, true);
+        }
+        else if (std::is_same_v<ISA, avx2>)
+        {
+            halide_target.set_feature(Halide::Target::Feature::AVX2, true);
+        }
+        else
+        {
+            assert("Unhandled ISA" && false);
+        }
+    }
+
     void generate_halide_program()
     {
         set_tensor_sizes();
@@ -673,6 +690,7 @@ public:
 
     {
         generate_halide_program();
+        set_jit_target_features();
         halide_program.print_loop_nest();
         print_halide();
     }
@@ -711,9 +729,9 @@ public:
         // for completeness, in case a user wants to run on arbitrarily
         // allocated input data
         //
-        // we allocate our own pointers with necessary alignment and vector size
-        // multiples, and memcpy over the inputs before running as aligned
-        // then return back to original memory
+        // we allocate our own pointers with necessary alignment and vector
+        // size multiples, and memcpy over the inputs before running as
+        // aligned then return back to original memory
         alignas(alignment) float A_aligned[int(
             std::ceil(A_size / float(vector_size)) * vector_size)];
         alignas(alignment) float B_aligned[int(

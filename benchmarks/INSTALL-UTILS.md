@@ -14,7 +14,7 @@ popd
 Then use conda to import the environment file provided as
 
 ```
-conda create -f env.yml
+conda env create -f env.yml
 ```
 
 You can then activate it as

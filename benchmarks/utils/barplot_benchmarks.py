@@ -46,7 +46,7 @@ def get_ratio_plot(df,
 
 
 def get_args():
-    parser = ArgumentParser(description="Plot benchmark GLOPs")
+    parser = ArgumentParser(description="Plot benchmark values")
     parser.add_argument(
         "--input",
         nargs="+",

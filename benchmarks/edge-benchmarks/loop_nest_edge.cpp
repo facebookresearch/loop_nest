@@ -100,7 +100,6 @@ int main() {
     baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, ArCr, 1, A.data(), B.data(),
                 CN.data(), 0);
 
-    // apply_relu(CN.data(), CN.data() + CN.size());
 
     fn(CJ.data(), A.data(), B.data(), 0);
 
@@ -207,7 +206,6 @@ int main() {
 
     fn(CJ.data(), A.data(), B.data(), 0);
 
-    // apply_relu(CN.data(), CN.data() + CN.size());
 
     std::cout << "MAXABSDIFF: "
               << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS, CN.data())
@@ -317,7 +315,6 @@ int main() {
     fn(CJ.data(), one_constant<float>, B.data(), 1);
     baseline_fn(CN.data(), one_constant<float>, B.data(), 1);
 
-    // apply_relu(CN.data(), CN.data() + CN.size());
     std::cout << "MAXABSDIFF: "
               << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
@@ -370,7 +367,7 @@ int main() {
                  {{"ArCr", 0}, {"AcBr", 0}},
                  // B's strides for each variable
                  {{"AcBr", 1}, {"BcCc", AcBr}}, facebook::sysml::aot::fma, 512,
-                 nullptr, {}, facebook::sysml::aot::elementwise_relu<CT_ISA>)
+                 nullptr, {})
           .get_shared();
     };
 
@@ -391,7 +388,6 @@ int main() {
                 CN.data(), 1);
 
     fn(CJ.data(), &A, B.data(), 1);
-    apply_relu(CN.data(), CN.data() + CN.size());
 
     std::cout << "MAXABSDIFF: "
               << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
@@ -457,7 +453,7 @@ int main() {
                  {{"ArCr", 1}, {"AcBr", ArCr}},
                  // B's strides for each variable
                  {{"AcBr", 1}, {"BcCc", AcBr}}, facebook::sysml::aot::fma, 512,
-                 nullptr, {}, facebook::sysml::aot::elementwise_relu<CT_ISA>)
+                 nullptr, {})
           .get_shared();
     };
 
@@ -478,7 +474,6 @@ int main() {
                 CN.data(), 1);
 
     fn(CJ.data(), A.data(), B.data(), 1);
-    apply_relu(CN.data(), CN.data() + CN.size());
 
     std::cout << "MAXABSDIFF: "
               << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
@@ -528,8 +523,7 @@ int main() {
                  // A's strides for each variable
                  {{"r", k * 2}, {"k", 2}},
                  // B's strides for each variable
-                 {{"k", 2}}, facebook::sysml::aot::fma, 1024, nullptr, {},
-                 facebook::sysml::aot::elementwise_relu<CT_ISA>)
+                 {{"k", 2}}, facebook::sysml::aot::fma, 1024, nullptr, {})
           .get_shared();
     };
 
@@ -550,7 +544,6 @@ int main() {
                 CN.data(), 1);
 
     fn(CJ.data(), A.data(), B.data(), 0);
-    apply_relu(CN.data(), CN.data() + CN.size());
 
     std::cout << "MAXABSDIFF: "
               << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
@@ -621,7 +614,7 @@ int main() {
                  {{"ArCr", AcBr}, {"AcBr", 1}},
                  // B's strides for each variable
                  {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma, 512,
-                 nullptr, {}, facebook::sysml::aot::elementwise_relu<CT_ISA>)
+                 nullptr, {})
           .get_shared();
     };
 
@@ -642,7 +635,6 @@ int main() {
                 CN.data(), 1);
 
     fn(CJ.data(), A.data(), B.data(), 1);
-    apply_relu(CN.data(), CN.data() + CN.size());
 
     std::cout << "MAXABSDIFF: "
               << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
@@ -712,7 +704,7 @@ int main() {
                  {{"ArCr", AcBr}, {"AcBr", 1}},
                  // B's strides for each variable
                  {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma, 2,
-                 nullptr, {}, facebook::sysml::aot::elementwise_relu<CT_ISA>)
+                 nullptr, {})
           .get_shared();
     };
 
@@ -733,7 +725,6 @@ int main() {
                 CN.data());
 
     fn(CJ.data(), A.data(), B.data(), 0);
-    apply_relu(CN.data(), CN.data() + CN.size());
 
     std::cout << "MAXABSDIFF: "
               << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
@@ -800,7 +791,6 @@ int main() {
                 CN.data());
 
     fn(CJ.data(), A.data(), B.data(), 0);
-    // apply_relu(CN.data(), CN.data() + CN.size());
 
     std::cout << "MAXABSDIFF: "
               << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
@@ -861,7 +851,7 @@ int main() {
                  {{"ArCr", AcBr}, {"AcBr", 1}},
                  // B's strides for each variable
                  {{"AcBr", 1}, {"BcCc", AcBr}}, facebook::sysml::aot::fma, 1024,
-                 nullptr, {}, facebook::sysml::aot::elementwise_relu<CT_ISA>)
+                 nullptr, {})
           .get_shared();
     };
 
@@ -882,7 +872,6 @@ int main() {
                               B.data(), CN.data());
 
     fn(CJ.data(), A.data(), B.data(), 0);
-    apply_relu(CN.data(), CN.data() + CN.size());
 
     std::cout << "MAXABSDIFF: "
               << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
@@ -965,7 +954,6 @@ int main() {
                 CN.data());
 
     fn(CJ.data(), A.data(), B.data(), 0);
-    // apply_relu(CN.data(), CN.data() + CN.size());
 
     std::cout << "MAXABSDIFF: "
               << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
@@ -1049,7 +1037,6 @@ int main() {
                 CN.data());
 
     fn(CJ.data(), A.data(), B.data(), 0);
-    // apply_relu(CN.data(), CN.data() + CN.size());
 
     std::cout << "MAXABSDIFF: "
               << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
@@ -1131,8 +1118,7 @@ int main() {
                   {"KZ", 1}},
                  // B's strides for each variable
                  {{"KX", KY * KZ}, {"KY", KZ}, {"KZ", 1}},
-                 facebook::sysml::aot::fma, 1024, nullptr, {},
-                 facebook::sysml::aot::elementwise_relu<CT_ISA>)
+                 facebook::sysml::aot::fma, 1024, nullptr, {})
           .get_shared();
     };
 
@@ -1152,7 +1138,6 @@ int main() {
     baseline_3DConv(OX, OY, OZ, KX, KY, KZ, A.data(), B.data(), CN.data());
 
     fn(CJ.data(), A.data(), B.data(), 0);
-    apply_relu(CN.data(), CN.data() + CN.size());
 
     std::cout << "MAXABSDIFF: "
               << maxAbsDiff(CJ.data(), CJ.data() + OX * OY * OZ, CN.data())

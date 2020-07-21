@@ -239,7 +239,6 @@ int main() {
                 CN.data(), 1);
 
     fn(CJ.data(), A.data(), B.data(), 0);
-    apply_relu(CN.data(), CN.data() + CN.size());
 
     std::cout << "MAXABSDIFF: "
               << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
