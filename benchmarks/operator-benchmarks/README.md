@@ -32,13 +32,11 @@ For our experiments, we cover:
 We compare:
 
 * loop_nest
-* Halide
+* LLVM (w/ Halide)
 * oneDNN (formerly MKL-DNN) (https://github.com/oneapi-src/oneDNN)
 
 TODO:
-* Halide needs to use Buffer not ImageParam (which is slower)
 * remaining operators
 * oneDNN
 * Halide should use autotuning
 * loop_nest should use our own search (rather than hardcoded schedules)
-* consider adding pre/post operations to these (currently none used)

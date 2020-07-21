@@ -633,13 +633,17 @@ private:
 private:
     void set_jit_target_features()
     {
+        halide_target.set_feature(Halide::Target::Feature::NoAsserts, true);
+
         if (std::is_same_v<ISA, avx512>)
         {
             halide_target.set_feature(Halide::Target::Feature::AVX512, true);
+            halide_target.set_feature(Halide::Target::Feature::AVX2, false);
         }
         else if (std::is_same_v<ISA, avx2>)
         {
             halide_target.set_feature(Halide::Target::Feature::AVX2, true);
+            halide_target.set_feature(Halide::Target::Feature::AVX512, false);
         }
         else
         {

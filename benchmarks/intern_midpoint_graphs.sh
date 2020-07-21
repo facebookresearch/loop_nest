@@ -17,7 +17,7 @@ python3 utils/barplot_benchmarks.py \
 python3 utils/barplot_benchmarks.py \
 	--input edge-benchmarks/*results/summary.csv \
 	--field gflops \
-	--denominator "halide" \
+	--denominator "llvm" \
 	--ylabel "GFLOPS Ratio" \
 	--title "Relative GFLOPS" \
 	--add_unit_line \

@@ -55,7 +55,7 @@ def extract_results(output_path):
 
 
 def dump_summary(summary_log, output_path):
-    defaults = ("halide", )
+    defaults = ("llvm", )
 
     with open(output_path, "w") as fout:
         writer = csv.writer(fout, delimiter=",")
@@ -82,7 +82,7 @@ def run_experiments(loop_nest_root, halide_root, cpp_file, archs, output_dir):
 
 def get_args():
     parser = ArgumentParser(
-        description="Run NN operator benchmarks for Halide")
+        description="Run NN operator benchmarks for LLVM w/Halide")
     parser.add_argument("--loop_nest",
                         type=str,
                         help="Path to loop_nest root directory")

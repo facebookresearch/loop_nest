@@ -1127,7 +1127,7 @@ int main() {
 
     auto fn = gen_loop_nest();
     fn.save_to_file("zi.asm");
-    fn.register_perf("fn7");
+    // fn.register_perf("fn7");
 
     auto A = getRandomVector<float>(IX * IY * IZ);
     auto B = getRandomVector<float>(KX * KY * KZ);
@@ -1196,7 +1196,7 @@ int main() {
 
     auto fn = gen_loop_nest();
     fn.save_to_file("zi.asm");
-    fn.register_perf("fn8");
+    // fn.register_perf("fn8");
 
     auto A = getRandomVector<float>(AcBr * ArCr);
     auto B = getRandomVector<float>(AcBr * BcCc);
