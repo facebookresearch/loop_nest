@@ -23,7 +23,7 @@ int main()
         int AcBr = 100;
         int BcCc = 100;
 
-        auto tree = Program<CT_ISA>(
+        auto tree = loop_tree_program<CT_ISA>(
             {{"AcBr", 256},
              {"ArCr", 3},
              {"BcCc", 16},
@@ -67,35 +67,38 @@ int main()
         fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc,
-                  CN.data())
+                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
-/*
-    {
+    /*
+        {
 
-        int R = 1024;
-        int C = 1024;
+            int R = 1024;
+            int C = 1024;
 
-        auto A  = getRandomVector<float>(R * C);
-        auto B  = getRandomVector<float>(R * C);
-        auto BJ = getRandomVector<float>(R * C);
+            auto A  = getRandomVector<float>(R * C);
+            auto B  = getRandomVector<float>(R * C);
+            auto BJ = getRandomVector<float>(R * C);
 
-        auto tree = Program<CT_ISA>({{"R", 1}, {"C", 1}}, {{"R", R}, {"C", C}},
-                                    {{"R", 1}, {"C", R}}, {{"R", 1}, {"C", C}});
+            auto tree = loop_tree_program<CT_ISA>({{"R", 1}, {"C", 1}}, {{"R",
+       R}, {"C", C}},
+                                        {{"R", 1}, {"C", R}}, {{"R", 1}, {"C",
+       C}});
 
-        auto transpose = facebook::sysml::aot::transposer_baseline(
-            {{"R", 1}, {"C", 1}}, {{"R", R}, {"C", C}}, {{"R", 1}, {"C", R}},
-            {{"R", 1}, {"C", C}});
+            auto transpose = facebook::sysml::aot::transposer_baseline(
+                {{"R", 1}, {"C", 1}}, {{"R", R}, {"C", C}}, {{"R", 1}, {"C",
+       R}},
+                {{"R", 1}, {"C", C}});
 
-        transpose(B.data(), A.data());
+            transpose(B.data(), A.data());
 
-        auto fn = tree.get_fn();
-        fn({{"A", A.data()}, {"C", BJ.data()}});
+            auto fn = tree.get_fn();
+            fn({{"A", A.data()}, {"C", BJ.data()}});
 
-        std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(BJ.data(), BJ.data() + R * C, B.data()) << "\n";
-    }
-    */
+            std::cout << "MAXABSDIFF: "
+                      << maxAbsDiff(BJ.data(), BJ.data() + R * C, B.data()) <<
+       "\n";
+        }
+        */
 }
