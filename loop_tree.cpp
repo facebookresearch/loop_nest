@@ -71,34 +71,30 @@ int main()
                   << "\n";
     }
 
-    /*
-        {
+    {
 
-            int R = 1024;
-            int C = 1024;
+        int R = 1024;
+        int C = 1024;
 
-            auto A  = getRandomVector<float>(R * C);
-            auto B  = getRandomVector<float>(R * C);
-            auto BJ = getRandomVector<float>(R * C);
+        auto A  = getRandomVector<float>(R * C);
+        auto B  = getRandomVector<float>(R * C);
+        auto BJ = getRandomVector<float>(R * C);
 
-            auto tree = loop_tree_program<CT_ISA>({{"R", 1}, {"C", 1}}, {{"R",
-       R}, {"C", C}},
-                                        {{"R", 1}, {"C", R}}, {{"R", 1}, {"C",
-       C}});
+        auto tree = loop_tree_program<CT_ISA>(
+            {{"R", 1}, {"C", 1}}, {{"R", R}, {"C", C}}, {{"R", 1}, {"C", R}},
+            {{"R", 1}, {"C", C}});
 
-            auto transpose = facebook::sysml::aot::transposer_baseline(
-                {{"R", 1}, {"C", 1}}, {{"R", R}, {"C", C}}, {{"R", 1}, {"C",
-       R}},
-                {{"R", 1}, {"C", C}});
 
-            transpose(B.data(), A.data());
+        auto transpose = facebook::sysml::aot::transposer_baseline(
+            {{"R", 1}, {"C", 1}}, {{"R", R}, {"C", C}}, {{"R", 1}, {"C", R}},
+            {{"R", 1}, {"C", C}});
 
-            auto fn = tree.get_fn();
-            fn({{"A", A.data()}, {"C", BJ.data()}});
+        transpose(B.data(), A.data());
 
-            std::cout << "MAXABSDIFF: "
-                      << maxAbsDiff(BJ.data(), BJ.data() + R * C, B.data()) <<
-       "\n";
-        }
-        */
+        auto fn = tree.get_fn();
+        fn({{"A", A.data()}, {"C", BJ.data()}});
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(BJ.data(), BJ.data() + R * C, B.data()) << "\n";
+    }
 }
