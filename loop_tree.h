@@ -45,7 +45,7 @@ template <class ISA>
 class jitted_loop_nest_node;
 
 template <class ISA>
-class TransposeNode;
+class transpose_node;
 
 template <class ISA>
 class for_loop_node;
@@ -92,10 +92,9 @@ public:
     get_fn(std::map<std::string, int> const&) const = 0;
 
     virtual std::vector<std::string> get_tensors_used() const = 0;
+
     virtual std::map<std::string, std::map<std::string, int>> const&
     get_tensor_strides() const = 0;
-    // virtual void set_limits(std::map<std::string, std::vector<int>> const&) =
-    // 0;
 };
 
 template <class ISA>
@@ -139,11 +138,6 @@ public:
         return strides;
     }
 
-    // void set_limits(std::map<std::string, std::vector<int>> const&) override
-    // {
-    //     // do nothing...
-    // }
-
     loop_tree_fn_type get_fn(std::map<std::string, int> const&) const
     {
         return [inputs = this->inputs, output = this->output](
@@ -174,7 +168,6 @@ private:
 
     std::vector<std::string>                          in_scope_tensor_names;
     std::map<std::string, std::map<std::string, int>> in_scope_tensor_strides;
-    //    std::map<std::string, std::vector<int>>           limits;
 
     template <class R>
     friend class jitted_loop_nest_node;
@@ -231,7 +224,7 @@ public:
         , var(var)
         , delta(delta)
     {
-        // LN_LOG(DEBUG)  << "For(" << var << "," << delta << ")" << "\n";
+
         this->set_children(children);
         set_in_scope_tensor_info();
     }
@@ -247,25 +240,14 @@ public:
         return in_scope_tensor_strides;
     }
 
-    // void
-    // set_limits(std::map<std::string, std::vector<int>> const& limits)
-    // override
-    // {
-    //     this->limits = limits;
-    // }
-
     loop_tree_fn_type get_fn(std::map<std::string, int> const& sizes) const
     {
-        // TODO(j): issues with using stateful method in lambda...we don't
-        // want that
-
         auto var      = this->var;
         auto delta    = this->delta;
         auto children = this->get_children();
         auto limit    = sizes.at(var);
 
         int full = limit / delta;
-        LN_LOG(DEBUG) << "Full: " << full << "\n";
         int rest = limit % delta;
 
         std::vector<loop_tree_fn_type> full_fns, tail_fns;
@@ -305,25 +287,6 @@ public:
     }
 };
 
-// template <class ISA, class PlusType, class MultipliesType>
-// std::shared_ptr<loop_tree_node<ISA>>
-// merge_loop_into_jitter(std::shared_ptr<loop_tree_node<ISA>> node,
-//                        TransposeNode<ISA, PlusType, MultipliesType>*
-//                        child)
-// {
-//     // create initial transpose jitter and add in {node.var, node.delta}
-//     to
-//     // order in jitter
-// }
-
-// template <class ISA>
-// std::shared_ptr<loop_tree_node<ISA>>
-// merge_loop_into_jitter(std::shared_ptr<loop_tree_node<ISA>>         node,
-//                                          TransposeJitterNode<ISA>* child)
-// {
-//     // add in {node.var, node.delta} to order in jitter
-// }
-
 template <class ISA>
 class jitted_loop_nest_node : public loop_tree_node<ISA>
 {
@@ -340,12 +303,6 @@ private:
     arithmetic_op_kind                                multiplies;
 
     std::vector<std::string> tensors_used;
-
-    // TODO (j) how should we handle general type? should that be a template?
-    // facebook::sysml::aot::unique_aot_fn
-    facebook::sysml::aot::shared_aot_fn<void(float*, const float*, const float*,
-                                             int)>
-        compiled_fn;
 
 public:
     jitted_loop_nest_node(
@@ -401,6 +358,8 @@ public:
 
     loop_tree_fn_type get_fn(std::map<std::string, int> const&) const
     {
+        // TODO(j): call to jitter should reflect all other arguments (e.g. type
+        // of op-pair etc)
         auto jit_fn = facebook::sysml::aot::FMA_loop_nest_jitter<ISA>(
                           order, sizes, formulas.at(output),
                           formulas.at(inputs[0]), formulas.at(inputs[1]),
@@ -572,32 +531,14 @@ public:
         , sizes(sizes)
         , formulas(formulas)
     {
-        // int  i      = 0;
-        // // auto limits = sizes_to_limits(sizes);
-        // LN_LOG(DEBUG) << "Original limits size:" << limits.size() << "\n";
-        // for (auto c : nodes)
-        // {
-        //     LN_LOG(DEBUG) << "i: " << i << "\n";
-        //     // c->set_limits(limits);
-        //     i++;
-        // }
-        // LN_LOG(DEBUG) << "Size:" << nodes.size() << "\n";
 
-        // PASS
-        std::cout << "Simplifying loop nests" << std::endl;
+        LN_LOG(DEBUG) << "Pass: Simplifying loop nests\n";
         std::vector<std::shared_ptr<loop_tree_node<ISA>>> new_nodes;
         for (auto c : nodes)
         {
             new_nodes.push_back(simplify_loop_nests(c, sizes, formulas));
         }
         nodes = new_nodes;
-
-        // PASS
-        // std::cout << "Compiling loop nests" << std::endl;
-        // for (auto c : nodes)
-        // {
-        //     compile_loop_nests(c);
-        // }
     }
 
     std::vector<std::shared_ptr<loop_tree_node<ISA>>> get_children()
@@ -631,8 +572,6 @@ public:
 
     loop_tree_fn_type get_fn() const
     {
-        auto nodes = this->nodes;
-
         std::vector<loop_tree_fn_type> sub_functions;
 
         for (auto const& c : this->nodes)
