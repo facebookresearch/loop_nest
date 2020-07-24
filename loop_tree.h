@@ -108,15 +108,12 @@ private:
     using super_type = loop_tree_node<ISA>;
 
     // 0 -> A, 1 -> B, rest are followed tensors
-    std::vector<std::string> inputs;
-
+    std::vector<std::string>                          inputs;
     std::string                                       output;
     std::map<std::string, std::map<std::string, int>> strides;
     arithmetic_op_kind                                plus;
     arithmetic_op_kind                                multiplies;
     // TODO(j): need to add elementwise ops here...
-
-    friend class jitted_loop_nest_node<ISA>;
 
 public:
     compute_node(
@@ -129,17 +126,22 @@ public:
     {
     }
 
-    std::vector<std::string> get_tensors_used() const
-    {
-        auto tensors_used = inputs;
-        tensors_used.push_back(output);
-        return tensors_used;
-    }
+    std::string const&              get_output() const { return output; }
+    std::vector<std::string> const& get_inputs() const { return inputs; }
+    arithmetic_op_kind              get_plus() const { return plus; }
+    arithmetic_op_kind get_multiplies() const { return multiplies; }
 
     std::map<std::string, std::map<std::string, int>> const&
     get_tensor_strides() const
     {
         return strides;
+    }
+
+    std::vector<std::string> get_tensors_used() const
+    {
+        auto tensors_used = inputs;
+        tensors_used.push_back(output);
+        return tensors_used;
     }
 
     loop_tree_fn_type get_fn(std::map<std::string, int> const&) const
@@ -172,9 +174,6 @@ private:
     std::string                                       output;
     std::map<std::string, std::map<std::string, int>> strides;
 
-    // TODO(j): replace with getters
-    friend class jitted_transpose_node<ISA>;
-
 public:
     transpose_node(std::string input, std::string output,
                    std::map<std::string, std::map<std::string, int>> strides)
@@ -184,6 +183,10 @@ public:
         , strides(strides)
     {
     }
+
+    std::string const& get_input() const { return input; }
+
+    std::string const& get_output() const { return output; }
 
     std::vector<std::string> get_tensors_used() const
     {
@@ -221,12 +224,6 @@ private:
 
     std::vector<std::string>                          in_scope_tensor_names;
     std::map<std::string, std::map<std::string, int>> in_scope_tensor_strides;
-
-    template <class R>
-    friend class jitted_loop_nest_node;
-
-    template <class R>
-    friend class jitted_transpose_node;
 
 private:
     void set_in_scope_tensor_info()
@@ -391,7 +388,8 @@ public:
         , plus(compute_jitter_node->plus)
         , multiplies(compute_jitter_node->multiplies)
     {
-        order.insert(order.begin(), {for_node->var, for_node->delta});
+        order.insert(order.begin(),
+                     {for_node->get_var(), for_node->get_delta()});
     }
 
     jitted_loop_nest_node(std::shared_ptr<for_loop_node<ISA>> for_node,
@@ -399,14 +397,14 @@ public:
                           std::map<std::string, int>          sizes,
                           std::map<std::string, std::set<std::string>> formulas)
         : super_type(node_kind::jitted_loop_nest_node_type)
-        , inputs(compute_node->inputs)
-        , output(compute_node->output)
-        , order({{for_node->var, for_node->delta}})
+        , inputs(compute_node->get_inputs())
+        , output(compute_node->get_output())
+        , order({{for_node->get_var(), for_node->get_delta()}})
         , sizes(sizes)
         , formulas(formulas)
-        , strides(compute_node->strides)
-        , plus(compute_node->plus)
-        , multiplies(compute_node->multiplies)
+        , strides(compute_node->get_tensor_strides())
+        , plus(compute_node->get_plus())
+        , multiplies(compute_node->get_multiplies())
     {
     }
 
@@ -471,12 +469,13 @@ public:
     jitted_transpose_node(std::shared_ptr<for_loop_node<ISA>>  for_node,
                           std::shared_ptr<transpose_node<ISA>> transpose_node)
         : super_type(node_kind::jitted_transpose_node_type)
-        , input(transpose_node->input)
-        , output(transpose_node->output)
+        , input(transpose_node->get_input())
+        , output(transpose_node->get_output())
         , order({})
-        , strides(transpose_node->strides)
+        , strides(transpose_node->get_tensor_strides())
     {
-        order.insert(order.begin(), {for_node->var, for_node->delta});
+        order.insert(order.begin(),
+                     {for_node->get_var(), for_node->get_delta()});
     }
 
     jitted_transpose_node(
@@ -488,7 +487,8 @@ public:
         , order(transpose_jitter->order)
         , strides(transpose_jitter->strides)
     {
-        order.insert(order.begin(), {for_node->var, for_node->delta});
+        order.insert(order.begin(),
+                     {for_node->get_var(), for_node->get_delta()});
     }
 
     loop_tree_fn_type get_fn(std::map<std::string, int> const& sizes) const
