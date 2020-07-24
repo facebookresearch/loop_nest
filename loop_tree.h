@@ -28,16 +28,34 @@ enum class node_kind
     jitted_transpose_node_type
 };
 
-// TODO(j): is there a better way?
-// I put ops into enum to avoid passing yet 2 more
-// templates throughtout (which also seemed to make
-// downcasting tree nodes hard?)
+// Note: add classes from arithmetic_operations.h
+// as needed
 enum class arithmetic_op_kind
 {
     plus,
     multiplies,
-    // TODO: need to add rest here
+    max,
+    min
 };
+
+std::shared_ptr<operation_pair_base>
+get_operation_pair(arithmetic_op_kind plus_op, arithmetic_op_kind multiplies_op)
+{
+
+    std::map<std::pair<arithmetic_op_kind, arithmetic_op_kind>,
+             std::shared_ptr<operation_pair_base>>
+        op_map = {
+            {{arithmetic_op_kind::plus, arithmetic_op_kind::multiplies},
+             std::make_shared<operation_pair<basic_plus, basic_multiplies>>()},
+            {{arithmetic_op_kind::max, arithmetic_op_kind::multiplies},
+             std::make_shared<operation_pair<max, basic_multiplies>>()},
+            {{arithmetic_op_kind::min, arithmetic_op_kind::multiplies},
+             std::make_shared<operation_pair<min, basic_multiplies>>()},
+            {{arithmetic_op_kind::max, arithmetic_op_kind::plus},
+             std::make_shared<operation_pair<max, basic_plus>>()}};
+
+    return op_map.at({plus_op, multiplies_op});
+}
 
 template <class ISA>
 class compute_node;
@@ -118,11 +136,14 @@ private:
 public:
     compute_node(
         std::vector<std::string> const& inputs, std::string const& output,
-        std::map<std::string, std::map<std::string, int>> const& strides)
+        std::map<std::string, std::map<std::string, int>> const& strides,
+        arithmetic_op_kind plus, arithmetic_op_kind multiplies)
         : super_type(node_kind::compute_node_type)
         , inputs(inputs)
         , output(output)
         , strides(strides)
+        , plus(plus)
+        , multiplies(multiplies)
     {
     }
 
@@ -146,6 +167,12 @@ public:
 
     loop_tree_fn_type get_fn(std::map<std::string, int> const&) const
     {
+        // TODO(j): if we want to support more, extend here otherwise only
+        // supported through loop nest
+        assert("Interpreted compute only supports FMA" &&
+               (plus == arithmetic_op_kind::plus &&
+                multiplies == arithmetic_op_kind::multiplies));
+
         return [inputs = this->inputs, output = this->output](
                    std::map<std::string, float*> const& tensors) {
             LN_LOG(DEBUG) << "Hit compute\n";
@@ -155,7 +182,6 @@ public:
             float* A = tensors.at(inputs[0]);
             float* B = tensors.at(inputs[1]);
             float* C = tensors.at(output);
-            // TODO(j): generalize to other ops supported....
             LN_LOG(DEBUG) << "(A:" << A[0] << ") * (B:" << B[0] << ")"
                           << "\n";
             C[0] += A[0] * B[0];
@@ -412,12 +438,13 @@ public:
     {
         // TODO(j): call to jitter should reflect all other arguments (e.g. type
         // of op-pair etc)
-        auto jit_fn = facebook::sysml::aot::FMA_loop_nest_jitter<ISA>(
-                          order, sizes, formulas.at(output),
-                          formulas.at(inputs[0]), formulas.at(inputs[1]),
-                          strides.at(output), strides.at(inputs[0]),
-                          strides.at(inputs[1]), facebook::sysml::aot::fma)
-                          .get_shared();
+        auto jit_fn =
+            facebook::sysml::aot::FMA_loop_nest_jitter<ISA>(
+                order, sizes, formulas.at(output), formulas.at(inputs[0]),
+                formulas.at(inputs[1]), strides.at(output),
+                strides.at(inputs[0]), strides.at(inputs[1]),
+                get_operation_pair(plus, multiplies))
+                .get_shared();
 
         auto output = this->output;
         auto inputs = this->inputs;
@@ -634,7 +661,8 @@ private:
         auto innermost =
             std::shared_ptr<compute_node<ISA>>(new compute_node<ISA>(
                 {"A", "B"}, "C",
-                {{"A", A_strides}, {"B", B_strides}, {"C", C_strides}}));
+                {{"A", A_strides}, {"B", B_strides}, {"C", C_strides}},
+                arithmetic_op_kind::plus, arithmetic_op_kind::multiplies));
 
         std::shared_ptr<loop_tree_node<ISA>> current = innermost;
         for (auto it = order.rbegin(); it != order.rend(); it++)
