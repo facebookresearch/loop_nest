@@ -645,6 +645,10 @@ merge_loop_into_jitter(std::shared_ptr<for_loop_node<ISA>>         node,
         new jitted_transpose_node<ISA>(node, child));
 }
 
+#ifdef TEST_STOP_SIMPLIFICATION
+int test_simplification_counter_ = 0;
+#endif
+
 template <class ISA>
 std::shared_ptr<loop_tree_node<ISA>>
 simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>> node)
@@ -668,12 +672,23 @@ simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>> node)
         return node;
     }
 
+    #ifdef TEST_STOP_SIMPLIFICATION
+    if (test_simplification_counter_ >= 3) {
+        std::cout << "Stopping short on simplification" << std::endl;
+        return node;
+    }
+    #endif
+
     auto for_node = std::dynamic_pointer_cast<for_loop_node<ISA>>(node);
     std::shared_ptr<loop_tree_node<ISA>> single_child = new_children.at(0);
 
     switch (single_child->get_type())
     {
     case node_kind::compute_node_type:
+        #ifdef TEST_STOP_SIMPLIFICATION
+        test_simplification_counter_ += 1;
+        #endif
+
         return merge_loop_into_jitter(
             for_node,
             std::dynamic_pointer_cast<compute_node<ISA>>(single_child));
