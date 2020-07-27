@@ -136,19 +136,22 @@ private:
     std::map<std::string, std::map<std::string, int>> strides;
     arithmetic_op_kind                                plus;
     arithmetic_op_kind                                multiplies;
+    std::optional<int>                                unroll_limit;
     // TODO(j): need to add elementwise ops here...
 
 public:
     compute_node(
         std::vector<std::string> const& inputs, std::string const& output,
         std::map<std::string, std::map<std::string, int>> const& strides,
-        arithmetic_op_kind plus, arithmetic_op_kind multiplies)
+        arithmetic_op_kind plus, arithmetic_op_kind multiplies,
+        std::optional<int> unroll_limit = std::nullopt)
         : super_type(node_kind::compute_node_type)
         , inputs(inputs)
         , output(output)
         , strides(strides)
         , plus(plus)
         , multiplies(multiplies)
+        , unroll_limit(unroll_limit)
     {
     }
 
@@ -156,6 +159,7 @@ public:
     std::vector<std::string> const& get_inputs() const { return inputs; }
     arithmetic_op_kind              get_plus() const { return plus; }
     arithmetic_op_kind get_multiplies() const { return multiplies; }
+    std::optional<int> get_unroll_limit() const { return unroll_limit; }
 
     std::map<std::string, std::map<std::string, int>> const&
     get_tensor_strides() const
@@ -215,20 +219,25 @@ private:
     std::string                                       input;
     std::string                                       output;
     std::map<std::string, std::map<std::string, int>> strides;
+    std::optional<int>                                unroll_limit;
 
 public:
     transpose_node(std::string input, std::string output,
-                   std::map<std::string, std::map<std::string, int>> strides)
+                   std::map<std::string, std::map<std::string, int>> strides,
+                   std::optional<int> unroll_limit = std::nullopt)
         : super_type(node_kind::transpose_node_type)
         , input(input)
         , output(output)
         , strides(strides)
+        , unroll_limit(unroll_limit)
     {
     }
 
     std::string const& get_input() const { return input; }
 
     std::string const& get_output() const { return output; }
+
+    std::optional<int> get_unroll_limit() const { return unroll_limit; }
 
     std::vector<std::string> get_tensors_used() const
     {
@@ -442,13 +451,15 @@ private:
     std::map<std::string, std::map<std::string, int>> strides;
     arithmetic_op_kind                                plus;
     arithmetic_op_kind                                multiplies;
+    std::optional<int>                                unroll_limit;
 
 public:
     jitted_loop_nest_node(
         std::vector<std::string> inputs, std::string output,
         std::vector<std::pair<std::string, int>>          order,
         std::map<std::string, std::map<std::string, int>> strides,
-        arithmetic_op_kind plus, arithmetic_op_kind multiplies)
+        arithmetic_op_kind plus, arithmetic_op_kind multiplies,
+        std::optional<int> unroll_limit = std::nullopt)
         : super_type(node_kind::jitted_loop_nest_node_type)
         , inputs(inputs)
         , output(output)
@@ -456,6 +467,7 @@ public:
         , strides(strides)
         , plus(plus)
         , multiplies(multiplies)
+        , unroll_limit(unroll_limit)
     {
     }
 
@@ -469,6 +481,7 @@ public:
         , strides(compute_jitter_node->strides)
         , plus(compute_jitter_node->plus)
         , multiplies(compute_jitter_node->multiplies)
+        , unroll_limit(compute_jitter_node->unroll_limit)
     {
         order.insert(order.begin(),
                      {for_node->get_var(), for_node->get_delta()});
@@ -483,6 +496,7 @@ public:
         , strides(compute_node->get_tensor_strides())
         , plus(compute_node->get_plus())
         , multiplies(compute_node->get_multiplies())
+        , unroll_limit(compute_node->get_unroll_limit())
     {
     }
 
@@ -537,17 +551,20 @@ private:
     std::string                                       output;
     std::vector<std::pair<std::string, int>>          order;
     std::map<std::string, std::map<std::string, int>> strides;
+    std::optional<int>                                unroll_limit;
 
 public:
     jitted_transpose_node(
         std::string input, std::string output,
         std::vector<std::pair<std::string, int>>          order,
-        std::map<std::string, std::map<std::string, int>> strides)
+        std::map<std::string, std::map<std::string, int>> strides,
+        std::optional<int> unroll_limit = std::nullopt)
         : super_type(node_kind::jitted_transpose_node_type)
         , input(input)
         , output(output)
         , order(order)
         , strides(strides)
+        , unroll_limit(unroll_limit)
     {
     }
 
@@ -558,6 +575,7 @@ public:
         , output(transpose_node->get_output())
         , order({})
         , strides(transpose_node->get_tensor_strides())
+        , unroll_limit(transpose_node->get_unroll_limit())
     {
         order.insert(order.begin(),
                      {for_node->get_var(), for_node->get_delta()});
@@ -571,6 +589,7 @@ public:
         , output(transpose_jitter->output)
         , order(transpose_jitter->order)
         , strides(transpose_jitter->strides)
+        , unroll_limit(transpose_jitter->unroll_limit)
     {
         order.insert(order.begin(),
                      {for_node->get_var(), for_node->get_delta()});
@@ -672,12 +691,13 @@ simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>> node)
         return node;
     }
 
-    #ifdef TEST_STOP_SIMPLIFICATION
-    if (test_simplification_counter_ >= 3) {
+#ifdef TEST_STOP_SIMPLIFICATION
+    if (test_simplification_counter_ >= 3)
+    {
         std::cout << "Stopping short on simplification" << std::endl;
         return node;
     }
-    #endif
+#endif
 
     auto for_node = std::dynamic_pointer_cast<for_loop_node<ISA>>(node);
     std::shared_ptr<loop_tree_node<ISA>> single_child = new_children.at(0);
@@ -685,9 +705,9 @@ simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>> node)
     switch (single_child->get_type())
     {
     case node_kind::compute_node_type:
-        #ifdef TEST_STOP_SIMPLIFICATION
+#ifdef TEST_STOP_SIMPLIFICATION
         test_simplification_counter_ += 1;
-        #endif
+#endif
 
         return merge_loop_into_jitter(
             for_node,
@@ -713,8 +733,71 @@ simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>> node)
         break;
 
     default:
-        assert("Unhandled merger" && false);
+        assert("Unhandled node kind" && false);
         return node;
+    }
+}
+
+std::int64_t get_tensor_size(
+    std::string const&                                       name,
+    std::map<std::string, std::map<std::string, int>> const& strides,
+    std::map<std::string, int> const&                        sizes,
+    std::map<std::string, std::set<std::string>> const&      formulas)
+{
+    std::int64_t size = 1;
+    for (auto const& s : sizes)
+    {
+        if (formulas.at(name).count(s.first))
+            size += (s.second - 1) * strides.at(name).at(s.first);
+    }
+    size *= 4;
+    return size;
+}
+
+template <class ISA>
+std::int64_t get_largest_intermediate_output_size(
+    std::shared_ptr<loop_tree_node<ISA>>                node,
+    std::vector<std::string> const&                     provided_tensors,
+    std::map<std::string, int> const&                   sizes,
+    std::map<std::string, std::set<std::string>> const& formulas)
+{
+    std::int64_t max_size = 0;
+    switch (node->get_type())
+    {
+    case node_kind::for_loop_node_type:
+        for (auto const& child : node->get_children())
+        {
+            max_size =
+                std::max(max_size, get_largest_intermediate_output_size(child));
+        }
+        return max_size;
+        break;
+    case node_kind::compute_node_type:
+        // fall through
+    case node_kind::transpose_node_type:
+        // fall through
+    case node_kind::jitted_loop_nest_node_type:
+        // fall through
+    case node_kind::jitted_transpose_node_type:
+        std::set<std::string> possible_intermediates =
+            node->get_output_tensors();
+
+        for (auto const& name : provided_tensors)
+        {
+            possible_intermediates.erase(name);
+        }
+
+        for (auto const& name : possible_intermediates)
+        {
+            max_size = std::max(
+                max_size, get_tensor_size(name, node->get_tensor_strides(),
+                                          sizes, formulas));
+        }
+
+        return max_size;
+        break;
+    default:
+        assert("Unhandled node kind" && false);
     }
 }
 
@@ -725,18 +808,21 @@ private:
     std::vector<std::shared_ptr<loop_tree_node<ISA>>> nodes;
     std::map<std::string, int>                        sizes;
     std::map<std::string, std::set<std::string>>      formulas;
+    std::set<std::string>                             provided_tensors;
 
     static std::vector<std::shared_ptr<loop_tree_node<ISA>>>
     loop_nest_compute_to_tree(std::vector<std::pair<std::string, int>> order,
                               std::map<std::string, int> C_strides,
                               std::map<std::string, int> A_strides,
-                              std::map<std::string, int> B_strides)
+                              std::map<std::string, int> B_strides,
+                              std::optional<int>         unroll_limit)
     {
         auto innermost =
             std::shared_ptr<compute_node<ISA>>(new compute_node<ISA>(
                 {"A", "B"}, "C",
                 {{"A", A_strides}, {"B", B_strides}, {"C", C_strides}},
-                arithmetic_op_kind::plus, arithmetic_op_kind::multiplies));
+                arithmetic_op_kind::plus, arithmetic_op_kind::multiplies,
+                unroll_limit));
 
         std::shared_ptr<loop_tree_node<ISA>> current = innermost;
         for (auto it = order.rbegin(); it != order.rend(); it++)
@@ -752,11 +838,12 @@ private:
     std::vector<std::shared_ptr<loop_tree_node<ISA>>>
     loop_nest_transpose_to_tree(std::vector<std::pair<std::string, int>> order,
                                 std::map<std::string, int> C_strides,
-                                std::map<std::string, int> A_strides)
+                                std::map<std::string, int> A_strides,
+                                std::optional<int>         unroll_limit)
     {
         std::shared_ptr<transpose_node<ISA>> innermost =
             std::shared_ptr<transpose_node<ISA>>(new transpose_node<ISA>(
-                "A", "C", {{"A", A_strides}, {"C", C_strides}}));
+                "A", "C", {{"A", A_strides}, {"C", C_strides}}, unroll_limit));
 
         std::shared_ptr<loop_tree_node<ISA>> current = innermost;
         for (auto it = order.rbegin(); it != order.rend(); it++)
@@ -771,13 +858,14 @@ private:
     }
 
 public:
-    loop_tree_program(
-        std::vector<std::shared_ptr<loop_tree_node<ISA>>> nodes,
-        std::map<std::string, int>                        sizes,
-        std::map<std::string, std::set<std::string>>      formulas = {})
+    loop_tree_program(std::vector<std::shared_ptr<loop_tree_node<ISA>>> nodes,
+                      std::map<std::string, int>                        sizes,
+                      std::map<std::string, std::set<std::string>> formulas,
+                      std::set<std::string> provided_tensors)
         : nodes(nodes)
         , sizes(sizes)
         , formulas(formulas)
+        , provided_tensors(provided_tensors)
     {
 
 #ifndef NOPTIM
@@ -803,21 +891,37 @@ public:
                       std::set<std::string>                    B_formula,
                       std::map<std::string, int>               C_strides,
                       std::map<std::string, int>               A_strides,
-                      std::map<std::string, int>               B_strides)
+                      std::map<std::string, int>               B_strides,
+                      std::optional<int> unroll_limit = std::nullopt)
         : loop_tree_program(
-              loop_nest_compute_to_tree(order, C_strides, A_strides, B_strides),
-              sizes, {{"C", C_formula}, {"A", A_formula}, {"B", B_formula}})
+              loop_nest_compute_to_tree(order, C_strides, A_strides, B_strides,
+                                        unroll_limit),
+              sizes, {{"C", C_formula}, {"A", A_formula}, {"B", B_formula}},
+              {"A", "B", "C"})
     {
     }
 
     loop_tree_program(std::vector<std::pair<std::string, int>> order,
                       std::map<std::string, int>               sizes,
                       std::map<std::string, int>               Out_strides,
-                      std::map<std::string, int>               In_strides)
-        : loop_tree_program(
-              loop_nest_transpose_to_tree(order, Out_strides, In_strides),
-              sizes)
+                      std::map<std::string, int>               In_strides,
+                      std::optional<int> unroll_limit = std::nullopt)
+        : loop_tree_program(loop_nest_transpose_to_tree(
+                                order, Out_strides, In_strides, unroll_limit),
+                            sizes, {}, {"A", "C"})
     {
+    }
+
+    std::int64_t get_scratch_size() const
+    {
+        std::int64_t max_size = 0;
+        for (auto const& child : nodes)
+        {
+            max_size = std::max(max_size,
+                                get_largest_intermediate_output_size(
+                                    child, provided_tensors, sizes, formulas));
+        }
+        return max_size;
     }
 
     loop_tree_fn_type get_fn() const
