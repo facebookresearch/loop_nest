@@ -138,13 +138,22 @@ private:
     arithmetic_op_kind                                multiplies;
     std::optional<int>                                unroll_limit;
     // TODO(j): need to add elementwise ops here...
+    std::shared_ptr<elementwise_operation<ISA>> elementwise_preop;
+    std::vector<std::string>                    elementwise_preop_tensors;
+    std::shared_ptr<elementwise_operation<ISA>> elementwise_postop;
+    std::vector<std::string>                    elementwise_postop_tensors;
 
 public:
     compute_node(
         std::vector<std::string> const& inputs, std::string const& output,
         std::map<std::string, std::map<std::string, int>> const& strides,
         arithmetic_op_kind plus, arithmetic_op_kind multiplies,
-        std::optional<int> unroll_limit = std::nullopt)
+        std::optional<int>                          unroll_limit = std::nullopt,
+        std::shared_ptr<elementwise_operation<ISA>> elementwise_preop = nullptr,
+        std::vector<std::string> elementwise_preop_tensors            = {},
+        std::shared_ptr<elementwise_operation<ISA>> elementwise_postop =
+            nullptr,
+        std::vector<std::string> elementwise_postop_tensors = {})
         : super_type(node_kind::compute_node_type)
         , inputs(inputs)
         , output(output)
@@ -152,14 +161,68 @@ public:
         , plus(plus)
         , multiplies(multiplies)
         , unroll_limit(unroll_limit)
+        , elementwise_preop(elementwise_preop)
+        , elementwise_preop_tensors(elementwise_preop_tensors)
+        , elementwise_postop(elementwise_postop)
+        , elementwise_postop_tensors(elementwise_postop_tensors)
     {
+        for (auto const& t : inputs)
+        {
+            assert(strides.count(t) > 0);
+        }
+
+        assert(strides.count(output));
+
+        if (!elementwise_preop_tensors.empty())
+        {
+            assert(elementwise_preop != nullptr);
+        }
+
+        for (auto const& t : elementwise_preop_tensors)
+        {
+            assert(strides.count(t) > 0);
+        }
+
+        if (!elementwise_postop_tensors.empty())
+        {
+            assert(elementwise_postop != nullptr);
+        }
+
+        for (auto const& t : elementwise_postop_tensors)
+        {
+            assert(strides.count(t) > 0);
+        }
     }
 
-    std::string const&              get_output() const { return output; }
+    std::string const& get_output() const { return output; }
+
     std::vector<std::string> const& get_inputs() const { return inputs; }
-    arithmetic_op_kind              get_plus() const { return plus; }
+
+    arithmetic_op_kind get_plus() const { return plus; }
+
     arithmetic_op_kind get_multiplies() const { return multiplies; }
+
     std::optional<int> get_unroll_limit() const { return unroll_limit; }
+
+    std::shared_ptr<elementwise_operation<ISA>> get_elementwise_preop()
+    {
+        return elementwise_preop;
+    }
+
+    std::vector<std::string> const& get_elementwise_preop_tensors()
+    {
+        return elementwise_preop_tensors;
+    }
+
+    std::shared_ptr<elementwise_operation<ISA>> get_elementwise_postop()
+    {
+        return elementwise_postop;
+    }
+
+    std::vector<std::string> const& get_elementwise_postop_tensors()
+    {
+        return elementwise_postop_tensors;
+    }
 
     std::map<std::string, std::map<std::string, int>> const&
     get_tensor_strides() const
@@ -171,6 +234,14 @@ public:
     {
         auto tensors_used = inputs;
         tensors_used.push_back(output);
+
+        tensors_used.insert(tensors_used.end(),
+                            elementwise_preop_tensors.begin(),
+                            elementwise_preop_tensors.end());
+        tensors_used.insert(tensors_used.end(),
+                            elementwise_postop_tensors.begin(),
+                            elementwise_postop_tensors.end());
+
         return tensors_used;
     }
 
@@ -186,10 +257,13 @@ public:
                (plus == arithmetic_op_kind::plus &&
                 multiplies == arithmetic_op_kind::multiplies));
 
+        assert("Interpreted doesn't support pre/post-ops" &&
+               (elementwise_preop_tensors.empty() &&
+                elementwise_postop_tensors.empty()));
+
         return [inputs = this->inputs, output = this->output](
                    std::map<std::string, float*> const& tensors,
                    std::map<std::string, int> const&    alphas) {
-            LN_LOG(DEBUG) << "Hit compute\n";
             assert(tensors.count(inputs[0]) && tensors.count(inputs[1]) &&
                    tensors.count(output));
 
@@ -202,8 +276,6 @@ public:
                 C[0] = 0.0;
             }
 
-            LN_LOG(DEBUG) << "(A:" << A[0] << ") * (B:" << B[0] << ")"
-                          << "\n";
             C[0] += A[0] * B[0];
         };
     }
@@ -259,11 +331,9 @@ public:
         return [input  = this->input,
                 output = this->output](std::map<std::string, float*> tensors,
                                        std::map<std::string, int> const&) {
-            LN_LOG(DEBUG) << "Hit transpose\n";
             float* A = tensors.at(input);
             float* C = tensors.at(output);
-            LN_LOG(DEBUG) << "(C:" << C[0] << ") * (A:" << A[0] << ")"
-                          << "\n";
+
             C[0] = A[0];
         };
     }
@@ -317,7 +387,6 @@ private:
                 std::int64_t offset =
                     in_scope_tensor_strides.at(name).at(var) * delta;
                 to_advance.push_back({name, offset});
-                LN_LOG(DEBUG) << name << "+=" << offset << "\n";
             }
         }
 
@@ -452,6 +521,10 @@ private:
     arithmetic_op_kind                                plus;
     arithmetic_op_kind                                multiplies;
     std::optional<int>                                unroll_limit;
+    std::shared_ptr<elementwise_operation<ISA>>       elementwise_preop;
+    std::vector<std::string>                          elementwise_preop_tensors;
+    std::shared_ptr<elementwise_operation<ISA>>       elementwise_postop;
+    std::vector<std::string> elementwise_postop_tensors;
 
 public:
     jitted_loop_nest_node(
@@ -459,7 +532,12 @@ public:
         std::vector<std::pair<std::string, int>>          order,
         std::map<std::string, std::map<std::string, int>> strides,
         arithmetic_op_kind plus, arithmetic_op_kind multiplies,
-        std::optional<int> unroll_limit = std::nullopt)
+        std::optional<int>                          unroll_limit = std::nullopt,
+        std::shared_ptr<elementwise_operation<ISA>> elementwise_preop = nullptr,
+        std::vector<std::string> elementwise_preop_tensors            = {},
+        std::shared_ptr<elementwise_operation<ISA>> elementwise_postop =
+            nullptr,
+        std::vector<std::string> elementwise_postop_tensors = {})
         : super_type(node_kind::jitted_loop_nest_node_type)
         , inputs(inputs)
         , output(output)
@@ -468,6 +546,10 @@ public:
         , plus(plus)
         , multiplies(multiplies)
         , unroll_limit(unroll_limit)
+        , elementwise_preop(elementwise_preop)
+        , elementwise_preop_tensors(elementwise_preop_tensors)
+        , elementwise_postop(elementwise_postop)
+        , elementwise_postop_tensors(elementwise_postop_tensors)
     {
     }
 
@@ -482,6 +564,12 @@ public:
         , plus(compute_jitter_node->plus)
         , multiplies(compute_jitter_node->multiplies)
         , unroll_limit(compute_jitter_node->unroll_limit)
+        , elementwise_preop(compute_jitter_node->elementwise_preop)
+        , elementwise_preop_tensors(
+              compute_jitter_node->elementwise_preop_tensors)
+        , elementwise_postop(compute_jitter_node->elementwise_postop)
+        , elementwise_postop_tensors(
+              compute_jitter_node->elementwise_postop_tensors)
     {
         order.insert(order.begin(),
                      {for_node->get_var(), for_node->get_delta()});
@@ -497,6 +585,12 @@ public:
         , plus(compute_node->get_plus())
         , multiplies(compute_node->get_multiplies())
         , unroll_limit(compute_node->get_unroll_limit())
+        , elementwise_preop(compute_node->get_elementwise_preop())
+        , elementwise_preop_tensors(
+              compute_node->get_elementwise_preop_tensors())
+        , elementwise_postop(compute_node->get_elementwise_postop())
+        , elementwise_postop_tensors(
+              compute_node->get_elementwise_postop_tensors())
     {
     }
 
@@ -504,25 +598,84 @@ public:
     get_fn(std::map<std::string, int> const&                   sizes,
            std::map<std::string, std::set<std::string>> const& formulas) const
     {
-        // TODO(j): call to jitter should reflect all other arguments (e.g. type
-        // of op-pair etc)
+
+        // contains followed tensors for pre/post ops
+        std::vector<std::string> extra_tensors;
+
+        std::vector<std::map<std::string, int>> preop_strides;
+        for (auto const& name : elementwise_preop_tensors)
+        {
+            preop_strides.push_back(strides.at(name));
+            extra_tensors.push_back(name);
+        }
+
+        std::vector<std::map<std::string, int>> postop_strides;
+        for (auto const& name : elementwise_postop_tensors)
+        {
+            postop_strides.push_back(strides.at(name));
+            extra_tensors.push_back(name);
+        }
+
+        // loop nest currently supports at most 2 followed tensors for
+        // elementwise ops
+        assert(extra_tensors.size() <= 2);
+
         auto jit_fn =
             facebook::sysml::aot::FMA_loop_nest_jitter<ISA>(
                 order, sizes, formulas.at(output), formulas.at(inputs[0]),
                 formulas.at(inputs[1]), strides.at(output),
                 strides.at(inputs[0]), strides.at(inputs[1]),
-                get_operation_pair(plus, multiplies))
+                get_operation_pair(plus, multiplies), unroll_limit,
+                elementwise_preop, preop_strides, elementwise_postop,
+                postop_strides)
                 .get_shared();
 
         auto output = this->output;
         auto inputs = this->inputs;
 
-        return
-            [jit_fn, inputs, output](std::map<std::string, float*>     tensors,
-                                     std::map<std::string, int> const& alphas) {
+        if (extra_tensors.size() == 0)
+        {
+            return [jit_fn, inputs,
+                    output](std::map<std::string, float*>     tensors,
+                            std::map<std::string, int> const& alphas) {
                 jit_fn(tensors.at(output), tensors.at(inputs[0]),
                        tensors.at(inputs[1]), alphas.at(output));
             };
+        }
+        else if (extra_tensors.size() == 1)
+        {
+            auto jit_fn_cast =
+                aot_fn_cast<void(float*, float const*, float const*, int,
+                                 float const*)>(std::move(jit_fn));
+
+            return [jit_fn_cast, inputs, output,
+                    extra_tensors](std::map<std::string, float*>     tensors,
+                                   std::map<std::string, int> const& alphas) {
+                jit_fn_cast(tensors.at(output), tensors.at(inputs[0]),
+                            tensors.at(inputs[1]), alphas.at(output),
+                            tensors.at(extra_tensors[0]));
+            };
+        }
+        else if (extra_tensors.size() == 2)
+        {
+            auto jit_fn_cast =
+                aot_fn_cast<void(float*, float const*, float const*, int,
+                                 float const*, float const*)>(
+                    std::move(jit_fn));
+
+            return [jit_fn_cast, inputs, output,
+                    extra_tensors](std::map<std::string, float*>     tensors,
+                                   std::map<std::string, int> const& alphas) {
+                jit_fn_cast(tensors.at(output), tensors.at(inputs[0]),
+                            tensors.at(inputs[1]), alphas.at(output),
+                            tensors.at(extra_tensors[0]),
+                            tensors.at(extra_tensors[1]));
+            };
+        }
+        else
+        {
+            assert("Exceeded number of allowed followed tensors" && false);
+        }
     }
 
     std::vector<std::string> get_tensors_used() const override
@@ -811,18 +964,49 @@ private:
     std::set<std::string>                             provided_tensors;
 
     static std::vector<std::shared_ptr<loop_tree_node<ISA>>>
-    loop_nest_compute_to_tree(std::vector<std::pair<std::string, int>> order,
-                              std::map<std::string, int> C_strides,
-                              std::map<std::string, int> A_strides,
-                              std::map<std::string, int> B_strides,
-                              std::optional<int>         unroll_limit)
+    loop_nest_compute_to_tree(
+        std::vector<std::pair<std::string, int>> order,
+        std::map<std::string, int>               C_strides,
+        std::map<std::string, int>               A_strides,
+        std::map<std::string, int> B_strides, std::optional<int> unroll_limit,
+        std::shared_ptr<elementwise_operation<ISA>> elementwise_preop,
+        std::vector<std::map<std::string, int>> const&
+                                                    elementwise_preop_strides,
+        std::shared_ptr<elementwise_operation<ISA>> elementwise_postop,
+        std::vector<std::map<std::string, int>> const&
+            elementwise_postop_strides)
     {
+
+        std::map<std::string, std::map<std::string, int>> tensor_strides = {
+            {"A", A_strides}, {"B", B_strides}, {"C", C_strides}};
+
+        assert("Convenience wrapper handles single followed pre-op tensor" &&
+               (elementwise_preop_strides.size() <= 1));
+        assert("Convenience wrapper handles single followed post-op tensor" &&
+               (elementwise_postop_strides.size() <= 1));
+
+        std::vector<std::string> preop_tensors;
+        std::vector<std::string> postop_tensors;
+
+        if (elementwise_preop != nullptr &&
+            (!elementwise_preop_strides.empty()))
+        {
+            tensor_strides["pre"] = elementwise_preop_strides[0];
+            preop_tensors.push_back("pre");
+        }
+
+        if (elementwise_postop != nullptr &&
+            (!elementwise_postop_strides.empty()))
+        {
+            tensor_strides["post"] = elementwise_postop_strides[0];
+            postop_tensors.push_back("post");
+        }
+
         auto innermost =
             std::shared_ptr<compute_node<ISA>>(new compute_node<ISA>(
-                {"A", "B"}, "C",
-                {{"A", A_strides}, {"B", B_strides}, {"C", C_strides}},
-                arithmetic_op_kind::plus, arithmetic_op_kind::multiplies,
-                unroll_limit));
+                {"A", "B"}, "C", tensor_strides, arithmetic_op_kind::plus,
+                arithmetic_op_kind::multiplies, unroll_limit, elementwise_preop,
+                preop_tensors, elementwise_postop, postop_tensors));
 
         std::shared_ptr<loop_tree_node<ISA>> current = innermost;
         for (auto it = order.rbegin(); it != order.rend(); it++)
@@ -884,21 +1068,37 @@ public:
         return nodes;
     }
 
-    loop_tree_program(std::vector<std::pair<std::string, int>> order,
-                      std::map<std::string, int>               sizes,
-                      std::set<std::string>                    C_formula,
-                      std::set<std::string>                    A_formula,
-                      std::set<std::string>                    B_formula,
-                      std::map<std::string, int>               C_strides,
-                      std::map<std::string, int>               A_strides,
-                      std::map<std::string, int>               B_strides,
-                      std::optional<int> unroll_limit = std::nullopt)
+    loop_tree_program(
+        std::vector<std::pair<std::string, int>> order,
+        std::map<std::string, int> sizes, std::set<std::string> C_formula,
+        std::set<std::string> A_formula, std::set<std::string> B_formula,
+        std::map<std::string, int>                  C_strides,
+        std::map<std::string, int>                  A_strides,
+        std::map<std::string, int>                  B_strides,
+        std::optional<int>                          unroll_limit = std::nullopt,
+        std::shared_ptr<elementwise_operation<ISA>> elementwise_preop = nullptr,
+        std::vector<std::map<std::string, int>> const&
+                                                    elementwise_preop_strides = {},
+        std::shared_ptr<elementwise_operation<ISA>> elementwise_postop =
+            nullptr,
+        std::vector<std::map<std::string, int>> const&
+            elementwise_postop_strides = {})
         : loop_tree_program(
-              loop_nest_compute_to_tree(order, C_strides, A_strides, B_strides,
-                                        unroll_limit),
+              loop_nest_compute_to_tree(
+                  order, C_strides, A_strides, B_strides, unroll_limit,
+                  elementwise_preop, elementwise_preop_strides,
+                  elementwise_postop, elementwise_postop_strides),
               sizes, {{"C", C_formula}, {"A", A_formula}, {"B", B_formula}},
               {"A", "B", "C"})
     {
+        if (!elementwise_preop_strides.empty())
+        {
+            provided_tensors.insert("pre");
+        }
+        if (!elementwise_postop_strides.empty())
+        {
+            provided_tensors.insert("post");
+        }
     }
 
     loop_tree_program(std::vector<std::pair<std::string, int>> order,

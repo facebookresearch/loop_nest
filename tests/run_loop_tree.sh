@@ -17,12 +17,11 @@ g++ -g -Wall -Wpedantic -std=c++17 loop_tree.cpp \
 -DNOPTIM \
 -o test.out && ./test.out
 
-# only jitting part of the loop nest (top levels interpreted)
+# # only jitting part of the loop nest (top levels interpreted)
 g++ -g -Wall -Wpedantic -std=c++17 loop_tree.cpp \
 -I ./xbyak -I ./ \
 -Wno-sign-compare \
 -DCT_ISA=avx2  \
 -DNDEBUG=1 \
--DNOPTIM \
 -DTEST_STOP_SIMPLIFICATION \
 -o test.out && ./test.out
