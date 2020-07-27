@@ -51,7 +51,7 @@ int main()
             // A's strides for each variable
             {{"ArCr", AcBr}, {"AcBr", 1}},
             // B's strides for each variable
-            {{"AcBr", BcCc}, {"BcCc", 1}});
+            {{"AcBr", BcCc}, {"BcCc", 1}}, 1, 322);
 
         auto fn = tree.get_fn();
 
@@ -64,7 +64,7 @@ int main()
         baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
                     B.data(), CN.data(), 1);
 
-        fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}}, {{"C", 1}});
+        fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
 
         std::cout << "MAXABSDIFF: "
                   << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
@@ -104,7 +104,7 @@ int main()
             // A's strides for each variable
             {{"ArCr", AcBr}, {"AcBr", 1}},
             // B's strides for each variable
-            {{"AcBr", BcCc}, {"BcCc", 1}});
+            {{"AcBr", BcCc}, {"BcCc", 1}}, 0, 322);
 
         auto fn = tree.get_fn();
 
@@ -118,7 +118,7 @@ int main()
         baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
                     B.data(), CN.data(), 0);
 
-        fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}}, {{"C", 0}});
+        fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
 
         std::cout << "MAXABSDIFF: "
                   << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
@@ -126,7 +126,6 @@ int main()
     }
 
     {
-
         int R = 1024;
         int C = 1024;
 
@@ -145,7 +144,7 @@ int main()
         transpose(B.data(), A.data());
 
         auto fn = tree.get_fn();
-        fn({{"A", A.data()}, {"C", BJ.data()}}, {});
+        fn({{"A", A.data()}, {"C", BJ.data()}});
 
         std::cout << "MAXABSDIFF: "
                   << maxAbsDiff(BJ.data(), BJ.data() + R * C, B.data()) << "\n";
@@ -184,7 +183,7 @@ int main()
             // A's strides for each variable
             {{"ArCr", AcBr}, {"AcBr", 1}},
             // B's strides for each variable
-            {{"AcBr", BcCc}, {"BcCc", 1}}, 40);
+            {{"AcBr", BcCc}, {"BcCc", 1}}, 1, 40);
 
         auto fn = tree.get_fn();
 
@@ -197,13 +196,14 @@ int main()
         baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
                     B.data(), CN.data(), 1);
 
-        fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}}, {{"C", 1}});
+        fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
 
         std::cout << "MAXABSDIFF: "
                   << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
+#ifndef NPOST_OP
     {
         int ArCr = 100;
         int AcBr = 100;
@@ -237,7 +237,7 @@ int main()
             // A's strides for each variable
             {{"ArCr", AcBr}, {"AcBr", 1}},
             // B's strides for each variable
-            {{"AcBr", BcCc}, {"BcCc", 1}}, 1024, nullptr, {},
+            {{"AcBr", BcCc}, {"BcCc", 1}}, 0, 1024, nullptr, {},
             compose(elementwise_bias<CT_ISA>, elementwise_relu<CT_ISA>),
             {
                 {{"BcCc", 1}},
@@ -261,11 +261,11 @@ int main()
         fn({{"C", CJ.data()},
             {"A", A.data()},
             {"B", B.data()},
-            {"post", bias.data()}},
-           {{"C", 0}});
+            {"post", bias.data()}});
 
         std::cout << "MAXABSDIFF: "
                   << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
+#endif
 }

@@ -15,6 +15,7 @@ g++ -g -Wall -Wpedantic -std=c++17 loop_tree.cpp \
 -DCT_ISA=avx2  \
 -DNDEBUG=1 \
 -DNOPTIM \
+-DNPOST_OP \
 -o test.out && ./test.out
 
 # # only jitting part of the loop nest (top levels interpreted)
@@ -24,4 +25,5 @@ g++ -g -Wall -Wpedantic -std=c++17 loop_tree.cpp \
 -DCT_ISA=avx2  \
 -DNDEBUG=1 \
 -DTEST_STOP_SIMPLIFICATION \
+-DNPOST_OP \
 -o test.out && ./test.out
