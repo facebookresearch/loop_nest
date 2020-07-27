@@ -550,7 +550,7 @@ private:
 
         mov(vreg.b16, ZeroVector_.b16);
 
-        ld1(vreg.s4[0], ptr(base));
+        ldr(SReg(vreg.s4.getIdx()), ptr(base));
 
         if (offset)
         {
@@ -954,8 +954,8 @@ private:
                     switch (src2.traits->access)
                     {
                     case SCALAR:
-                        broadcast_scalar(arg2_register, src2.traits->reg,
-                                         src2.offset * 4, vector_size);
+                        load_scalar(arg2_register, src2.traits->reg,
+                                    src2.offset * 4);
                         break;
 
                     case VECTOR_PACKED:
@@ -969,7 +969,16 @@ private:
                                       src2.traits->innermost_stride * 4);
                         break;
                     }
-                    fmla((C_VMMs[op.dest]++).s4, arg1_reg.s4, arg2_register.s4);
+                    if (src2.traits->access == SCALAR)
+                    {
+                        fmla((C_VMMs[op.dest]++).s4, arg1_reg.s4,
+                             arg2_register.s4[0]);
+                    }
+                    else
+                    {
+                        fmla((C_VMMs[op.dest]++).s4, arg1_reg.s4,
+                             arg2_register.s4);
+                    }
                 }
             };
         }
