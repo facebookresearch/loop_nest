@@ -111,8 +111,9 @@ public:
 
     node_kind get_type() const { return kind_; }
 
+    // sizes, and tensor formulas
     virtual loop_tree_fn_type
-    get_fn(std::map<std::string, int> const&) const = 0;
+    get_fn(std::map<std::string, int> const&, std::map<std::string, std::set<std::string>> const&) const = 0;
 
     virtual std::vector<std::string> get_tensors_used() const = 0;
 
@@ -133,7 +134,6 @@ private:
     arithmetic_op_kind                                plus;
     arithmetic_op_kind                                multiplies;
     // TODO(j): need to add elementwise ops here...
-    int AlphaReg_ = 0;
 
 public:
     compute_node(
@@ -167,7 +167,7 @@ public:
         return tensors_used;
     }
 
-    loop_tree_fn_type get_fn(std::map<std::string, int> const& sizes) const
+    loop_tree_fn_type get_fn(std::map<std::string, int> const& sizes, std::map<std::string, std::set<std::string>> const&) const
     {
         // TODO(j): if we want to support more ops, extend here otherwise only
         // supported through loop nest
@@ -234,7 +234,7 @@ public:
         return strides;
     }
 
-    loop_tree_fn_type get_fn(std::map<std::string, int> const&) const
+    loop_tree_fn_type get_fn(std::map<std::string, int> const&, std::map<std::string, std::set<std::string>> const&) const
     {
         return [input  = this->input,
                 output = this->output](std::map<std::string, float*> tensors,
@@ -313,17 +313,16 @@ private:
     }
 
     std::function<void(std::map<std::string, int>&, int)> get_alphas_adjuster(
-        std::vector<std::string> const& output_tensor_names) const
+        std::vector<std::string> const& output_tensor_names, std::map<std::string, std::set<std::string>> const& formulas) const
     {
         std::vector<std::string> to_adjust;
         for (auto const& name : output_tensor_names)
         {
-            // TODO(j): collect tensor formulas
-            // if (in_scope_tensor_formulas.at(name).count(var) == 0)
-            // {
-            //     // reduction variable, so adjust the tensor's alpha
-            //     to_adjust.push_back(name);
-            // }
+            if (formulas.at(name).count(var) == 0)
+            {
+                // reduction variable, so adjust the tensor's alpha
+                to_adjust.push_back(name);
+            }
         }
 
         return [=](std::map<std::string, int>& alphas, int adjustment) {
@@ -361,7 +360,7 @@ public:
         return in_scope_tensor_strides;
     }
 
-    loop_tree_fn_type get_fn(std::map<std::string, int> const& sizes) const
+    loop_tree_fn_type get_fn(std::map<std::string, int> const& sizes, std::map<std::string, std::set<std::string>> const& formulas) const
     {
         auto var      = this->var;
         auto delta    = this->delta;
@@ -379,19 +378,20 @@ public:
             {
                 auto s = sizes;
                 s[var] = delta;
-                full_fns.push_back(c->get_fn(s));
+                full_fns.push_back(c->get_fn(s, formulas));
             }
             if (rest)
             {
                 std::cout << "Issued a tail: " << rest << std::endl;
                 auto s = sizes;
                 s[var] = rest;
-                tail_fns.push_back(c->get_fn(s));
+                tail_fns.push_back(c->get_fn(s, formulas));
             }
         }
 
         auto advancer       = get_tensor_advancer(get_tensors_used());
-        auto alpha_adjuster = get_alphas_adjuster(get_output_tensors());
+        auto alpha_adjuster = get_alphas_adjuster(get_output_tensors(), formulas);
+
 
         return [=](std::map<std::string, float*>     tensors,
                    std::map<std::string, int>        alphas) {
@@ -409,7 +409,6 @@ public:
             {
                 fn(tensors, alphas);
             }
-            // alpha_adjuster(alphas, -2 * full);
         };
     }
 };
@@ -423,8 +422,6 @@ private:
     std::vector<std::string>                          inputs;
     std::string                                       output;
     std::vector<std::pair<std::string, int>>          order;
-    std::map<std::string, int>                        sizes;
-    std::map<std::string, std::set<std::string>>      formulas;
     std::map<std::string, std::map<std::string, int>> strides;
     arithmetic_op_kind                                plus;
     arithmetic_op_kind                                multiplies;
@@ -433,16 +430,12 @@ public:
     jitted_loop_nest_node(
         std::vector<std::string> inputs, std::string output,
         std::vector<std::pair<std::string, int>>          order,
-        std::map<std::string, int>                        sizes,
-        std::map<std::string, std::set<std::string>>      formulas,
         std::map<std::string, std::map<std::string, int>> strides,
         arithmetic_op_kind plus, arithmetic_op_kind multiplies)
         : super_type(node_kind::jitted_loop_nest_node_type)
         , inputs(inputs)
         , output(output)
         , order(order)
-        , sizes(sizes)
-        , formulas(formulas)
         , strides(strides)
         , plus(plus)
         , multiplies(multiplies)
@@ -456,8 +449,6 @@ public:
         , inputs(compute_jitter_node->inputs)
         , output(compute_jitter_node->output)
         , order(compute_jitter_node->order)
-        , sizes(compute_jitter_node->sizes)
-        , formulas(compute_jitter_node->formulas)
         , strides(compute_jitter_node->strides)
         , plus(compute_jitter_node->plus)
         , multiplies(compute_jitter_node->multiplies)
@@ -467,22 +458,18 @@ public:
     }
 
     jitted_loop_nest_node(std::shared_ptr<for_loop_node<ISA>> for_node,
-                          std::shared_ptr<compute_node<ISA>>  compute_node,
-                          std::map<std::string, int>          sizes,
-                          std::map<std::string, std::set<std::string>> formulas)
+                          std::shared_ptr<compute_node<ISA>>  compute_node)
         : super_type(node_kind::jitted_loop_nest_node_type)
         , inputs(compute_node->get_inputs())
         , output(compute_node->get_output())
         , order({{for_node->get_var(), for_node->get_delta()}})
-        , sizes(sizes)
-        , formulas(formulas)
         , strides(compute_node->get_tensor_strides())
         , plus(compute_node->get_plus())
         , multiplies(compute_node->get_multiplies())
     {
     }
 
-    loop_tree_fn_type get_fn(std::map<std::string, int> const&) const
+    loop_tree_fn_type get_fn(std::map<std::string, int> const& sizes, std::map<std::string, std::set<std::string>> const& formulas) const
     {
         // TODO(j): call to jitter should reflect all other arguments (e.g. type
         // of op-pair etc)
@@ -568,7 +555,7 @@ public:
                      {for_node->get_var(), for_node->get_delta()});
     }
 
-    loop_tree_fn_type get_fn(std::map<std::string, int> const& sizes) const
+    loop_tree_fn_type get_fn(std::map<std::string, int> const& sizes, std::map<std::string, std::set<std::string>> const&) const
     {
         // TODO(j): needs user unroll limit
         auto jit_fn = facebook::sysml::aot::transposer_jitter<ISA>(
@@ -609,12 +596,10 @@ merge_loop_into_jitter(std::shared_ptr<for_loop_node<ISA>>         node,
 template <class ISA>
 std::shared_ptr<loop_tree_node<ISA>>
 merge_loop_into_jitter(std::shared_ptr<for_loop_node<ISA>>          node,
-                       std::shared_ptr<compute_node<ISA>>           child,
-                       std::map<std::string, int>                   sizes,
-                       std::map<std::string, std::set<std::string>> formulas)
+                       std::shared_ptr<compute_node<ISA>>           child)
 {
     return std::shared_ptr<loop_tree_node<ISA>>(
-        new jitted_loop_nest_node<ISA>(node, child, sizes, formulas));
+        new jitted_loop_nest_node<ISA>(node, child));
 }
 
 template <class ISA>
@@ -637,9 +622,7 @@ merge_loop_into_jitter(std::shared_ptr<for_loop_node<ISA>>         node,
 
 template <class ISA>
 std::shared_ptr<loop_tree_node<ISA>>
-simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>>         node,
-                    std::map<std::string, int>                   sizes,
-                    std::map<std::string, std::set<std::string>> formulas)
+simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>>         node)
 {
     if (node->get_type() != node_kind::for_loop_node_type)
     {
@@ -649,7 +632,7 @@ simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>>         node,
     std::vector<std::shared_ptr<loop_tree_node<ISA>>> new_children;
     for (auto c : node->get_children())
     {
-        new_children.push_back(simplify_loop_nests(c, sizes, formulas));
+        new_children.push_back(simplify_loop_nests(c));
     }
     node->set_children(new_children);
 
@@ -668,8 +651,7 @@ simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>>         node,
     case node_kind::compute_node_type:
         return merge_loop_into_jitter(
             for_node,
-            std::dynamic_pointer_cast<compute_node<ISA>>(single_child), sizes,
-            formulas);
+            std::dynamic_pointer_cast<compute_node<ISA>>(single_child));
         break;
 
     case node_kind::jitted_loop_nest_node_type:
@@ -758,13 +740,13 @@ public:
         , formulas(formulas)
     {
 
-        // LN_LOG(DEBUG) << "Pass: Simplifying loop nests\n";
-        // std::vector<std::shared_ptr<loop_tree_node<ISA>>> new_nodes;
-        // for (auto c : nodes)
-        // {
-        //     new_nodes.push_back(simplify_loop_nests(c, sizes, formulas));
-        // }
-        // nodes = new_nodes;
+        LN_LOG(DEBUG) << "Pass: Simplifying loop nests\n";
+        std::vector<std::shared_ptr<loop_tree_node<ISA>>> new_nodes;
+        for (auto c : nodes)
+        {
+            new_nodes.push_back(simplify_loop_nests(c));
+        }
+        nodes = new_nodes;
     }
 
     std::vector<std::shared_ptr<loop_tree_node<ISA>>> get_children()
@@ -802,7 +784,7 @@ public:
 
         for (auto const& c : this->nodes)
         {
-            sub_functions.push_back(c->get_fn(sizes));
+            sub_functions.push_back(c->get_fn(sizes, formulas));
         }
 
         return [sub_functions](std::map<std::string, float*> const& tensors,
