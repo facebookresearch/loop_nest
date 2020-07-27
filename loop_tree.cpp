@@ -64,7 +64,7 @@ int main()
         baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
                     B.data(), CN.data(), 1);
 
-        fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
+        fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}}, {{"C", 1}});
 
         std::cout << "MAXABSDIFF: "
                   << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
@@ -92,7 +92,7 @@ int main()
         transpose(B.data(), A.data());
 
         auto fn = tree.get_fn();
-        fn({{"A", A.data()}, {"C", BJ.data()}});
+        fn({{"A", A.data()}, {"C", BJ.data()}}, {});
 
         std::cout << "MAXABSDIFF: "
                   << maxAbsDiff(BJ.data(), BJ.data() + R * C, B.data()) << "\n";

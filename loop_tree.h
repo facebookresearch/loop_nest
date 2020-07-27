@@ -72,8 +72,9 @@ class jitted_transpose_node;
 template <class ISA>
 class for_loop_node;
 
-using loop_tree_fn_type =
-    std::function<void(std::map<std::string, float*> const&)>;
+// void (map from name to tensors, map from name to alpha for given tensor)
+using loop_tree_fn_type = std::function<void(
+    std::map<std::string, float*> const&, std::map<std::string, int> const&)>;
 
 template <class ISA>
 class loop_tree_node
@@ -132,6 +133,7 @@ private:
     arithmetic_op_kind                                plus;
     arithmetic_op_kind                                multiplies;
     // TODO(j): need to add elementwise ops here...
+    int AlphaReg_ = 0;
 
 public:
     compute_node(
@@ -165,16 +167,17 @@ public:
         return tensors_used;
     }
 
-    loop_tree_fn_type get_fn(std::map<std::string, int> const&) const
+    loop_tree_fn_type get_fn(std::map<std::string, int> const& sizes) const
     {
-        // TODO(j): if we want to support more, extend here otherwise only
+        // TODO(j): if we want to support more ops, extend here otherwise only
         // supported through loop nest
         assert("Interpreted compute only supports FMA" &&
                (plus == arithmetic_op_kind::plus &&
                 multiplies == arithmetic_op_kind::multiplies));
 
         return [inputs = this->inputs, output = this->output](
-                   std::map<std::string, float*> const& tensors) {
+                   std::map<std::string, float*> const& tensors,
+                   std::map<std::string, int> const&    alphas) {
             LN_LOG(DEBUG) << "Hit compute\n";
             assert(tensors.count(inputs[0]) && tensors.count(inputs[1]) &&
                    tensors.count(output));
@@ -182,6 +185,12 @@ public:
             float* A = tensors.at(inputs[0]);
             float* B = tensors.at(inputs[1]);
             float* C = tensors.at(output);
+
+            if (alphas.at(output) == 0)
+            {
+                C[0] = 0.0;
+            }
+
             LN_LOG(DEBUG) << "(A:" << A[0] << ") * (B:" << B[0] << ")"
                           << "\n";
             C[0] += A[0] * B[0];
@@ -228,7 +237,8 @@ public:
     loop_tree_fn_type get_fn(std::map<std::string, int> const&) const
     {
         return [input  = this->input,
-                output = this->output](std::map<std::string, float*> tensors) {
+                output = this->output](std::map<std::string, float*> tensors,
+                                       std::map<std::string, int> const&) {
             LN_LOG(DEBUG) << "Hit transpose\n";
             float* A = tensors.at(input);
             float* C = tensors.at(output);
@@ -248,7 +258,8 @@ private:
     std::string var;
     int         delta;
 
-    std::vector<std::string>                          in_scope_tensor_names;
+    std::vector<std::string> in_scope_tensor_names;
+    std::vector<std::string> in_scope_output_tensor_names;
     std::map<std::string, std::map<std::string, int>> in_scope_tensor_strides;
 
 private:
@@ -260,6 +271,9 @@ private:
             in_scope_tensor_names.insert(in_scope_tensor_names.end(),
                                          node_tensor_names.begin(),
                                          node_tensor_names.end());
+
+            // TODO(j): collect output tensor names
+            // in_scope_output_tensor_names
 
             auto node_tensor_strides = c->get_tensor_strides();
 
@@ -289,6 +303,34 @@ private:
             {
                 assert(tensors.count(p.first));
                 tensors[p.first] += p.second;
+            }
+        };
+    }
+
+    std::vector<std::string> const& get_output_tensors() const
+    {
+        return in_scope_output_tensor_names;
+    }
+
+    std::function<void(std::map<std::string, int>&, int)> get_alphas_adjuster(
+        std::vector<std::string> const& output_tensor_names) const
+    {
+        std::vector<std::string> to_adjust;
+        for (auto const& name : output_tensor_names)
+        {
+            // TODO(j): collect tensor formulas
+            // if (in_scope_tensor_formulas.at(name).count(var) == 0)
+            // {
+            //     // reduction variable, so adjust the tensor's alpha
+            //     to_adjust.push_back(name);
+            // }
+        }
+
+        return [=](std::map<std::string, int>& alphas, int adjustment) {
+            for (auto const& name : to_adjust)
+            {
+                assert(alphas.count(name));
+                alphas[name] += adjustment;
             }
         };
     }
@@ -341,27 +383,33 @@ public:
             }
             if (rest)
             {
+                std::cout << "Issued a tail: " << rest << std::endl;
                 auto s = sizes;
                 s[var] = rest;
                 tail_fns.push_back(c->get_fn(s));
             }
         }
 
-        auto advancer = get_tensor_advancer(get_tensors_used());
+        auto advancer       = get_tensor_advancer(get_tensors_used());
+        auto alpha_adjuster = get_alphas_adjuster(get_output_tensors());
 
-        return [=](std::map<std::string, float*> tensors) {
+        return [=](std::map<std::string, float*>     tensors,
+                   std::map<std::string, int>        alphas) {
             for (int i = 0; i < full; ++i)
             {
                 for (auto const& fn : full_fns)
                 {
-                    fn(tensors);
+                    fn(tensors, alphas);
                 }
                 advancer(tensors);
+                alpha_adjuster(alphas, 2);
             }
+
             for (auto const& fn : tail_fns)
             {
-                fn(tensors);
+                fn(tensors, alphas);
             }
+            // alpha_adjuster(alphas, -2 * full);
         };
     }
 };
@@ -449,10 +497,12 @@ public:
         auto output = this->output;
         auto inputs = this->inputs;
 
-        return [jit_fn, inputs, output](std::map<std::string, float*> tensors) {
-            jit_fn(tensors.at(output), tensors.at(inputs[0]),
-                   tensors.at(inputs[1]), 1);
-        };
+        return
+            [jit_fn, inputs, output](std::map<std::string, float*>     tensors,
+                                     std::map<std::string, int> const& alphas) {
+                jit_fn(tensors.at(output), tensors.at(inputs[0]),
+                       tensors.at(inputs[1]), alphas.at(output));
+            };
     }
 
     std::vector<std::string> get_tensors_used() const override
@@ -528,9 +578,11 @@ public:
         auto output = this->output;
         auto input  = this->input;
 
-        return [jit_fn, output, input](std::map<std::string, float*> tensors) {
-            jit_fn(tensors.at(output), tensors.at(input));
-        };
+        return
+            [jit_fn, output, input](std::map<std::string, float*>     tensors,
+                                    std::map<std::string, int> const& alphas) {
+                jit_fn(tensors.at(output), tensors.at(input));
+            };
     }
 
     std::vector<std::string> get_tensors_used() const override
@@ -706,13 +758,13 @@ public:
         , formulas(formulas)
     {
 
-        LN_LOG(DEBUG) << "Pass: Simplifying loop nests\n";
-        std::vector<std::shared_ptr<loop_tree_node<ISA>>> new_nodes;
-        for (auto c : nodes)
-        {
-            new_nodes.push_back(simplify_loop_nests(c, sizes, formulas));
-        }
-        nodes = new_nodes;
+        // LN_LOG(DEBUG) << "Pass: Simplifying loop nests\n";
+        // std::vector<std::shared_ptr<loop_tree_node<ISA>>> new_nodes;
+        // for (auto c : nodes)
+        // {
+        //     new_nodes.push_back(simplify_loop_nests(c, sizes, formulas));
+        // }
+        // nodes = new_nodes;
     }
 
     std::vector<std::shared_ptr<loop_tree_node<ISA>>> get_children()
@@ -753,10 +805,11 @@ public:
             sub_functions.push_back(c->get_fn(sizes));
         }
 
-        return [sub_functions](std::map<std::string, float*> const& tensors) {
+        return [sub_functions](std::map<std::string, float*> const& tensors,
+                               std::map<std::string, int> const& alphas) {
             for (auto const& f : sub_functions)
             {
-                f(tensors);
+                f(tensors, alphas);
             }
         };
     }
