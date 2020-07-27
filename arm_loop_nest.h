@@ -574,7 +574,7 @@ private:
     }
 
     void broadcast_scalar(VReg const& vreg, Reg64 const& base, int offset,
-                          int mask = vector_size)
+                          int mask = vector_size, int increment = 0)
     {
         if (offset)
         {
@@ -597,18 +597,39 @@ private:
         {
             sub_imm(base, offset);
         }
+        if (increment)
+        {
+            add_imm(base, increment);
+        }
     }
 
-    void load_vector(VReg const& vreg, Reg64 const& base, int offset, int mask)
+    void load_vector(VReg const& vreg, Reg64 const& base, int offset, int mask,
+                     int increment = 0)
     {
         if (offset)
         {
             add_imm(base, offset);
         }
 
-        if (mask == vector_size)
+        if (mask == vector_size || mask == 3)
         {
-            ld1(vreg.s4, ptr(base));
+            if (increment && increment < 256)
+            {
+                ldr(QReg(vreg.s4.getIdx()), post_ptr(base, increment));
+                increment = 0;
+            }
+            else
+            {
+                ldr(QReg(vreg.s4.getIdx()), ptr(base));
+            }
+        }
+        else if (mask == 2)
+        {
+            ldr(DReg(vreg.s4.getIdx()), ptr(base));
+        }
+        else if (mask == 1)
+        {
+            ldr(SReg(vreg.s4.getIdx()), ptr(base));
         }
         else
         {
@@ -625,6 +646,10 @@ private:
         if (offset)
         {
             sub_imm(base, offset);
+        }
+        if (increment)
+        {
+            add_imm(base, increment);
         }
     }
 
@@ -685,7 +710,7 @@ private:
     }
 
     void gather_vector(VReg const& vreg, Reg64 const& base, int offset,
-                       int mask, int stride)
+                       int mask, int stride, int increment = 0)
     {
         if (mask == 0)
         {
@@ -709,6 +734,10 @@ private:
         if (offset)
         {
             sub_imm(base, offset);
+        }
+        if (increment)
+        {
+            add_imm(base, increment);
         }
     }
 
@@ -844,6 +873,234 @@ private:
     }
 
     void issue_unrolled_fmas(std::vector<fma_operation> fmas)
+    {
+        most_frequent_queue<memory_argument> queue;
+
+        // coalesce broadcasting loads
+        auto normalize_broadcast = [](memory_argument m) {
+            if (m.traits->access == SCALAR)
+            {
+                auto new_off = vector_size * (m.offset / vector_size);
+                return memory_argument{new_off, m.traits, vector_size,
+                                       m.coordinates};
+            }
+            return m;
+        };
+
+        std::set<memory_argument> can_implicit_broadcast;
+        for (auto const& inst : fmas)
+        {
+            assert(is_inside_current_limits(inst.coordinates));
+            queue.inc(inst.src1);
+            auto src2 = normalize_broadcast(inst.src2);
+            queue.inc(src2);
+            can_implicit_broadcast.insert(src2);
+        }
+
+        auto num_regs = isa_traits<aarch64>::total_vector_registers -
+                        first_unused_vmm_register;
+
+        std::set<int> free_regs;
+        for (auto i = 0; i < num_regs; ++i)
+        {
+            free_regs.insert(first_unused_vmm_register + i);
+        }
+        std::map<memory_argument, int> vmm_map;
+
+        while (queue.size())
+        {
+
+            std::vector<memory_argument> loads;
+            for (; free_regs.size() && queue.size();)
+            {
+                auto addr = queue.top();
+                if (!vmm_map.count(addr))
+                {
+                    vmm_map[addr] = *free_regs.begin();
+                    free_regs.erase(vmm_map.at(addr));
+                    loads.emplace_back(addr);
+                }
+                queue.pop();
+            }
+
+            // reduce loads for uncoalesced broadcasts
+            std::map<memory_argument, int> load_mask;
+            for (auto const& fma : fmas)
+            {
+                // keep track of needed loads for broadcasting
+                if (fma.src2.traits->access == SCALAR)
+                {
+                    auto idx  = fma.src2.offset % vector_size;
+                    auto src2 = normalize_broadcast(fma.src2);
+                    load_mask[normalize_broadcast(fma.src2)] =
+                        std::max(load_mask[src2], idx);
+                }
+            }
+
+            std::vector<fma_operation> in_vmm_fmas;
+            for (auto it = fmas.begin(); it != fmas.end();)
+            {
+                auto src1 = it->src1;
+                auto src2 = normalize_broadcast(it->src2);
+                if (vmm_map.count(src1) && vmm_map.count(src2))
+                {
+                    in_vmm_fmas.emplace_back(*it);
+                    it = fmas.erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+
+            if (!in_vmm_fmas.size())
+            {
+                issue_unrolled_fmas_(fmas);
+                return;
+            }
+
+            std::sort(loads.begin(), loads.end(),
+                      [](const memory_argument& a, const memory_argument& b) {
+                          return a.offset < b.offset;
+                      });
+
+            std::map<int, std::pair<int, int>> tmp_addresser;
+            std::map<int, int>                 tmp_addresser_base;
+            std::map<int, std::vector<int>>    load_incrs;
+            for (auto const& addr : loads)
+            {
+                auto base_reg = addr.traits->reg.getIdx();
+                if (!tmp_addresser.count(base_reg))
+                {
+                    int tmp                 = 11 + tmp_addresser.size();
+                    tmp_addresser[base_reg] = std::make_pair(tmp, addr.offset);
+                    tmp_addresser_base[tmp] = addr.offset;
+                    load_incrs[base_reg];
+                }
+                else
+                {
+                    auto prev_off = tmp_addresser[base_reg].second;
+                    load_incrs[base_reg].emplace_back(addr.offset - prev_off);
+                    tmp_addresser[base_reg].second = addr.offset;
+                }
+            }
+            std::map<memory_argument, int> post_ptr_map;
+            for (auto const& addr : loads)
+            {
+                auto base_reg = addr.traits->reg.getIdx();
+                if (load_incrs.at(base_reg).size())
+                {
+                    post_ptr_map[addr] = load_incrs.at(base_reg).front();
+                    load_incrs.at(base_reg).erase(
+                        load_incrs.at(base_reg).begin());
+                }
+            }
+
+            for (auto const& kv : tmp_addresser)
+            {
+                auto orig_reg  = kv.first;
+                auto tmp_reg   = kv.second.first;
+                auto orig_base = tmp_addresser_base.at(tmp_reg);
+                mov(Reg64(tmp_reg), Reg64(orig_reg));
+                add_imm(Reg64(tmp_reg), orig_base * 4);
+            }
+
+            for (auto const& addr : loads)
+            {
+
+                auto reg = Vmm(vmm_map.at(addr));
+                auto addr_reg =
+                    Reg64(tmp_addresser.at(addr.traits->reg.getIdx()).first);
+                auto inc = 0;
+                if (post_ptr_map.count(addr))
+                {
+                    inc = post_ptr_map.at(addr) * 4;
+                }
+                switch (addr.traits->access)
+                {
+                case SCALAR:
+                    if (can_implicit_broadcast.count(addr))
+                    {
+                        load_vector(reg, addr_reg, 0,
+                                    load_mask.count(addr)
+                                        ? load_mask.at(addr) + 1
+                                        : vector_size,
+                                    inc);
+                    }
+                    else
+                    {
+                        broadcast_scalar(reg, addr_reg, 0, addr.mask, inc);
+                    }
+                    break;
+                case VECTOR_PACKED:
+                    load_vector(reg, addr_reg, 0, vector_size, inc);
+                    break;
+
+                case VECTOR_STRIDED:
+                    gather_vector(reg, addr_reg, 0, addr.mask,
+                                  addr.traits->innermost_stride * 4, inc);
+                    break;
+                }
+            }
+
+            // emit fmas
+            for (auto const& fma : in_vmm_fmas)
+            {
+                auto arg1_reg = Vmm(vmm_map.at(fma.src1));
+                auto arg2_reg = Vmm(vmm_map.at(normalize_broadcast(fma.src2)));
+                if (fma.src2.traits->access == SCALAR)
+                {
+                    auto idx = fma.src2.offset % vector_size;
+                    fmla((C_VMMs[fma.dest]++).s4, arg1_reg.s4,
+                         arg2_reg.s4[idx]);
+                }
+                else
+                {
+                    fmla((C_VMMs[fma.dest]++).s4, arg1_reg.s4, arg2_reg.s4);
+                }
+            }
+
+            queue = most_frequent_queue<memory_argument>();
+            std::set<memory_argument> keep;
+            for (auto const& inst : fmas)
+            {
+                auto src2 = normalize_broadcast(inst.src2);
+                queue.inc(inst.src1);
+                if (vmm_map.count(src2))
+                {
+                    if (src2.traits->access == SCALAR)
+                    {
+                        keep.insert(src2);
+                    }
+                    else
+                    {
+                        queue.inc(normalize_broadcast(inst.src2));
+                    }
+                }
+                else
+                {
+                    queue.inc(normalize_broadcast(inst.src2));
+                }
+            }
+            std::vector<memory_argument> to_free;
+            for (auto const& kv : vmm_map)
+            {
+                if (keep.count(kv.first))
+                {
+                    continue;
+                }
+                to_free.emplace_back(kv.first);
+                free_regs.insert(kv.second);
+            }
+            for (auto const& m : to_free)
+            {
+                vmm_map.erase(m);
+            }
+
+        } // while queue.size()
+    }
+
+    void issue_unrolled_fmas_(std::vector<fma_operation> fmas)
     {
         most_frequent_queue<memory_argument> queue;
 
