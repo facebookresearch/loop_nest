@@ -1019,8 +1019,8 @@ private:
     std::vector<std::shared_ptr<loop_tree_node<ISA>>> nodes;
     std::map<std::string, int>                        sizes;
     std::map<std::string, std::set<std::string>>      formulas;
-    std::set<std::string>                             provided_tensors;
-    int                                               max_interpreted_depth;
+    // for forcing partially interpreted trees (mainly for testing)
+    int max_interpreted_depth;
 
     static std::vector<std::shared_ptr<loop_tree_node<ISA>>>
     loop_nest_compute_to_tree(
@@ -1102,12 +1102,10 @@ public:
     loop_tree_program(std::vector<std::shared_ptr<loop_tree_node<ISA>>> nodes,
                       std::map<std::string, int>                        sizes,
                       std::map<std::string, std::set<std::string>> formulas,
-                      std::set<std::string> provided_tensors,
                       std::optional<int> max_interpreted_depth = std::nullopt)
         : nodes(nodes)
         , sizes(sizes)
         , formulas(formulas)
-        , provided_tensors(provided_tensors)
         , max_interpreted_depth(max_interpreted_depth ? *max_interpreted_depth
                                                       : 0)
     {
@@ -1150,16 +1148,8 @@ public:
                   elementwise_preop, elementwise_preop_strides,
                   elementwise_postop, elementwise_postop_strides, optim_config),
               sizes, {{"C", C_formula}, {"A", A_formula}, {"B", B_formula}},
-              {"A", "B", "C"}, max_interpreted_depth)
+              max_interpreted_depth)
     {
-        if (!elementwise_preop_strides.empty())
-        {
-            provided_tensors.insert("pre");
-        }
-        if (!elementwise_postop_strides.empty())
-        {
-            provided_tensors.insert("post");
-        }
     }
 
     loop_tree_program(std::vector<std::pair<std::string, int>> order,
@@ -1170,11 +1160,11 @@ public:
                       std::optional<int> max_interpreted_depth = std::nullopt)
         : loop_tree_program(loop_nest_transpose_to_tree(
                                 order, Out_strides, In_strides, unroll_limit),
-                            sizes, {}, {"A", "C"}, max_interpreted_depth)
+                            sizes, {}, max_interpreted_depth)
     {
     }
 
-    std::int64_t get_scratch_size() const
+    std::int64_t get_scratch_size(std::set<std::string> provided_tensors) const
     {
         std::int64_t max_size = 0;
         for (auto const& child : nodes)
