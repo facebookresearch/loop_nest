@@ -708,8 +708,10 @@ int main()
         C = 0
         for BcCc:
             for AcBr:
-                // transpose B1 into B2 (interpreted, since no parent can be
-        jitted) B2[BcCc, AcBr] = B1[AcBr, BcCc] for ArCr:
+                // transpose B1 into B2
+                // (interpreted, since parent can't be jitted)
+                B2[BcCc, AcBr] = B1[AcBr, BcCc]
+                for ArCr:
                     // jitted
                     C[ArCr, BcCc] += A[ArCr, AcBr] * B2[BcCc, AcBr]
         */
