@@ -295,6 +295,24 @@ public:
 };
 
 template <class ISA>
+std::shared_ptr<loop_tree_node<ISA>> make_compute_node(
+    std::vector<std::string> const& inputs, std::string const& output,
+    std::map<std::string, std::map<std::string, int>> const& strides,
+    arithmetic_op_kind plus, arithmetic_op_kind multiplies, int alpha,
+    std::optional<int>                          unroll_limit = std::nullopt,
+    std::shared_ptr<elementwise_operation<ISA>> elementwise_preop = nullptr,
+    std::vector<std::string>                    elementwise_preop_tensors = {},
+    std::shared_ptr<elementwise_operation<ISA>> elementwise_postop = nullptr,
+    std::vector<std::string>                    elementwise_postop_tensors = {},
+    std::optional<OptimizationConfiguration>    optim_config = std::nullopt)
+{
+    return std::shared_ptr<loop_tree_node<ISA>>(new compute_node<ISA>(
+        inputs, output, strides, plus, multiplies, alpha, unroll_limit,
+        elementwise_preop, elementwise_preop_tensors, elementwise_postop,
+        elementwise_postop_tensors, optim_config));
+}
+
+template <class ISA>
 class transpose_node : public loop_tree_node<ISA>
 {
 
@@ -351,6 +369,16 @@ public:
         };
     }
 };
+
+template <class ISA>
+std::shared_ptr<loop_tree_node<ISA>>
+make_transpose_node(std::string input, std::string output,
+                    std::map<std::string, std::map<std::string, int>> strides,
+                    std::optional<int> unroll_limit = std::nullopt)
+{
+    return std::shared_ptr<loop_tree_node<ISA>>(
+        new transpose_node<ISA>(input, output, strides, unroll_limit));
+}
 
 template <class ISA>
 class for_loop_node : public loop_tree_node<ISA>
@@ -524,6 +552,15 @@ public:
         };
     }
 };
+
+template <class ISA>
+std::shared_ptr<loop_tree_node<ISA>>
+make_for_loop_node(std::string var, int delta,
+                   std::vector<std::shared_ptr<loop_tree_node<ISA>>> children)
+{
+    return std::shared_ptr<loop_tree_node<ISA>>(
+        new for_loop_node<ISA>(var, delta, children));
+}
 
 template <class ISA>
 class jitted_loop_nest_node : public loop_tree_node<ISA>
@@ -1026,18 +1063,16 @@ private:
             postop_tensors.push_back("post");
         }
 
-        auto innermost =
-            std::shared_ptr<compute_node<ISA>>(new compute_node<ISA>(
-                {"A", "B"}, "C", tensor_strides, arithmetic_op_kind::plus,
-                arithmetic_op_kind::multiplies, alpha, unroll_limit,
-                elementwise_preop, preop_tensors, elementwise_postop,
-                postop_tensors, optim_config));
+        auto current = make_compute_node<ISA>(
+            {"A", "B"}, "C", tensor_strides, arithmetic_op_kind::plus,
+            arithmetic_op_kind::multiplies, alpha, unroll_limit,
+            elementwise_preop, preop_tensors, elementwise_postop,
+            postop_tensors, optim_config);
 
-        std::shared_ptr<loop_tree_node<ISA>> current = innermost;
         for (auto it = order.rbegin(); it != order.rend(); it++)
         {
-            auto new_node = std::shared_ptr<for_loop_node<ISA>>(
-                new for_loop_node<ISA>(it->first, it->second, {current}));
+            auto new_node =
+                make_for_loop_node<ISA>(it->first, it->second, {current});
             current = new_node;
         }
 
@@ -1050,16 +1085,13 @@ private:
                                 std::map<std::string, int> A_strides,
                                 std::optional<int>         unroll_limit)
     {
-        std::shared_ptr<transpose_node<ISA>> innermost =
-            std::shared_ptr<transpose_node<ISA>>(new transpose_node<ISA>(
-                "A", "C", {{"A", A_strides}, {"C", C_strides}}, unroll_limit));
+        auto current = make_transpose_node<ISA>(
+            "A", "C", {{"A", A_strides}, {"C", C_strides}}, unroll_limit);
 
-        std::shared_ptr<loop_tree_node<ISA>> current = innermost;
         for (auto it = order.rbegin(); it != order.rend(); it++)
         {
             std::shared_ptr<loop_tree_node<ISA>> new_node =
-                std::shared_ptr<for_loop_node<ISA>>(
-                    new for_loop_node<ISA>(it->first, it->second, {current}));
+                make_for_loop_node<ISA>(it->first, it->second, {current});
             current = new_node;
         }
 
