@@ -143,6 +143,7 @@ private:
     std::vector<std::string>                    elementwise_preop_tensors;
     std::shared_ptr<elementwise_operation<ISA>> elementwise_postop;
     std::vector<std::string>                    elementwise_postop_tensors;
+    std::optional<OptimizationConfiguration>    optim_config;
 
 public:
     compute_node(
@@ -154,7 +155,8 @@ public:
         std::vector<std::string> elementwise_preop_tensors            = {},
         std::shared_ptr<elementwise_operation<ISA>> elementwise_postop =
             nullptr,
-        std::vector<std::string> elementwise_postop_tensors = {})
+        std::vector<std::string> elementwise_postop_tensors   = {},
+        std::optional<OptimizationConfiguration> optim_config = std::nullopt)
         : super_type(node_kind::compute_node_type)
         , inputs(inputs)
         , output(output)
@@ -167,6 +169,7 @@ public:
         , elementwise_preop_tensors(elementwise_preop_tensors)
         , elementwise_postop(elementwise_postop)
         , elementwise_postop_tensors(elementwise_postop_tensors)
+        , optim_config(optim_config)
     {
         for (auto const& t : inputs)
         {
@@ -208,24 +211,29 @@ public:
 
     std::optional<int> get_unroll_limit() const { return unroll_limit; }
 
-    std::shared_ptr<elementwise_operation<ISA>> get_elementwise_preop()
+    std::shared_ptr<elementwise_operation<ISA>> get_elementwise_preop() const
     {
         return elementwise_preop;
     }
 
-    std::vector<std::string> const& get_elementwise_preop_tensors()
+    std::vector<std::string> const& get_elementwise_preop_tensors() const
     {
         return elementwise_preop_tensors;
     }
 
-    std::shared_ptr<elementwise_operation<ISA>> get_elementwise_postop()
+    std::shared_ptr<elementwise_operation<ISA>> get_elementwise_postop() const
     {
         return elementwise_postop;
     }
 
-    std::vector<std::string> const& get_elementwise_postop_tensors()
+    std::vector<std::string> const& get_elementwise_postop_tensors() const
     {
         return elementwise_postop_tensors;
+    }
+
+    std::optional<OptimizationConfiguration> get_optim_config() const
+    {
+        return optim_config;
     }
 
     std::map<std::string, std::map<std::string, int>> const&
@@ -533,6 +541,7 @@ private:
     std::vector<std::string>                    elementwise_preop_tensors;
     std::shared_ptr<elementwise_operation<ISA>> elementwise_postop;
     std::vector<std::string>                    elementwise_postop_tensors;
+    std::optional<OptimizationConfiguration>    optim_config;
 
 public:
     jitted_loop_nest_node(
@@ -545,7 +554,8 @@ public:
         std::vector<std::string> elementwise_preop_tensors            = {},
         std::shared_ptr<elementwise_operation<ISA>> elementwise_postop =
             nullptr,
-        std::vector<std::string> elementwise_postop_tensors = {})
+        std::vector<std::string> elementwise_postop_tensors   = {},
+        std::optional<OptimizationConfiguration> optim_config = std::nullopt)
         : super_type(node_kind::jitted_loop_nest_node_type)
         , inputs(inputs)
         , output(output)
@@ -559,6 +569,7 @@ public:
         , elementwise_preop_tensors(elementwise_preop_tensors)
         , elementwise_postop(elementwise_postop)
         , elementwise_postop_tensors(elementwise_postop_tensors)
+        , optim_config(optim_config)
     {
     }
 
@@ -580,6 +591,7 @@ public:
         , elementwise_postop(compute_jitter_node->elementwise_postop)
         , elementwise_postop_tensors(
               compute_jitter_node->elementwise_postop_tensors)
+        , optim_config(compute_jitter_node->optim_config)
     {
         order.insert(order.begin(),
                      {for_node->get_var(), for_node->get_delta()});
@@ -602,6 +614,7 @@ public:
         , elementwise_postop(compute_node->get_elementwise_postop())
         , elementwise_postop_tensors(
               compute_node->get_elementwise_postop_tensors())
+        , optim_config(compute_node->get_optim_config())
     {
     }
 
@@ -638,7 +651,7 @@ public:
                 strides.at(inputs[0]), strides.at(inputs[1]),
                 get_operation_pair(plus, multiplies), unroll_limit,
                 elementwise_preop, preop_strides, elementwise_postop,
-                postop_strides)
+                postop_strides, optim_config)
                 .get_shared();
 
         auto output = this->output;
@@ -765,9 +778,9 @@ public:
     get_fn(std::map<std::string, int> const&                   sizes,
            std::map<std::string, std::set<std::string>> const& formulas) const
     {
-        // TODO(j): needs user unroll limit
         auto jit_fn = facebook::sysml::aot::transposer_jitter<ISA>(
-                          order, sizes, strides.at(output), strides.at(input))
+                          order, sizes, strides.at(output), strides.at(input),
+                          unroll_limit)
                           .get_shared();
 
         auto output = this->output;
@@ -987,7 +1000,8 @@ private:
                                                     elementwise_preop_strides,
         std::shared_ptr<elementwise_operation<ISA>> elementwise_postop,
         std::vector<std::map<std::string, int>> const&
-            elementwise_postop_strides)
+                                                 elementwise_postop_strides,
+        std::optional<OptimizationConfiguration> optim_config)
     {
 
         std::map<std::string, std::map<std::string, int>> tensor_strides = {
@@ -1020,7 +1034,7 @@ private:
                 {"A", "B"}, "C", tensor_strides, arithmetic_op_kind::plus,
                 arithmetic_op_kind::multiplies, alpha, unroll_limit,
                 elementwise_preop, preop_tensors, elementwise_postop,
-                postop_tensors));
+                postop_tensors, optim_config));
 
         std::shared_ptr<loop_tree_node<ISA>> current = innermost;
         for (auto it = order.rbegin(); it != order.rend(); it++)
@@ -1096,12 +1110,13 @@ public:
         std::shared_ptr<elementwise_operation<ISA>> elementwise_postop =
             nullptr,
         std::vector<std::map<std::string, int>> const&
-            elementwise_postop_strides = {})
+                                                 elementwise_postop_strides = {},
+        std::optional<OptimizationConfiguration> optim_config = std::nullopt)
         : loop_tree_program(
               loop_nest_compute_to_tree(
                   order, C_strides, A_strides, B_strides, alpha, unroll_limit,
                   elementwise_preop, elementwise_preop_strides,
-                  elementwise_postop, elementwise_postop_strides),
+                  elementwise_postop, elementwise_postop_strides, optim_config),
               sizes, {{"C", C_formula}, {"A", A_formula}, {"B", B_formula}},
               {"A", "B", "C"})
     {
