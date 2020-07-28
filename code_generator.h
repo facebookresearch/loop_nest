@@ -129,6 +129,7 @@ public:
     using VReg  = Xbyak::VReg;
     using SReg  = Xbyak::SReg;
     using DReg  = Xbyak::DReg;
+    using QReg  = Xbyak::QReg;
     using WReg  = Xbyak::WReg;
     using XReg  = Xbyak::XReg;
 
