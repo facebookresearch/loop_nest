@@ -28,6 +28,18 @@ enum class node_kind
     jitted_transpose_node_type
 };
 
+static std::map<node_kind, std::string> node_kind_to_str = {
+    {node_kind::for_loop_node_type, "for_loop_node"},
+    {node_kind::compute_node_type, "compute_node"},
+    {node_kind::transpose_node_type, "transpose_node"},
+    {node_kind::jitted_loop_nest_node_type, "jitted_loop_nest_node"},
+    {node_kind::jitted_transpose_node_type, "jitted_transpose_node"}};
+
+std::string get_node_kind_str(node_kind kind)
+{
+    return node_kind_to_str.at(kind);
+}
+
 // Note: add classes from arithmetic_operations.h
 // as needed
 enum class arithmetic_op_kind
@@ -116,9 +128,9 @@ public:
     get_fn(std::map<std::string, int> const&,
            std::map<std::string, std::set<std::string>> const&) const = 0;
 
-    virtual std::vector<std::string> get_tensors_used() const = 0;
+    virtual std::set<std::string> get_tensors_used() const = 0;
 
-    virtual std::vector<std::string> get_output_tensors() const = 0;
+    virtual std::set<std::string> get_output_tensors() const = 0;
 
     virtual std::map<std::string, std::map<std::string, int>> const&
     get_tensor_strides() const = 0;
@@ -242,22 +254,20 @@ public:
         return strides;
     }
 
-    std::vector<std::string> get_tensors_used() const
+    std::set<std::string> get_tensors_used() const
     {
-        auto tensors_used = inputs;
-        tensors_used.push_back(output);
+        std::set<std::string> tensors_used(inputs.begin(), inputs.end());
+        tensors_used.insert(output);
 
-        tensors_used.insert(tensors_used.end(),
-                            elementwise_preop_tensors.begin(),
+        tensors_used.insert(elementwise_preop_tensors.begin(),
                             elementwise_preop_tensors.end());
-        tensors_used.insert(tensors_used.end(),
-                            elementwise_postop_tensors.begin(),
+        tensors_used.insert(elementwise_postop_tensors.begin(),
                             elementwise_postop_tensors.end());
 
         return tensors_used;
     }
 
-    std::vector<std::string> get_output_tensors() const { return {output}; }
+    std::set<std::string> get_output_tensors() const { return {output}; }
 
     loop_tree_fn_type
     get_fn(std::map<std::string, int> const& sizes,
@@ -342,12 +352,9 @@ public:
 
     std::optional<int> get_unroll_limit() const { return unroll_limit; }
 
-    std::vector<std::string> get_tensors_used() const
-    {
-        return {input, output};
-    }
+    std::set<std::string> get_tensors_used() const { return {input, output}; }
 
-    std::vector<std::string> get_output_tensors() const { return {output}; }
+    std::set<std::string> get_output_tensors() const { return {output}; }
 
     std::map<std::string, std::map<std::string, int>> const&
     get_tensor_strides() const
@@ -362,10 +369,12 @@ public:
         return [input  = this->input,
                 output = this->output](std::map<std::string, float*> tensors,
                                        std::map<std::string, int> const&) {
+            assert(tensors.count(input));
+            assert(tensors.count(output));
+
             float* A = tensors.at(input);
             float* C = tensors.at(output);
-
-            C[0] = A[0];
+            C[0]     = A[0];
         };
     }
 };
@@ -389,8 +398,8 @@ private:
     std::string var;
     int         delta;
 
-    std::vector<std::string> in_scope_tensor_names;
-    std::vector<std::string> in_scope_output_tensor_names;
+    std::set<std::string> in_scope_tensor_names;
+    std::set<std::string> in_scope_output_tensor_names;
     std::map<std::string, std::map<std::string, int>> in_scope_tensor_strides;
 
 private:
@@ -399,13 +408,11 @@ private:
         for (auto c : this->get_children())
         {
             auto node_tensor_names = c->get_tensors_used();
-            in_scope_tensor_names.insert(in_scope_tensor_names.end(),
-                                         node_tensor_names.begin(),
+            in_scope_tensor_names.insert(node_tensor_names.begin(),
                                          node_tensor_names.end());
 
             auto node_output_tensor_names = c->get_output_tensors();
             in_scope_output_tensor_names.insert(
-                in_scope_output_tensor_names.end(),
                 node_output_tensor_names.begin(),
                 node_output_tensor_names.end());
 
@@ -417,7 +424,7 @@ private:
     }
 
     std::function<void(std::map<std::string, float*>&)>
-    get_tensor_advancer(std::vector<std::string> const& tensor_names) const
+    get_tensor_advancer(std::set<std::string> const& tensor_names) const
     {
         std::vector<std::pair<std::string, std::int64_t>> to_advance;
 
@@ -442,7 +449,7 @@ private:
 
     std::function<void(std::map<std::string, int>&, int)>
     get_alpha_offsets_adjuster(
-        std::vector<std::string> const&                     output_tensor_names,
+        std::set<std::string> const&                        output_tensor_names,
         std::map<std::string, std::set<std::string>> const& formulas) const
     {
 
@@ -480,12 +487,12 @@ public:
         set_in_scope_tensor_info();
     }
 
-    std::vector<std::string> get_tensors_used() const override
+    std::set<std::string> get_tensors_used() const override
     {
         return in_scope_tensor_names;
     }
 
-    std::vector<std::string> get_output_tensors() const
+    std::set<std::string> get_output_tensors() const
     {
         return in_scope_output_tensor_names;
     }
@@ -744,14 +751,14 @@ public:
         }
     }
 
-    std::vector<std::string> get_tensors_used() const override
+    std::set<std::string> get_tensors_used() const override
     {
-        std::vector<std::string> tensors_used = inputs;
-        tensors_used.push_back(output);
+        std::set<std::string> tensors_used(inputs.begin(), inputs.end());
+        tensors_used.insert(output);
         return tensors_used;
     }
 
-    std::vector<std::string> get_output_tensors() const { return {output}; }
+    std::set<std::string> get_output_tensors() const { return {output}; }
 
     std::map<std::string, std::map<std::string, int>> const&
     get_tensor_strides() const override
@@ -832,12 +839,12 @@ public:
         };
     }
 
-    std::vector<std::string> get_tensors_used() const override
+    std::set<std::string> get_tensors_used() const override
     {
         return {input, output};
     }
 
-    std::vector<std::string> get_output_tensors() const { return {output}; }
+    std::set<std::string> get_output_tensors() const { return {output}; }
 
     std::map<std::string, std::map<std::string, int>> const&
     get_tensor_strides() const override
@@ -918,8 +925,12 @@ simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>> node,
 
     switch (single_child->get_type())
     {
-    case node_kind::compute_node_type:
+    case node_kind::for_loop_node_type:
+        // child is not jitted, so can't add on this node
+        return node;
+        break;
 
+    case node_kind::compute_node_type:
         return merge_loop_into_jitter(
             for_node,
             std::dynamic_pointer_cast<compute_node<ISA>>(single_child));
@@ -1200,6 +1211,17 @@ public:
         };
     }
 };
+
+template <class ISA>
+std::shared_ptr<loop_tree_program<ISA>>
+make_loop_tree_program(std::vector<std::shared_ptr<loop_tree_node<ISA>>> nodes,
+                       std::map<std::string, int>                        sizes,
+                       std::map<std::string, std::set<std::string>> formulas,
+                       std::optional<int> max_interpreted_depth = std::nullopt)
+{
+    return std::shared_ptr<loop_tree_program<ISA>>(new loop_tree_program<ISA>(
+        nodes, sizes, formulas, max_interpreted_depth));
+}
 
 } // namespace aot
 } // namespace sysml
