@@ -502,6 +502,9 @@ public:
         auto alpha_offsets_adjuster =
             get_alpha_offsets_adjuster(get_output_tensors(), formulas);
 
+        LN_LOG(DEBUG) << "loop_tree: Executing interpreted for(" << var << ","
+                      << delta << ")\n";
+
         return [=](std::map<std::string, float*> tensors,
                    std::map<std::string, int>    alpha_offsets) {
             for (int i = 0; i < full; ++i)
@@ -842,13 +845,10 @@ merge_loop_into_jitter(std::shared_ptr<for_loop_node<ISA>>         node,
         new jitted_transpose_node<ISA>(node, child));
 }
 
-#ifdef TEST_STOP_SIMPLIFICATION
-int test_simplification_counter_ = 0;
-#endif
-
 template <class ISA>
 std::shared_ptr<loop_tree_node<ISA>>
-simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>> node)
+simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>> node,
+                    int current_depth = 0, int max_interpreted_depth = 0)
 {
     if (node->get_type() != node_kind::for_loop_node_type)
     {
@@ -858,7 +858,8 @@ simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>> node)
     std::vector<std::shared_ptr<loop_tree_node<ISA>>> new_children;
     for (auto c : node->get_children())
     {
-        new_children.push_back(simplify_loop_nests(c));
+        new_children.push_back(
+            simplify_loop_nests(c, current_depth + 1, max_interpreted_depth));
     }
     node->set_children(new_children);
 
@@ -869,13 +870,11 @@ simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>> node)
         return node;
     }
 
-#ifdef TEST_STOP_SIMPLIFICATION
-    if (test_simplification_counter_ >= 3)
+    if (current_depth < max_interpreted_depth)
     {
-        std::cout << "Stopping short on simplification" << std::endl;
+        // part of the prefix we want to have interpreted
         return node;
     }
-#endif
 
     auto for_node = std::dynamic_pointer_cast<for_loop_node<ISA>>(node);
     std::shared_ptr<loop_tree_node<ISA>> single_child = new_children.at(0);
@@ -883,9 +882,6 @@ simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>> node)
     switch (single_child->get_type())
     {
     case node_kind::compute_node_type:
-#ifdef TEST_STOP_SIMPLIFICATION
-        test_simplification_counter_ += 1;
-#endif
 
         return merge_loop_into_jitter(
             for_node,
@@ -987,6 +983,7 @@ private:
     std::map<std::string, int>                        sizes;
     std::map<std::string, std::set<std::string>>      formulas;
     std::set<std::string>                             provided_tensors;
+    int                                               max_interpreted_depth;
 
     static std::vector<std::shared_ptr<loop_tree_node<ISA>>>
     loop_nest_compute_to_tree(
@@ -1073,22 +1070,24 @@ public:
     loop_tree_program(std::vector<std::shared_ptr<loop_tree_node<ISA>>> nodes,
                       std::map<std::string, int>                        sizes,
                       std::map<std::string, std::set<std::string>> formulas,
-                      std::set<std::string> provided_tensors)
+                      std::set<std::string> provided_tensors,
+                      std::optional<int> max_interpreted_depth = std::nullopt)
         : nodes(nodes)
         , sizes(sizes)
         , formulas(formulas)
         , provided_tensors(provided_tensors)
+        , max_interpreted_depth(max_interpreted_depth ? *max_interpreted_depth
+                                                      : 0)
     {
 
-#ifndef NOPTIM
         LN_LOG(DEBUG) << "Pass: Simplifying loop nests\n";
         std::vector<std::shared_ptr<loop_tree_node<ISA>>> new_nodes;
         for (auto c : nodes)
         {
-            new_nodes.push_back(simplify_loop_nests(c));
+            new_nodes.push_back(
+                simplify_loop_nests(c, 0, this->max_interpreted_depth));
         }
-        nodes = new_nodes;
-#endif
+        this->nodes = new_nodes;
     }
 
     std::vector<std::shared_ptr<loop_tree_node<ISA>>> get_children()
@@ -1111,14 +1110,15 @@ public:
             nullptr,
         std::vector<std::map<std::string, int>> const&
                                                  elementwise_postop_strides = {},
-        std::optional<OptimizationConfiguration> optim_config = std::nullopt)
+        std::optional<OptimizationConfiguration> optim_config = std::nullopt,
+        std::optional<int> max_interpreted_depth              = std::nullopt)
         : loop_tree_program(
               loop_nest_compute_to_tree(
                   order, C_strides, A_strides, B_strides, alpha, unroll_limit,
                   elementwise_preop, elementwise_preop_strides,
                   elementwise_postop, elementwise_postop_strides, optim_config),
               sizes, {{"C", C_formula}, {"A", A_formula}, {"B", B_formula}},
-              {"A", "B", "C"})
+              {"A", "B", "C"}, max_interpreted_depth)
     {
         if (!elementwise_preop_strides.empty())
         {
@@ -1134,10 +1134,11 @@ public:
                       std::map<std::string, int>               sizes,
                       std::map<std::string, int>               Out_strides,
                       std::map<std::string, int>               In_strides,
-                      std::optional<int> unroll_limit = std::nullopt)
+                      std::optional<int> unroll_limit          = std::nullopt,
+                      std::optional<int> max_interpreted_depth = std::nullopt)
         : loop_tree_program(loop_nest_transpose_to_tree(
                                 order, Out_strides, In_strides, unroll_limit),
-                            sizes, {}, {"A", "C"})
+                            sizes, {}, {"A", "C"}, max_interpreted_depth)
     {
     }
 
