@@ -341,4 +341,436 @@ int main()
                   << "\n";
     }
 #endif
+
+    {
+        /*
+        for BcCc:
+            for ArCr:
+                // no zero-ing out of C1,C2
+                for AcBr1:
+                    C1 += A1 * B1
+                for AcBr2:
+                    C2 += A2 * B2
+        */
+
+        int ArCr  = 100;
+        int AcBr1 = 100;
+        int AcBr2 = 200;
+        int BcCc  = 100;
+
+        std::map<std::string, int> sizes = {
+            {"ArCr", ArCr}, {"AcBr1", AcBr1}, {"AcBr2", AcBr2}, {"BcCc", BcCc}};
+
+        std::map<std::string, std::set<std::string>> formulas = {
+            {"C1", {"ArCr", "BcCc"}},  {"A1", {"ArCr", "AcBr1"}},
+            {"B1", {"AcBr1", "BcCc"}}, {"C2", {"ArCr", "BcCc"}},
+            {"A2", {"ArCr", "AcBr2"}}, {"B2", {"AcBr2", "BcCc"}}};
+
+        std::map<std::string, std::map<std::string, int>> mm1_strides = {
+            {"C1", {{"ArCr", BcCc}, {"BcCc", 1}}},
+            {"A1", {{"ArCr", AcBr1}, {"AcBr1", 1}}},
+            {"B1", {{"AcBr1", BcCc}, {"BcCc", 1}}}};
+
+        auto mm1 = make_compute_node<CT_ISA>(
+            {"A1", "B1"}, "C1", mm1_strides, arithmetic_op_kind::plus,
+            arithmetic_op_kind::multiplies, 1, 100);
+
+        std::map<std::string, std::map<std::string, int>> mm2_strides = {
+            {"C2", {{"ArCr", BcCc}, {"BcCc", 1}}},
+            {"A2", {{"ArCr", AcBr2}, {"AcBr2", 1}}},
+            {"B2", {{"AcBr2", BcCc}, {"BcCc", 1}}}};
+
+        auto mm2 = make_compute_node<CT_ISA>(
+            {"A2", "B2"}, "C2", mm2_strides, arithmetic_op_kind::plus,
+            arithmetic_op_kind::multiplies, 1, 100);
+
+        auto ln1 = make_for_loop_node<CT_ISA>("AcBr1", 1, {mm1});
+        auto ln2 = make_for_loop_node<CT_ISA>("AcBr2", 1, {mm2});
+
+        auto root = make_for_loop_node<CT_ISA>(
+            "BcCc", 1, {make_for_loop_node<CT_ISA>("ArCr", 1, {ln1, ln2})});
+
+        auto tree = make_loop_tree_program<CT_ISA>({root}, sizes, formulas,
+                                                   MAX_INTERPRETED_DEPTH);
+
+        auto fn = tree->get_fn();
+
+        auto A1  = getRandomVector<float>(AcBr1 * ArCr);
+        auto B1  = getRandomVector<float>(AcBr1 * BcCc);
+        auto CN1 = getRandomVector<float>(ArCr * BcCc);
+        auto CJ1 = CN1;
+
+        auto A2  = getRandomVector<float>(AcBr2 * ArCr);
+        auto B2  = getRandomVector<float>(AcBr2 * BcCc);
+        auto CN2 = getRandomVector<float>(ArCr * BcCc);
+        auto CJ2 = CN2;
+
+        baseline_MM(ArCr, AcBr1, BcCc, AcBr1, 1, BcCc, 1, BcCc, 1, A1.data(),
+                    B1.data(), CN1.data(), 1);
+
+        baseline_MM(ArCr, AcBr2, BcCc, AcBr2, 1, BcCc, 1, BcCc, 1, A2.data(),
+                    B2.data(), CN2.data(), 1);
+
+        std::map<std::string, float*> tensors = {
+            {"C1", CJ1.data()}, {"A1", A1.data()}, {"B1", B1.data()},
+            {"C2", CJ2.data()}, {"A2", A2.data()}, {"B2", B2.data()}};
+
+        fn(tensors);
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ1.data(), CJ1.data() + ArCr * BcCc,
+                                CN1.data())
+                  << "\n";
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ2.data(), CJ2.data() + ArCr * BcCc,
+                                CN2.data())
+                  << "\n";
+    }
+
+    {
+        /*
+        for BcCc:
+            for ArCr:
+                C1 = 0
+                C2 = 0
+                for AcBr1:
+                    C1 += A1 * B1
+                for AcBr2:
+                    C2 += A2 * B2
+        */
+
+        int ArCr  = 100;
+        int AcBr1 = 100;
+        int AcBr2 = 200;
+        int BcCc  = 100;
+
+        std::map<std::string, int> sizes = {
+            {"ArCr", ArCr}, {"AcBr1", AcBr1}, {"AcBr2", AcBr2}, {"BcCc", BcCc}};
+
+        std::map<std::string, std::set<std::string>> formulas = {
+            {"C1", {"ArCr", "BcCc"}},  {"A1", {"ArCr", "AcBr1"}},
+            {"B1", {"AcBr1", "BcCc"}}, {"C2", {"ArCr", "BcCc"}},
+            {"A2", {"ArCr", "AcBr2"}}, {"B2", {"AcBr2", "BcCc"}}};
+
+        std::map<std::string, std::map<std::string, int>> mm1_strides = {
+            {"C1", {{"ArCr", BcCc}, {"BcCc", 1}}},
+            {"A1", {{"ArCr", AcBr1}, {"AcBr1", 1}}},
+            {"B1", {{"AcBr1", BcCc}, {"BcCc", 1}}}};
+
+        auto mm1 = make_compute_node<CT_ISA>(
+            {"A1", "B1"}, "C1", mm1_strides, arithmetic_op_kind::plus,
+            arithmetic_op_kind::multiplies, 0, 100);
+
+        std::map<std::string, std::map<std::string, int>> mm2_strides = {
+            {"C2", {{"ArCr", BcCc}, {"BcCc", 1}}},
+            {"A2", {{"ArCr", AcBr2}, {"AcBr2", 1}}},
+            {"B2", {{"AcBr2", BcCc}, {"BcCc", 1}}}};
+
+        auto mm2 = make_compute_node<CT_ISA>(
+            {"A2", "B2"}, "C2", mm2_strides, arithmetic_op_kind::plus,
+            arithmetic_op_kind::multiplies, 0, 100);
+
+        auto ln1 = make_for_loop_node<CT_ISA>("AcBr1", 1, {mm1});
+        auto ln2 = make_for_loop_node<CT_ISA>("AcBr2", 1, {mm2});
+
+        auto root = make_for_loop_node<CT_ISA>(
+            "BcCc", 1, {make_for_loop_node<CT_ISA>("ArCr", 1, {ln1, ln2})});
+
+        auto tree = make_loop_tree_program<CT_ISA>({root}, sizes, formulas,
+                                                   MAX_INTERPRETED_DEPTH);
+
+        auto fn = tree->get_fn();
+
+        auto A1  = getRandomVector<float>(AcBr1 * ArCr);
+        auto B1  = getRandomVector<float>(AcBr1 * BcCc);
+        auto CN1 = getRandomVector<float>(ArCr * BcCc);
+        auto CJ1 = CN1;
+
+        auto A2  = getRandomVector<float>(AcBr2 * ArCr);
+        auto B2  = getRandomVector<float>(AcBr2 * BcCc);
+        auto CN2 = getRandomVector<float>(ArCr * BcCc);
+        auto CJ2 = CN2;
+
+        baseline_MM(ArCr, AcBr1, BcCc, AcBr1, 1, BcCc, 1, BcCc, 1, A1.data(),
+                    B1.data(), CN1.data(), 0);
+
+        baseline_MM(ArCr, AcBr2, BcCc, AcBr2, 1, BcCc, 1, BcCc, 1, A2.data(),
+                    B2.data(), CN2.data(), 0);
+
+        std::map<std::string, float*> tensors = {
+            {"C1", CJ1.data()}, {"A1", A1.data()}, {"B1", B1.data()},
+            {"C2", CJ2.data()}, {"A2", A2.data()}, {"B2", B2.data()}};
+
+        fn(tensors);
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ1.data(), CJ1.data() + ArCr * BcCc,
+                                CN1.data())
+                  << "\n";
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ2.data(), CJ2.data() + ArCr * BcCc,
+                                CN2.data())
+                  << "\n";
+    }
+
+    {
+        /*
+        for BcCc:
+            for ArCr:
+                // no zero-ing out of C1
+                for AcBr1:
+                    C1 += A1 * B1
+
+        for BcCc:
+            for ArCr:
+                C2 = 0
+                for AcBr2:
+                    C2 += A2 * B2
+        */
+
+        int ArCr  = 100;
+        int AcBr1 = 100;
+        int AcBr2 = 200;
+        int BcCc  = 100;
+
+        std::map<std::string, int> sizes = {
+            {"ArCr", ArCr}, {"AcBr1", AcBr1}, {"AcBr2", AcBr2}, {"BcCc", BcCc}};
+
+        std::map<std::string, std::set<std::string>> formulas = {
+            {"C1", {"ArCr", "BcCc"}},  {"A1", {"ArCr", "AcBr1"}},
+            {"B1", {"AcBr1", "BcCc"}}, {"C2", {"ArCr", "BcCc"}},
+            {"A2", {"ArCr", "AcBr2"}}, {"B2", {"AcBr2", "BcCc"}}};
+
+        std::map<std::string, std::map<std::string, int>> mm1_strides = {
+            {"C1", {{"ArCr", BcCc}, {"BcCc", 1}}},
+            {"A1", {{"ArCr", AcBr1}, {"AcBr1", 1}}},
+            {"B1", {{"AcBr1", BcCc}, {"BcCc", 1}}}};
+
+        auto mm1 = make_compute_node<CT_ISA>(
+            {"A1", "B1"}, "C1", mm1_strides, arithmetic_op_kind::plus,
+            arithmetic_op_kind::multiplies, 1, 100);
+
+        std::map<std::string, std::map<std::string, int>> mm2_strides = {
+            {"C2", {{"ArCr", BcCc}, {"BcCc", 1}}},
+            {"A2", {{"ArCr", AcBr2}, {"AcBr2", 1}}},
+            {"B2", {{"AcBr2", BcCc}, {"BcCc", 1}}}};
+
+        auto mm2 = make_compute_node<CT_ISA>(
+            {"A2", "B2"}, "C2", mm2_strides, arithmetic_op_kind::plus,
+            arithmetic_op_kind::multiplies, 0, 100);
+
+        auto ln1 = make_for_loop_node<CT_ISA>(
+            "BcCc", 1,
+            {make_for_loop_node<CT_ISA>(
+                "ArCr", 1, {make_for_loop_node<CT_ISA>("AcBr1", 1, {mm1})})});
+
+        auto ln2 = make_for_loop_node<CT_ISA>(
+            "BcCc", 1,
+            {make_for_loop_node<CT_ISA>(
+                "ArCr", 1, {make_for_loop_node<CT_ISA>("AcBr2", 1, {mm2})})});
+
+        auto tree = make_loop_tree_program<CT_ISA>({ln1, ln2}, sizes, formulas,
+                                                   MAX_INTERPRETED_DEPTH);
+
+        auto fn = tree->get_fn();
+
+        auto A1  = getRandomVector<float>(AcBr1 * ArCr);
+        auto B1  = getRandomVector<float>(AcBr1 * BcCc);
+        auto CN1 = getRandomVector<float>(ArCr * BcCc);
+        auto CJ1 = CN1;
+
+        auto A2  = getRandomVector<float>(AcBr2 * ArCr);
+        auto B2  = getRandomVector<float>(AcBr2 * BcCc);
+        auto CN2 = getRandomVector<float>(ArCr * BcCc);
+        auto CJ2 = CN2;
+
+        baseline_MM(ArCr, AcBr1, BcCc, AcBr1, 1, BcCc, 1, BcCc, 1, A1.data(),
+                    B1.data(), CN1.data(), 1);
+
+        baseline_MM(ArCr, AcBr2, BcCc, AcBr2, 1, BcCc, 1, BcCc, 1, A2.data(),
+                    B2.data(), CN2.data(), 0);
+
+        std::map<std::string, float*> tensors = {
+            {"C1", CJ1.data()}, {"A1", A1.data()}, {"B1", B1.data()},
+            {"C2", CJ2.data()}, {"A2", A2.data()}, {"B2", B2.data()}};
+
+        fn(tensors);
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ1.data(), CJ1.data() + ArCr * BcCc,
+                                CN1.data())
+                  << "\n";
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ2.data(), CJ2.data() + ArCr * BcCc,
+                                CN2.data())
+                  << "\n";
+    }
+
+    {
+        /*
+        for BcCc:
+            for ArCr1:
+                C1 = 0
+                for AcBr1:
+                    C1 += A1 * B1
+            for ArCr2:
+                // no zero-ing out of C2
+                for AcBr2:
+                    C2 += A2 * B2
+        */
+
+        int ArCr1 = 100;
+        int ArCr2 = 50;
+        int AcBr1 = 100;
+        int AcBr2 = 200;
+        int BcCc  = 100;
+
+        std::map<std::string, int> sizes = {{"ArCr1", ArCr1},
+                                            {"ArCr2", ArCr2},
+                                            {"AcBr1", AcBr1},
+                                            {"AcBr2", AcBr2},
+                                            {"BcCc", BcCc}};
+
+        std::map<std::string, std::set<std::string>> formulas = {
+            {"C1", {"ArCr1", "BcCc"}},  {"A1", {"ArCr1", "AcBr1"}},
+            {"B1", {"AcBr1", "BcCc"}},  {"C2", {"ArCr2", "BcCc"}},
+            {"A2", {"ArCr2", "AcBr2"}}, {"B2", {"AcBr2", "BcCc"}}};
+
+        std::map<std::string, std::map<std::string, int>> mm1_strides = {
+            {"C1", {{"ArCr1", BcCc}, {"BcCc", 1}}},
+            {"A1", {{"ArCr1", AcBr1}, {"AcBr1", 1}}},
+            {"B1", {{"AcBr1", BcCc}, {"BcCc", 1}}}};
+
+        auto mm1 = make_compute_node<CT_ISA>(
+            {"A1", "B1"}, "C1", mm1_strides, arithmetic_op_kind::plus,
+            arithmetic_op_kind::multiplies, 0, 100);
+
+        std::map<std::string, std::map<std::string, int>> mm2_strides = {
+            {"C2", {{"ArCr2", BcCc}, {"BcCc", 1}}},
+            {"A2", {{"ArCr2", AcBr2}, {"AcBr2", 1}}},
+            {"B2", {{"AcBr2", BcCc}, {"BcCc", 1}}}};
+
+        auto mm2 = make_compute_node<CT_ISA>(
+            {"A2", "B2"}, "C2", mm2_strides, arithmetic_op_kind::plus,
+            arithmetic_op_kind::multiplies, 1, 100);
+
+        auto ln1 = make_for_loop_node<CT_ISA>(
+            "ArCr1", 1, {make_for_loop_node<CT_ISA>("AcBr1", 1, {mm1})});
+
+        auto ln2 = make_for_loop_node<CT_ISA>(
+            "ArCr2", 1, {make_for_loop_node<CT_ISA>("AcBr2", 1, {mm2})});
+
+        auto root = make_for_loop_node<CT_ISA>("BcCc", 1, {ln1, ln2});
+
+        auto tree = make_loop_tree_program<CT_ISA>({root}, sizes, formulas,
+                                                   MAX_INTERPRETED_DEPTH);
+
+        auto fn = tree->get_fn();
+
+        auto A1  = getRandomVector<float>(AcBr1 * ArCr1);
+        auto B1  = getRandomVector<float>(AcBr1 * BcCc);
+        auto CN1 = getRandomVector<float>(ArCr1 * BcCc);
+        auto CJ1 = CN1;
+
+        auto A2  = getRandomVector<float>(AcBr2 * ArCr2);
+        auto B2  = getRandomVector<float>(AcBr2 * BcCc);
+        auto CN2 = getRandomVector<float>(ArCr2 * BcCc);
+        auto CJ2 = CN2;
+
+        baseline_MM(ArCr1, AcBr1, BcCc, AcBr1, 1, BcCc, 1, BcCc, 1, A1.data(),
+                    B1.data(), CN1.data(), 0);
+
+        baseline_MM(ArCr2, AcBr2, BcCc, AcBr2, 1, BcCc, 1, BcCc, 1, A2.data(),
+                    B2.data(), CN2.data(), 1);
+
+        std::map<std::string, float*> tensors = {
+            {"C1", CJ1.data()}, {"A1", A1.data()}, {"B1", B1.data()},
+            {"C2", CJ2.data()}, {"A2", A2.data()}, {"B2", B2.data()}};
+
+        fn(tensors);
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ1.data(), CJ1.data() + ArCr1 * BcCc,
+                                CN1.data())
+                  << "\n";
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ2.data(), CJ2.data() + ArCr2 * BcCc,
+                                CN2.data())
+                  << "\n";
+    }
+
+    {
+        /*
+        C = 0
+        for BcCc:
+            for AcBr:
+                // transpose B1 into B2 (interpreted, since no parent can be
+        jitted) B2[BcCc, AcBr] = B1[AcBr, BcCc] for ArCr:
+                    // jitted
+                    C[ArCr, BcCc] += A[ArCr, AcBr] * B2[BcCc, AcBr]
+        */
+
+        int ArCr = 100;
+        int AcBr = 100;
+        int BcCc = 100;
+
+        std::map<std::string, int> sizes = {
+            {"ArCr", ArCr}, {"AcBr", AcBr}, {"BcCc", BcCc}};
+
+        std::map<std::string, std::set<std::string>> formulas = {
+            {"C", {"ArCr", "BcCc"}},
+            {"A", {"ArCr", "AcBr"}},
+            {"B1", {"AcBr", "BcCc"}},
+            {"B2", {"AcBr", "BcCc"}}};
+
+        std::map<std::string, std::map<std::string, int>> mm_strides = {
+            {"C", {{"ArCr", BcCc}, {"BcCc", 1}}},
+            {"A", {{"ArCr", AcBr}, {"AcBr", 1}}},
+            {"B2", {{"AcBr", 1}, {"BcCc", AcBr}}}};
+
+        auto mm = make_compute_node<CT_ISA>(
+            {"A", "B2"}, "C", mm_strides, arithmetic_op_kind::plus,
+            arithmetic_op_kind::multiplies, 0, 100);
+
+        std::map<std::string, std::map<std::string, int>> transpose_strides = {
+            {"B1", {{"AcBr", BcCc}, {"BcCc", 1}}},
+            {"B2", {{"AcBr", 1}, {"BcCc", AcBr}}}};
+
+        auto tr =
+            make_transpose_node<CT_ISA>("B1", "B2", transpose_strides, 100);
+
+        auto root = make_for_loop_node<CT_ISA>(
+            "BcCc", 1,
+            {make_for_loop_node<CT_ISA>(
+                "AcBr", 1, {tr, make_for_loop_node<CT_ISA>("ArCr", 1, {mm})})});
+
+        auto tree = make_loop_tree_program<CT_ISA>({root}, sizes, formulas,
+                                                   MAX_INTERPRETED_DEPTH);
+
+        auto fn = tree->get_fn();
+
+        auto A  = getRandomVector<float>(AcBr * ArCr);
+        auto B1 = getRandomVector<float>(AcBr * BcCc);
+        auto B2 = getRandomVector<float>(AcBr * BcCc);
+        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto CJ = CN;
+
+        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
+                    B1.data(), CN.data(), 0);
+
+        std::map<std::string, float*> tensors = {{"C", CJ.data()},
+                                                 {"A", A.data()},
+                                                 {"B1", B1.data()},
+                                                 {"B2", B2.data()}};
+
+        fn(tensors);
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << "\n";
+    }
 }
