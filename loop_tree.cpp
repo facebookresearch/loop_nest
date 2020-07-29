@@ -14,6 +14,10 @@
 #define CT_ISA avx2
 #endif
 
+// just for testing:
+// forces a prefix in loop tree
+// to be interpreted (rather than
+// part of jitted loop nest)
 #ifndef MAX_INTERPRETED_DEPTH
 #define MAX_INTERPRETED_DEPTH 0
 #endif
@@ -22,326 +26,6 @@ using namespace facebook::sysml::aot;
 
 int main()
 {
-    {
-        int ArCr = 100;
-        int AcBr = 100;
-        int BcCc = 100;
-
-        auto tree = loop_tree_program<CT_ISA>(
-            {{"AcBr", 256},
-             {"ArCr", 3},
-             {"BcCc", 16},
-             {"AcBr", 1},
-             {"AcBr", 1},
-             {"ArCr", 1},
-             {"BcCc", 1}},
-            // The second argument is a map of the dimension sizes
-            {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
-            // Vars of C (other variables are reduction variables)
-            {"ArCr", "BcCc"},
-            // Variables of A
-            {"ArCr", "AcBr"},
-            // Variables of B
-            {"AcBr", "BcCc"},
-            // C's strides for each variable.  Note that the
-            // strides data is a superset of the previous argument
-            // (variables of C).  I'm still deciding on the final
-            // design, possibly allowing for null strides that
-            // will just deduce them from the sizes, or some
-            // special structs indicating the layout (ie
-            // row-major, col-major).  In this case the vars have
-            // to be ordered though... Many decisions to make...
-            {{"ArCr", BcCc}, {"BcCc", 1}},
-            // A's strides for each variable
-            {{"ArCr", AcBr}, {"AcBr", 1}},
-            // B's strides for each variable
-            {{"AcBr", BcCc}, {"BcCc", 1}}, 1, 322, nullptr, {}, nullptr, {},
-            std::nullopt, MAX_INTERPRETED_DEPTH);
-
-        auto fn = tree.get_fn();
-
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
-
-        auto CN = getRandomVector<float>(ArCr * BcCc);
-        auto CJ = CN;
-
-        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
-                    B.data(), CN.data(), 1);
-
-        fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
-
-        std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
-                  << "\n";
-    }
-
-    {
-        int ArCr = 100;
-        int AcBr = 100;
-        int BcCc = 100;
-
-        auto tree = loop_tree_program<CT_ISA>(
-            {{"AcBr", 256},
-             {"ArCr", 3},
-             {"BcCc", 16},
-             {"AcBr", 1},
-             {"AcBr", 1},
-             {"ArCr", 1},
-             {"BcCc", 1}},
-            // The second argument is a map of the dimension sizes
-            {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
-            // Vars of C (other variables are reduction variables)
-            {"ArCr", "BcCc"},
-            // Variables of A
-            {"ArCr", "AcBr"},
-            // Variables of B
-            {"AcBr", "BcCc"},
-            // C's strides for each variable.  Note that the
-            // strides data is a superset of the previous argument
-            // (variables of C).  I'm still deciding on the final
-            // design, possibly allowing for null strides that
-            // will just deduce them from the sizes, or some
-            // special structs indicating the layout (ie
-            // row-major, col-major).  In this case the vars have
-            // to be ordered though... Many decisions to make...
-            {{"ArCr", BcCc}, {"BcCc", 1}},
-            // A's strides for each variable
-            {{"ArCr", AcBr}, {"AcBr", 1}},
-            // B's strides for each variable
-            {{"AcBr", BcCc}, {"BcCc", 1}}, 0, 322, nullptr, {}, nullptr, {},
-            std::nullopt, MAX_INTERPRETED_DEPTH);
-
-        auto fn = tree.get_fn();
-
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
-
-        auto CN = getRandomVector<float>(ArCr * BcCc);
-        auto CJ = CN;
-
-        // this time not accumulating
-        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
-                    B.data(), CN.data(), 0);
-
-        fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
-
-        std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
-                  << "\n";
-    }
-
-    {
-        int R = 1024;
-        int C = 1024;
-
-        auto A  = getRandomVector<float>(R * C);
-        auto B  = getRandomVector<float>(R * C);
-        auto BJ = getRandomVector<float>(R * C);
-
-        auto tree = loop_tree_program<CT_ISA>(
-            {{"R", 1}, {"C", 1}}, {{"R", R}, {"C", C}}, {{"R", 1}, {"C", R}},
-            {{"R", 1}, {"C", C}}, std::nullopt, MAX_INTERPRETED_DEPTH);
-
-        auto transpose = facebook::sysml::aot::transposer_baseline(
-            {{"R", 1}, {"C", 1}}, {{"R", R}, {"C", C}}, {{"R", 1}, {"C", R}},
-            {{"R", 1}, {"C", C}});
-
-        transpose(B.data(), A.data());
-
-        auto fn = tree.get_fn();
-        fn({{"A", A.data()}, {"C", BJ.data()}});
-
-        std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(BJ.data(), BJ.data() + R * C, B.data()) << "\n";
-    }
-
-    {
-        int ArCr = 100;
-        int AcBr = 100;
-        int BcCc = 100;
-
-        auto tree = loop_tree_program<CT_ISA>(
-            {{"AcBr", 256},
-             {"ArCr", 3},
-             {"BcCc", 16},
-             {"AcBr", 1},
-             {"AcBr", 1},
-             {"ArCr", 1},
-             {"BcCc", 1}},
-            // The second argument is a map of the dimension sizes
-            {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
-            // Vars of C (other variables are reduction variables)
-            {"ArCr", "BcCc"},
-            // Variables of A
-            {"ArCr", "AcBr"},
-            // Variables of B
-            {"AcBr", "BcCc"},
-            // C's strides for each variable.  Note that the
-            // strides data is a superset of the previous argument
-            // (variables of C).  I'm still deciding on the final
-            // design, possibly allowing for null strides that
-            // will just deduce them from the sizes, or some
-            // special structs indicating the layout (ie
-            // row-major, col-major).  In this case the vars have
-            // to be ordered though... Many decisions to make...
-            {{"ArCr", BcCc}, {"BcCc", 1}},
-            // A's strides for each variable
-            {{"ArCr", AcBr}, {"AcBr", 1}},
-            // B's strides for each variable
-            {{"AcBr", BcCc}, {"BcCc", 1}}, 1, 40, nullptr, {}, nullptr, {},
-            std::nullopt, MAX_INTERPRETED_DEPTH);
-
-        auto fn = tree.get_fn();
-
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
-
-        auto CN = getRandomVector<float>(ArCr * BcCc);
-        auto CJ = CN;
-
-        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
-                    B.data(), CN.data(), 1);
-
-        fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
-
-        std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
-                  << "\n";
-    }
-
-#ifndef NELEMENTWISE
-    {
-        int ArCr = 100;
-        int AcBr = 100;
-        int BcCc = 100;
-
-        auto tree = loop_tree_program<CT_ISA>(
-            {{"AcBr", 256},
-             {"ArCr", 3},
-             {"BcCc", 16},
-             {"AcBr", 1},
-             {"AcBr", 1},
-             {"ArCr", 1},
-             {"BcCc", 1}},
-            // The second argument is a map of the dimension sizes
-            {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
-            // Vars of C (other variables are reduction variables)
-            {"ArCr", "BcCc"},
-            // Variables of A
-            {"ArCr", "AcBr"},
-            // Variables of B
-            {"AcBr", "BcCc"},
-            // C's strides for each variable.  Note that the
-            // strides data is a superset of the previous argument
-            // (variables of C).  I'm still deciding on the final
-            // design, possibly allowing for null strides that
-            // will just deduce them from the sizes, or some
-            // special structs indicating the layout (ie
-            // row-major, col-major).  In this case the vars have
-            // to be ordered though... Many decisions to make...
-            {{"ArCr", BcCc}, {"BcCc", 1}},
-            // A's strides for each variable
-            {{"ArCr", AcBr}, {"AcBr", 1}},
-            // B's strides for each variable
-            {{"AcBr", BcCc}, {"BcCc", 1}}, 0, 1024, nullptr, {},
-            compose(elementwise_bias<CT_ISA>, elementwise_relu<CT_ISA>),
-            {
-                {{"BcCc", 1}},
-            },
-            std::nullopt, MAX_INTERPRETED_DEPTH);
-
-        auto fn = tree.get_fn();
-
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
-
-        auto CN = getRandomVector<float>(ArCr * BcCc);
-        auto CJ = CN;
-
-        auto bias = getRandomVector<float>(1 * BcCc * 1);
-
-        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
-                    B.data(), CN.data(), 0);
-        baseline_matrix_bias(ArCr, BcCc, BcCc, 1, 0, 1, CN.data(), bias.data());
-        apply_relu(CN.data(), CN.data() + ArCr * BcCc);
-
-        fn({{"C", CJ.data()},
-            {"A", A.data()},
-            {"B", B.data()},
-            {"post", bias.data()}});
-
-        std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
-                  << "\n";
-    }
-
-    {
-        int ArCr = 100;
-        int AcBr = 100;
-        int BcCc = 100;
-
-        auto tree = loop_tree_program<CT_ISA>(
-            {{"AcBr", 256},
-             {"ArCr", 3},
-             {"BcCc", 16},
-             {"AcBr", 1},
-             {"AcBr", 1},
-             {"ArCr", 1},
-             {"BcCc", 1}},
-            // The second argument is a map of the dimension sizes
-            {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
-            // Vars of C (other variables are reduction variables)
-            {"ArCr", "BcCc"},
-            // Variables of A
-            {"ArCr", "AcBr"},
-            // Variables of B
-            {"AcBr", "BcCc"},
-            // C's strides for each variable.  Note that the
-            // strides data is a superset of the previous argument
-            // (variables of C).  I'm still deciding on the final
-            // design, possibly allowing for null strides that
-            // will just deduce them from the sizes, or some
-            // special structs indicating the layout (ie
-            // row-major, col-major).  In this case the vars have
-            // to be ordered though... Many decisions to make...
-            {{"ArCr", BcCc}, {"BcCc", 1}},
-            // A's strides for each variable
-            {{"ArCr", AcBr}, {"AcBr", 1}},
-            // B's strides for each variable
-            {{"AcBr", BcCc}, {"BcCc", 1}}, 1, 1024,
-            compose(elementwise_bias<CT_ISA>, elementwise_relu<CT_ISA>),
-            {
-                {{"BcCc", 1}},
-            },
-            nullptr, {}, std::nullopt, MAX_INTERPRETED_DEPTH);
-
-        auto fn = tree.get_fn();
-
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
-
-        auto CN = getRandomVector<float>(ArCr * BcCc);
-        auto CJ = CN;
-
-        auto bias = getRandomVector<float>(1 * BcCc * 1);
-
-        baseline_matrix_bias(ArCr, BcCc, BcCc, 1, 0, 1, CN.data(), bias.data());
-        apply_relu(CN.data(), CN.data() + ArCr * BcCc);
-        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
-                    B.data(), CN.data(), 1);
-
-        fn({{"C", CJ.data()},
-            {"A", A.data()},
-            {"B", B.data()},
-            {"pre", bias.data()}});
-
-        std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
-                  << "\n";
-    }
-#endif
-
     {
         /*
         for BcCc:
@@ -352,6 +36,10 @@ int main()
                 for AcBr2:
                     C2 += A2 * B2
         */
+
+        /*
+       ----------> Definition
+       */
 
         int ArCr  = 100;
         int AcBr1 = 100;
@@ -371,22 +59,43 @@ int main()
             {"A1", {{"ArCr", AcBr1}, {"AcBr1", 1}}},
             {"B1", {{"AcBr1", BcCc}, {"BcCc", 1}}}};
 
+        // C1 += A1 * B1
+        // alpha 1 -> accumulate (no zero init)
         auto mm1 = make_compute_node<CT_ISA>(
             {"A1", "B1"}, "C1", mm1_strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 1, 100);
+
+        /*
+        for AcBr1:
+            C1 += A1 * B1
+        */
+        auto ln1 = make_for_loop_node<CT_ISA>("AcBr1", 1, {mm1});
 
         std::map<std::string, std::map<std::string, int>> mm2_strides = {
             {"C2", {{"ArCr", BcCc}, {"BcCc", 1}}},
             {"A2", {{"ArCr", AcBr2}, {"AcBr2", 1}}},
             {"B2", {{"AcBr2", BcCc}, {"BcCc", 1}}}};
 
+        // C2 += A2 * B2
         auto mm2 = make_compute_node<CT_ISA>(
             {"A2", "B2"}, "C2", mm2_strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 1, 100);
 
-        auto ln1 = make_for_loop_node<CT_ISA>("AcBr1", 1, {mm1});
+        /*
+        for AcBr2:
+            C2 += A2 * B2
+        */
         auto ln2 = make_for_loop_node<CT_ISA>("AcBr2", 1, {mm2});
 
+        /*
+        for BcCc:
+            for ArCr:
+                // no zero-ing out of C1, C2
+                for AcBr1:
+                    C1 += A1 * B1
+                for AcBr2:
+                    C2 += A2 * B2
+        */
         auto root = make_for_loop_node<CT_ISA>(
             "BcCc", 1, {make_for_loop_node<CT_ISA>("ArCr", 1, {ln1, ln2})});
 
@@ -394,6 +103,10 @@ int main()
                                                    MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
+
+        /*
+        ----------> Execution
+        */
 
         auto A1  = getRandomVector<float>(AcBr1 * ArCr);
         auto B1  = getRandomVector<float>(AcBr1 * BcCc);
@@ -440,6 +153,10 @@ int main()
                     C2 += A2 * B2
         */
 
+        /*
+        ----------> Definition
+        */
+
         int ArCr  = 100;
         int AcBr1 = 100;
         int AcBr2 = 200;
@@ -458,22 +175,43 @@ int main()
             {"A1", {{"ArCr", AcBr1}, {"AcBr1", 1}}},
             {"B1", {{"AcBr1", BcCc}, {"BcCc", 1}}}};
 
+        // C1 += A1 * B1
         auto mm1 = make_compute_node<CT_ISA>(
             {"A1", "B1"}, "C1", mm1_strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 0, 100);
+
+        /*
+        for AcBr1:
+            C1 += A1 * B1
+        */
+        auto ln1 = make_for_loop_node<CT_ISA>("AcBr1", 1, {mm1});
 
         std::map<std::string, std::map<std::string, int>> mm2_strides = {
             {"C2", {{"ArCr", BcCc}, {"BcCc", 1}}},
             {"A2", {{"ArCr", AcBr2}, {"AcBr2", 1}}},
             {"B2", {{"AcBr2", BcCc}, {"BcCc", 1}}}};
 
+        // C2 += A2 * B2
         auto mm2 = make_compute_node<CT_ISA>(
             {"A2", "B2"}, "C2", mm2_strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 0, 100);
 
-        auto ln1 = make_for_loop_node<CT_ISA>("AcBr1", 1, {mm1});
+        /*
+        for AcBr2:
+            C2 += A2 * B2
+        */
         auto ln2 = make_for_loop_node<CT_ISA>("AcBr2", 1, {mm2});
 
+        /*
+        for BcCc:
+            for ArCr:
+                C1 = 0
+                C2 = 0
+                for AcBr1:
+                    C1 += A1 * B1
+                for AcBr2:
+                    C2 += A2 * B2
+        */
         auto root = make_for_loop_node<CT_ISA>(
             "BcCc", 1, {make_for_loop_node<CT_ISA>("ArCr", 1, {ln1, ln2})});
 
@@ -481,6 +219,10 @@ int main()
                                                    MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
+
+        /*
+        ----------> Execution
+        */
 
         auto A1  = getRandomVector<float>(AcBr1 * ArCr);
         auto B1  = getRandomVector<float>(AcBr1 * BcCc);
@@ -530,6 +272,10 @@ int main()
                     C2 += A2 * B2
         */
 
+        /*
+       ----------> Definition
+       */
+
         int ArCr  = 100;
         int AcBr1 = 100;
         int AcBr2 = 200;
@@ -548,24 +294,40 @@ int main()
             {"A1", {{"ArCr", AcBr1}, {"AcBr1", 1}}},
             {"B1", {{"AcBr1", BcCc}, {"BcCc", 1}}}};
 
+        // C1 += A1 * B1
         auto mm1 = make_compute_node<CT_ISA>(
             {"A1", "B1"}, "C1", mm1_strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 1, 100);
+
+        /*
+        for BcCc:
+            for ArCr:
+                // no zero-ing out of C1
+                for AcBr1:
+                    C1 += A1 * B1
+        */
+        auto ln1 = make_for_loop_node<CT_ISA>(
+            "BcCc", 1,
+            {make_for_loop_node<CT_ISA>(
+                "ArCr", 1, {make_for_loop_node<CT_ISA>("AcBr1", 1, {mm1})})});
 
         std::map<std::string, std::map<std::string, int>> mm2_strides = {
             {"C2", {{"ArCr", BcCc}, {"BcCc", 1}}},
             {"A2", {{"ArCr", AcBr2}, {"AcBr2", 1}}},
             {"B2", {{"AcBr2", BcCc}, {"BcCc", 1}}}};
 
+        // C2 += A2 * B2
         auto mm2 = make_compute_node<CT_ISA>(
             {"A2", "B2"}, "C2", mm2_strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 0, 100);
 
-        auto ln1 = make_for_loop_node<CT_ISA>(
-            "BcCc", 1,
-            {make_for_loop_node<CT_ISA>(
-                "ArCr", 1, {make_for_loop_node<CT_ISA>("AcBr1", 1, {mm1})})});
-
+        /*
+        for BcCc:
+            for ArCr:
+                C2 = 0
+                for AcBr2:
+                    C2 += A2 * B2
+        */
         auto ln2 = make_for_loop_node<CT_ISA>(
             "BcCc", 1,
             {make_for_loop_node<CT_ISA>(
@@ -575,6 +337,10 @@ int main()
                                                    MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
+
+        /*
+       ----------> Execution
+       */
 
         auto A1  = getRandomVector<float>(AcBr1 * ArCr);
         auto B1  = getRandomVector<float>(AcBr1 * BcCc);
@@ -622,6 +388,10 @@ int main()
                     C2 += A2 * B2
         */
 
+        /*
+       ----------> Definition
+       */
+
         int ArCr1 = 100;
         int ArCr2 = 50;
         int AcBr1 = 100;
@@ -644,31 +414,60 @@ int main()
             {"A1", {{"ArCr1", AcBr1}, {"AcBr1", 1}}},
             {"B1", {{"AcBr1", BcCc}, {"BcCc", 1}}}};
 
+        // C1 += A1 * B1 with zero init
         auto mm1 = make_compute_node<CT_ISA>(
             {"A1", "B1"}, "C1", mm1_strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 0, 100);
+
+        /*
+        for ArCr1:
+            C1 = 0
+            for AcBr1:
+                C1 += A1 * B1
+        */
+        auto ln1 = make_for_loop_node<CT_ISA>(
+            "ArCr1", 1, {make_for_loop_node<CT_ISA>("AcBr1", 1, {mm1})});
 
         std::map<std::string, std::map<std::string, int>> mm2_strides = {
             {"C2", {{"ArCr2", BcCc}, {"BcCc", 1}}},
             {"A2", {{"ArCr2", AcBr2}, {"AcBr2", 1}}},
             {"B2", {{"AcBr2", BcCc}, {"BcCc", 1}}}};
 
+        // C2  += A2 * B2
         auto mm2 = make_compute_node<CT_ISA>(
             {"A2", "B2"}, "C2", mm2_strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 1, 100);
 
-        auto ln1 = make_for_loop_node<CT_ISA>(
-            "ArCr1", 1, {make_for_loop_node<CT_ISA>("AcBr1", 1, {mm1})});
-
+        /*
+        for ArCr2:
+            // no zero-ing out of C2
+            for AcBr2:
+                C2 += A2 * B2
+        */
         auto ln2 = make_for_loop_node<CT_ISA>(
             "ArCr2", 1, {make_for_loop_node<CT_ISA>("AcBr2", 1, {mm2})});
 
+        /*
+        for BcCc:
+            for ArCr1:
+                C1 = 0
+                for AcBr1:
+                    C1 += A1 * B1
+            for ArCr2:
+                // no zero-ing out of C2
+                for AcBr2:
+                    C2 += A2 * B2
+        */
         auto root = make_for_loop_node<CT_ISA>("BcCc", 1, {ln1, ln2});
 
         auto tree = make_loop_tree_program<CT_ISA>({root}, sizes, formulas,
                                                    MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
+
+        /*
+       ----------> Execution
+       */
 
         auto A1  = getRandomVector<float>(AcBr1 * ArCr1);
         auto B1  = getRandomVector<float>(AcBr1 * BcCc);
@@ -716,6 +515,10 @@ int main()
                     C[ArCr, BcCc] += A[ArCr, AcBr] * B2[BcCc, AcBr]
         */
 
+        /*
+       ----------> Definition
+       */
+
         int ArCr = 100;
         int AcBr = 100;
         int BcCc = 100;
@@ -734,26 +537,48 @@ int main()
             {"A", {{"ArCr", AcBr}, {"AcBr", 1}}},
             {"B2", {{"AcBr", 1}, {"BcCc", AcBr}}}};
 
+        // C[ArCr, BcCc] += A[ArCr, AcBr] * B2[BcCc, AcBr] (with zero init)
         auto mm = make_compute_node<CT_ISA>(
             {"A", "B2"}, "C", mm_strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 0, 100);
+
+        /*
+        for ArCr:
+            // jitted
+            C[ArCr, BcCc] += A[ArCr, AcBr] * B2[BcCc, AcBr]
+        */
+        auto ln = make_for_loop_node<CT_ISA>("ArCr", 1, {mm});
 
         std::map<std::string, std::map<std::string, int>> transpose_strides = {
             {"B1", {{"AcBr", BcCc}, {"BcCc", 1}}},
             {"B2", {{"AcBr", 1}, {"BcCc", AcBr}}}};
 
+        // B2[BcCc, AcBr] = B1[AcBr, BcCc]
         auto tr =
             make_transpose_node<CT_ISA>("B1", "B2", transpose_strides, 100);
 
+        /*
+        C = 0
+        for BcCc:
+            for AcBr:
+                // transpose B1 into B2
+                // (interpreted, since parent can't be jitted)
+                B2[BcCc, AcBr] = B1[AcBr, BcCc]
+                for ArCr:
+                    // jitted
+                    C[ArCr, BcCc] += A[ArCr, AcBr] * B2[BcCc, AcBr]
+        */
         auto root = make_for_loop_node<CT_ISA>(
-            "BcCc", 1,
-            {make_for_loop_node<CT_ISA>(
-                "AcBr", 1, {tr, make_for_loop_node<CT_ISA>("ArCr", 1, {mm})})});
+            "BcCc", 1, {make_for_loop_node<CT_ISA>("AcBr", 1, {tr, ln})});
 
         auto tree = make_loop_tree_program<CT_ISA>({root}, sizes, formulas,
                                                    MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
+
+        /*
+       ----------> Execution
+       */
 
         auto A  = getRandomVector<float>(AcBr * ArCr);
         auto B1 = getRandomVector<float>(AcBr * BcCc);
@@ -777,58 +602,408 @@ int main()
     }
 
     {
+        // Matrix multiplication without zero init
 
+        /*
+       ----------> Definition
+       */
+        int ArCr = 100;
+        int AcBr = 100;
+        int BcCc = 100;
+
+        // schedule
+        std::vector<std::pair<std::string, int>> order = {
+            {"AcBr", 256}, {"ArCr", 3}, {"BcCc", 16}, {"AcBr", 1},
+            {"AcBr", 1},   {"ArCr", 1}, {"BcCc", 1}};
+
+        // sizes of dimensions
+        std::map<std::string, int> sizes = {
+            {"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}};
+
+        // dimensions in each tensor
+        std::map<std::string, std::set<std::string>> formulas = {
+            {"C", {"ArCr", "BcCc"}},
+            {"A", {"ArCr", "AcBr"}},
+            {"B", {"AcBr", "BcCc"}}};
+
+        // strides defining innermost computation
+        std::map<std::string, std::map<std::string, int>> strides = {
+            {"C", {{"ArCr", BcCc}, {"BcCc", 1}}},
+            {"A", {{"ArCr", AcBr}, {"AcBr", 1}}},
+            {"B", {{"AcBr", BcCc}, {"BcCc", 1}}}};
+
+        // C += A * B
+        auto mm = make_compute_node<CT_ISA>(
+            {"A", "B"}, "C", strides, arithmetic_op_kind::plus,
+            arithmetic_op_kind::multiplies, 1, 322);
+
+        // add for-loops from the order
+        auto curr = mm;
+        for (auto it = order.rbegin(); it != order.rend(); it++)
+        {
+            curr = make_for_loop_node<CT_ISA>(it->first, it->second, {curr});
+        }
+
+        auto nodes = {curr};
+        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas);
+
+        auto fn = tree->get_fn();
+
+        auto A = getRandomVector<float>(AcBr * ArCr);
+        auto B = getRandomVector<float>(AcBr * BcCc);
+
+        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto CJ = CN;
+
+        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
+                    B.data(), CN.data(), 1);
+
+        fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << "\n";
+    }
+
+    {
+        // Matrix multiplication with zero init
+        /*
+       ----------> Definition
+       */
+        int ArCr = 100;
+        int AcBr = 100;
+        int BcCc = 100;
+
+        // schedule
+        std::vector<std::pair<std::string, int>> order = {
+            {"AcBr", 256}, {"ArCr", 3}, {"BcCc", 16}, {"AcBr", 1},
+            {"AcBr", 1},   {"ArCr", 1}, {"BcCc", 1}};
+
+        // sizes of dimensions
+        std::map<std::string, int> sizes = {
+            {"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}};
+
+        // dimensions in each tensor
+        std::map<std::string, std::set<std::string>> formulas = {
+            {"C", {"ArCr", "BcCc"}},
+            {"A", {"ArCr", "AcBr"}},
+            {"B", {"AcBr", "BcCc"}}};
+
+        // strides defining innermost computation
+        std::map<std::string, std::map<std::string, int>> strides = {
+            {"C", {{"ArCr", BcCc}, {"BcCc", 1}}},
+            {"A", {{"ArCr", AcBr}, {"AcBr", 1}}},
+            {"B", {{"AcBr", BcCc}, {"BcCc", 1}}}};
+
+        // C += A * B (with zero-init)
+        auto mm = make_compute_node<CT_ISA>(
+            {"A", "B"}, "C", strides, arithmetic_op_kind::plus,
+            arithmetic_op_kind::multiplies, 0, 322);
+
+        // add for-loops from the order
+        auto curr = mm;
+        for (auto it = order.rbegin(); it != order.rend(); it++)
+        {
+            curr = make_for_loop_node<CT_ISA>(it->first, it->second, {curr});
+        }
+
+        auto nodes = {curr};
+        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas);
+
+        auto fn = tree->get_fn();
+
+        auto A = getRandomVector<float>(AcBr * ArCr);
+        auto B = getRandomVector<float>(AcBr * BcCc);
+
+        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto CJ = CN;
+
+        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
+                    B.data(), CN.data(), 0);
+
+        fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << "\n";
+    }
+
+    {
+        // transposing
+        /*
+       ----------> Definition
+       */
+        int R = 1024;
+        int C = 1024;
+
+        std::map<std::string, int> sizes = {{"R", R}, {"C", C}};
+        std::map<std::string, std::set<std::string>> formulas = {
+            {"A", {"R", "C"}}, {"C", {"R", "C"}}};
+
+        std::vector<std::pair<std::string, int>> order = {{"R", 1}, {"C", 1}};
+
+        std::map<std::string, int> out_strides = {{"R", 1}, {"C", R}};
+        std::map<std::string, int> in_strides  = {{"R", 1}, {"C", C}};
+        std::map<std::string, std::map<std::string, int>> strides = {
+            {"A", in_strides}, {"C", out_strides}};
+
+        // transpose "A" into "C"
+        auto tr = make_transpose_node<CT_ISA>("A", "C", strides);
+
+        // add for-loops from the order
+        auto curr = tr;
+        for (auto it = order.rbegin(); it != order.rend(); it++)
+        {
+            curr = make_for_loop_node<CT_ISA>(it->first, it->second, {curr});
+        }
+
+        auto nodes = {curr};
+        // technically formulas aren't used in transpose so not
+        //  necessary here
+        // (but are always a required parameter for now)
+        auto tree = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas);
+
+        auto fn = tree->get_fn();
+
+        /*
+       ----------> Execution
+       */
+        auto A  = getRandomVector<float>(R * C);
+        auto B  = getRandomVector<float>(R * C);
+        auto BJ = getRandomVector<float>(R * C);
+
+        auto transpose = facebook::sysml::aot::transposer_baseline(
+            order, sizes, out_strides, in_strides);
+
+        transpose(B.data(), A.data());
+
+        fn({{"A", A.data()}, {"C", BJ.data()}});
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(BJ.data(), BJ.data() + R * C, B.data()) << "\n";
+    }
+
+#ifndef NELEMENTWISE
+    {
+        // Matrix multiplication with zero init
+        // and bias followed by relu as post-op
+
+        /*
+        ----------> Definition
+        */
+        int ArCr = 100;
+        int AcBr = 100;
+        int BcCc = 100;
+
+        // schedule
+        std::vector<std::pair<std::string, int>> order = {
+            {"AcBr", 256}, {"ArCr", 3}, {"BcCc", 16}, {"AcBr", 1},
+            {"AcBr", 1},   {"ArCr", 1}, {"BcCc", 1}};
+
+        // sizes of dimensions
+        std::map<std::string, int> sizes = {
+            {"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}};
+
+        // dimensions in each tensor
+        std::map<std::string, std::set<std::string>> formulas = {
+            {"C", {"ArCr", "BcCc"}},
+            {"A", {"ArCr", "AcBr"}},
+            {"B", {"AcBr", "BcCc"}}};
+
+        // strides defining innermost computation
+        std::map<std::string, std::map<std::string, int>> strides = {
+            {"C", {{"ArCr", BcCc}, {"BcCc", 1}}},
+            {"A", {{"ArCr", AcBr}, {"AcBr", 1}}},
+            {"B", {{"AcBr", BcCc}, {"BcCc", 1}}},
+            {"bias", {{"BcCc", 1}}}};
+
+        // C += A * B (with zero-init)
+        // followed by relu(C + bias) before storing
+        auto mm = make_compute_node<CT_ISA>(
+            {"A", "B"}, "C", strides, arithmetic_op_kind::plus,
+            arithmetic_op_kind::multiplies, 0, std::nullopt, nullptr, {},
+            compose(elementwise_bias<CT_ISA>, elementwise_relu<CT_ISA>),
+            {"bias"});
+
+        // add for-loops from the order
+        auto curr = mm;
+        for (auto it = order.rbegin(); it != order.rend(); it++)
+        {
+            curr = make_for_loop_node<CT_ISA>(it->first, it->second, {curr});
+        }
+
+        auto nodes = {curr};
+        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas);
+
+        auto fn = tree->get_fn();
+
+        /*
+        ----------> Execution
+        */
+        auto A = getRandomVector<float>(AcBr * ArCr);
+        auto B = getRandomVector<float>(AcBr * BcCc);
+
+        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto CJ = CN;
+
+        auto bias = getRandomVector<float>(1 * BcCc * 1);
+
+        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
+                    B.data(), CN.data(), 0);
+        baseline_matrix_bias(ArCr, BcCc, BcCc, 1, 0, 1, CN.data(), bias.data());
+        apply_relu(CN.data(), CN.data() + ArCr * BcCc);
+
+        fn({{"C", CJ.data()},
+            {"A", A.data()},
+            {"B", B.data()},
+            {"bias", bias.data()}});
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << "\n";
+    }
+
+    {
+        // Matrix multiplication without zero init
+        // bias and relu as pre-op
+
+        /*
+        ----------> Definition
+        */
+        int ArCr = 100;
+        int AcBr = 100;
+        int BcCc = 100;
+
+        // schedule
+        std::vector<std::pair<std::string, int>> order = {
+            {"AcBr", 256}, {"ArCr", 3}, {"BcCc", 16}, {"AcBr", 1},
+            {"AcBr", 1},   {"ArCr", 1}, {"BcCc", 1}};
+
+        // sizes of dimensions
+        std::map<std::string, int> sizes = {
+            {"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}};
+
+        // dimensions in each tensor
+        std::map<std::string, std::set<std::string>> formulas = {
+            {"C", {"ArCr", "BcCc"}},
+            {"A", {"ArCr", "AcBr"}},
+            {"B", {"AcBr", "BcCc"}}};
+
+        // strides defining innermost computation
+        std::map<std::string, std::map<std::string, int>> strides = {
+            {"C", {{"ArCr", BcCc}, {"BcCc", 1}}},
+            {"A", {{"ArCr", AcBr}, {"AcBr", 1}}},
+            {"B", {{"AcBr", BcCc}, {"BcCc", 1}}},
+            {"bias", {{"BcCc", 1}}}};
+
+        // C += A * B (without zero-init)
+        // followed by relu(C + bias) before storing
+        auto mm = make_compute_node<CT_ISA>(
+            {"A", "B"}, "C", strides, arithmetic_op_kind::plus,
+            arithmetic_op_kind::multiplies, 1, std::nullopt,
+            compose(elementwise_bias<CT_ISA>, elementwise_relu<CT_ISA>),
+            {"bias"}, nullptr, {});
+
+        // add for-loops from the order
+        auto curr = mm;
+        for (auto it = order.rbegin(); it != order.rend(); it++)
+        {
+            curr = make_for_loop_node<CT_ISA>(it->first, it->second, {curr});
+        }
+
+        auto nodes = {curr};
+        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas);
+
+        auto fn = tree->get_fn();
+
+        /*
+        ----------> Execution
+        */
+        auto A    = getRandomVector<float>(AcBr * ArCr);
+        auto B    = getRandomVector<float>(AcBr * BcCc);
+        auto CN   = getRandomVector<float>(ArCr * BcCc);
+        auto CJ   = CN;
+        auto bias = getRandomVector<float>(1 * BcCc * 1);
+
+        baseline_matrix_bias(ArCr, BcCc, BcCc, 1, 0, 1, CN.data(), bias.data());
+        apply_relu(CN.data(), CN.data() + ArCr * BcCc);
+        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
+                    B.data(), CN.data(), 1);
+
+        fn({{"C", CJ.data()},
+            {"A", A.data()},
+            {"B", B.data()},
+            {"bias", bias.data()}});
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << "\n";
+    }
+#endif
+
+    {
+        // convolution example
+
+        /*
+        ----------> Definition
+        */
         int CIN  = 128;
         int COUT = 128 + 3;
         int OS   = 56 + 4;
         int KS   = 3;
         int IS   = OS + KS - 1;
 
-        auto tree = loop_tree_program<CT_ISA>(
-            {{"c_out", 16}, //
-             {"o_h", 1},
-             {"o_w", 28},
-             {"c_in", 16},
-             {"c_in", 1},
-             {"o_w", 1}, //
-             //{"o_w", 1},    //
-             {"k_h", 1},    //
-             {"k_w", 1},    //
-             {"c_out", 1}}, //
-            // The second argument is a map of the dimension sizes
-            {{"c_out", COUT},
-             {"o_w", OS},
-             {"k_w", KS},
-             {"c_in", CIN},
-             {"o_h", OS},
-             {"k_h", KS}},
-            // Vars of C (other variables are reduction variables)
-            {"c_out", "o_w", "o_h"},
-            // Variables of A, note that i_w and i_h are not used
-            {"c_in", "i_w", "i_h"},
-            // Variables of B
-            {"c_in", "c_out", "k_w", "k_h"},
-            // C's strides for each variable
-            {{"o_w", COUT}, {"c_out", 1}, {"o_h", COUT * OS}},
-            // A's strides for each variable Note how we
-            // provide strides for i/k_h and i/k_w, this is
-            // because the access to A is based on output
-            // and reduction variables
-            {{"o_w", CIN},
-             {"k_w", CIN},
-             {"c_in", 1},
-             {"o_h", IS * CIN},
-             {"k_h", IS * CIN}},
-            // B's strides for each variable
-            {{"c_out", 1},
-             {"c_in", COUT},
-             {"k_w", COUT * CIN},
-             {"k_h", COUT * CIN * KS}},
-            0, 250, nullptr, {}, nullptr, {}, std::nullopt,
-            MAX_INTERPRETED_DEPTH);
+        // schedule
+        std::vector<std::pair<std::string, int>> order = {
+            {"c_out", 16}, {"o_h", 1}, {"o_w", 28}, {"c_in", 16}, {"c_in", 1},
+            {"o_w", 1},    {"k_h", 1}, {"k_w", 1},  {"c_out", 1}};
 
-        auto fn = tree.get_fn();
+        // sizes of dimensions
+        std::map<std::string, int> sizes = {{"c_out", COUT}, {"o_w", OS},
+                                            {"k_w", KS},     {"c_in", CIN},
+                                            {"o_h", OS},     {"k_h", KS}};
 
+        // dimensions in each tensor
+        std::map<std::string, std::set<std::string>> formulas = {
+            {"C", {"c_out", "o_w", "o_h"}},
+            {"A", {"c_in", "i_w", "i_h"}},
+            {"B", {"c_in", "c_out", "k_w", "k_h"}}};
+
+        // strides defining innermost computation
+        std::map<std::string, std::map<std::string, int>> strides = {
+            {"C", {{"o_w", COUT}, {"c_out", 1}, {"o_h", COUT * OS}}},
+            {"A",
+             {{"o_w", CIN},
+              {"k_w", CIN},
+              {"c_in", 1},
+              {"o_h", IS * CIN},
+              {"k_h", IS * CIN}}},
+            {"B",
+             {{"c_out", 1},
+              {"c_in", COUT},
+              {"k_w", COUT * CIN},
+              {"k_h", COUT * CIN * KS}}}};
+
+        // innermost op with zero init
+        auto mm = make_compute_node<CT_ISA>({"A", "B"}, "C", strides,
+                                            arithmetic_op_kind::plus,
+                                            arithmetic_op_kind::multiplies, 0);
+
+        // add for-loops from the order
+        auto curr = mm;
+        for (auto it = order.rbegin(); it != order.rend(); it++)
+        {
+            curr = make_for_loop_node<CT_ISA>(it->first, it->second, {curr});
+        }
+
+        auto nodes = {curr};
+        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas);
+
+        auto fn = tree->get_fn();
+
+        /*
+        ----------> Execution
+        */
         auto A  = getRandomVector<float>(CIN * IS * IS);
         auto B  = getRandomVector<float>(COUT * CIN * KS * KS);
         auto CN = std::vector<float>(COUT * OS * OS);
@@ -845,6 +1020,11 @@ int main()
     }
 
     {
+        // another convolution example with relu as post op
+
+        /*
+        ----------> Definition
+        */
         int OX = 101;
         int OY = 101;
         int OZ = 16 * 12 + 3;
@@ -855,61 +1035,56 @@ int main()
         int IY = OY + KY - 1;
         int IZ = OZ + KZ - 1;
 
-        auto tree = loop_tree_program<CT_ISA>(
-            // The first argument is the loop order in the form of
-            // {dimension, stride}.  For now the outer dimension has
-            // to divide the stride.  This is effectively the same as
-            // Halide's split into outer and inner variable, but can
-            // have arbitray number of splits.
-            {{"OX", 1},  // To block B in L2 cache
-             {"OY", 10}, // This and the next are for the register
-                         // blocking of C - 30 vector registers of
-                         // each holding 16 values
-             {"OY", 1},
-             {"OZ", 16},
-             {"KX", 1}, // broken up to allow for unrolling of 4
-             {"KY", 1}, // inner loops, should handle differently
-                        // later
-             {"KZ", 1},
-             {"OZ", 1}},
-            // The second argument is a map of the dimension sizes
-            {{"OX", OX},
-             {"OY", OY},
-             {"OZ", OZ},
-             {"KX", KX},
-             {"KY", KY},
-             {"KZ", KZ}},
-            // Vars of C (other variables are reduction variables)
-            {"OX", "OY", "OZ"},
-            // Variables of A
-            {"IX", "IY", "IZ"},
-            // Variables of B
-            {"KX", "KY", "KZ"},
-            // C's strides for each variable.  Note that the strides
-            // data is a superset of the previous argument (variables
-            // of C).  I'm still deciding on the final design,
-            // possibly allowing for null strides that will just
-            // deduce them from the sizes, or some special structs
-            // indicating the layout (ie row-major, col-major).  In
-            // this case the vars have to be ordered though...
-            // Many decisions to make...
-            {{"OX", OY * OZ}, {"OY", OZ}, {"OZ", 1}},
-            // A's strides for each variable
-            {{"OX", IY * IZ},
-             {"OY", IZ},
-             {"OZ", 1},
-             {"KX", IY * IZ},
-             {"KY", IZ},
-             {"KZ", 1}},
-            // B's strides for each variable
-            {{"KX", KY * KZ}, {"KY", KZ}, {"KZ", 1}}, 0, 1024, nullptr, {},
-            facebook::sysml::aot::elementwise_relu<CT_ISA>, {}, std::nullopt,
-            MAX_INTERPRETED_DEPTH);
+        // schedule
+        std::vector<std::pair<std::string, int>> order = {
+            {"OX", 1}, {"OY", 10}, {"OY", 1}, {"OZ", 16},
+            {"KX", 1}, {"KY", 1},  {"KZ", 1}, {"OZ", 1}};
 
-        auto fn = tree.get_fn();
+        // sizes of dimensions
+        std::map<std::string, int> sizes = {{"OX", OX}, {"OY", OY}, {"OZ", OZ},
+                                            {"KX", KX}, {"KY", KY}, {"KZ", KZ}};
+
+        // dimensions in each tensor
+        std::map<std::string, std::set<std::string>> formulas = {
+            {"C", {"OX", "OY", "OZ"}},
+            {"A", {"IX", "IY", "IZ"}},
+            {"B", {"KX", "KY", "KZ"}}};
+
+        // strides defining innermost computation
+        std::map<std::string, std::map<std::string, int>> strides = {
+            {"C", {{"OX", OY * OZ}, {"OY", OZ}, {"OZ", 1}}},
+            {"A",
+             {{"OX", IY * IZ},
+              {"OY", IZ},
+              {"OZ", 1},
+              {"KX", IY * IZ},
+              {"KY", IZ},
+              {"KZ", 1}}},
+            {"B", {{"KX", KY * KZ}, {"KY", KZ}, {"KZ", 1}}}};
+
+        // innermost op with zero init, and relu postop
+        auto mm = make_compute_node<CT_ISA>(
+            {"A", "B"}, "C", strides, arithmetic_op_kind::plus,
+            arithmetic_op_kind::multiplies, 0, std::nullopt, nullptr, {},
+            facebook::sysml::aot::elementwise_relu<CT_ISA>);
+
+        // add for-loops from the order
+        auto curr = mm;
+        for (auto it = order.rbegin(); it != order.rend(); it++)
+        {
+            curr = make_for_loop_node<CT_ISA>(it->first, it->second, {curr});
+        }
+
+        auto nodes = {curr};
+        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas);
+
+        auto fn = tree->get_fn();
+
+        /*
+        ----------> Execution
+        */
         auto A  = getRandomVector<float>(IX * IY * IZ);
         auto B  = getRandomVector<float>(KX * KY * KZ);
-
         auto CN = std::vector<float>(OX * OY * OZ);
         auto CJ = std::vector<float>(OX * OY * OZ);
 
