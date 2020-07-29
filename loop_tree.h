@@ -21,21 +21,21 @@ namespace aot
 
 enum class node_kind
 {
-    for_loop_node_type,
-    compute_node_type,
-    transpose_node_type,
-    jitted_loop_nest_node_type,
-    jitted_transpose_node_type
+    for_loop,
+    compute,
+    transpose,
+    jitted_loop_nest,
+    jitted_transpose
 };
 
-static std::map<node_kind, std::string> node_kind_to_str = {
-    {node_kind::for_loop_node_type, "for_loop_node"},
-    {node_kind::compute_node_type, "compute_node"},
-    {node_kind::transpose_node_type, "transpose_node"},
-    {node_kind::jitted_loop_nest_node_type, "jitted_loop_nest_node"},
-    {node_kind::jitted_transpose_node_type, "jitted_transpose_node"}};
+inline std::map<node_kind, std::string> node_kind_to_str = {
+    {node_kind::for_loop, "for_loop_node"},
+    {node_kind::compute, "compute_node"},
+    {node_kind::transpose, "transpose_node"},
+    {node_kind::jitted_loop_nest, "jitted_loop_nest_node"},
+    {node_kind::jitted_transpose, "jitted_transpose_node"}};
 
-std::string get_node_kind_str(node_kind kind)
+inline std::string get_node_kind_str(node_kind kind)
 {
     return node_kind_to_str.at(kind);
 }
@@ -50,7 +50,7 @@ enum class arithmetic_op_kind
     min
 };
 
-std::shared_ptr<operation_pair_base>
+inline std::shared_ptr<operation_pair_base>
 get_operation_pair(arithmetic_op_kind plus_op, arithmetic_op_kind multiplies_op)
 {
 
@@ -169,7 +169,7 @@ public:
             nullptr,
         std::vector<std::string> elementwise_postop_tensors   = {},
         std::optional<OptimizationConfiguration> optim_config = std::nullopt)
-        : super_type(node_kind::compute_node_type)
+        : super_type(node_kind::compute)
         , inputs(inputs)
         , output(output)
         , strides(strides)
@@ -304,17 +304,20 @@ public:
     }
 };
 
+// TODO (maybe name types for strides, elementwise_op_ptr, etc..
 template <class ISA>
 std::shared_ptr<loop_tree_node<ISA>> make_compute_node(
     std::vector<std::string> const& inputs, std::string const& output,
     std::map<std::string, std::map<std::string, int>> const& strides,
     arithmetic_op_kind plus, arithmetic_op_kind multiplies, int alpha,
-    std::optional<int>                          unroll_limit = std::nullopt,
-    std::shared_ptr<elementwise_operation<ISA>> elementwise_preop = nullptr,
-    std::vector<std::string>                    elementwise_preop_tensors = {},
-    std::shared_ptr<elementwise_operation<ISA>> elementwise_postop = nullptr,
-    std::vector<std::string>                    elementwise_postop_tensors = {},
-    std::optional<OptimizationConfiguration>    optim_config = std::nullopt)
+    std::optional<int> unroll_limit = std::nullopt,
+    std::shared_ptr<elementwise_operation<ISA>> const& elementwise_preop =
+        nullptr,
+    std::vector<std::string> const& elementwise_preop_tensors = {},
+    std::shared_ptr<elementwise_operation<ISA>> const& elementwise_postop =
+        nullptr,
+    std::vector<std::string> const&          elementwise_postop_tensors = {},
+    std::optional<OptimizationConfiguration> optim_config = std::nullopt)
 {
     return std::shared_ptr<loop_tree_node<ISA>>(new compute_node<ISA>(
         inputs, output, strides, plus, multiplies, alpha, unroll_limit,
@@ -335,10 +338,11 @@ private:
     std::optional<int>                                unroll_limit;
 
 public:
-    transpose_node(std::string input, std::string output,
-                   std::map<std::string, std::map<std::string, int>> strides,
-                   std::optional<int> unroll_limit = std::nullopt)
-        : super_type(node_kind::transpose_node_type)
+    transpose_node(
+        std::string const& input, std::string const& output,
+        std::map<std::string, std::map<std::string, int>> const& strides,
+        std::optional<int> unroll_limit = std::nullopt)
+        : super_type(node_kind::transpose)
         , input(input)
         , output(output)
         , strides(strides)
@@ -372,18 +376,18 @@ public:
             assert(tensors.count(input));
             assert(tensors.count(output));
 
-            float* A = tensors.at(input);
-            float* C = tensors.at(output);
+            float* A = tensors[input];
+            float* C = tensors[output];
             C[0]     = A[0];
         };
     }
 };
 
 template <class ISA>
-std::shared_ptr<loop_tree_node<ISA>>
-make_transpose_node(std::string input, std::string output,
-                    std::map<std::string, std::map<std::string, int>> strides,
-                    std::optional<int> unroll_limit = std::nullopt)
+std::shared_ptr<loop_tree_node<ISA>> make_transpose_node(
+    std::string const& input, std::string const& output,
+    std::map<std::string, std::map<std::string, int>> const& strides,
+    std::optional<int> unroll_limit = std::nullopt)
 {
     return std::shared_ptr<loop_tree_node<ISA>>(
         new transpose_node<ISA>(input, output, strides, unroll_limit));
@@ -476,13 +480,13 @@ public:
     std::string const& get_var() const { return var; }
     int                get_delta() const { return delta; }
 
-    for_loop_node(std::string var, int delta,
-                  std::vector<std::shared_ptr<loop_tree_node<ISA>>> children)
-        : super_type(node_kind::for_loop_node_type)
+    for_loop_node(
+        std::string var, int delta,
+        std::vector<std::shared_ptr<loop_tree_node<ISA>>> const& children)
+        : super_type(node_kind::for_loop)
         , var(var)
         , delta(delta)
     {
-
         this->set_children(children);
         set_in_scope_tensor_info();
     }
@@ -561,9 +565,9 @@ public:
 };
 
 template <class ISA>
-std::shared_ptr<loop_tree_node<ISA>>
-make_for_loop_node(std::string var, int delta,
-                   std::vector<std::shared_ptr<loop_tree_node<ISA>>> children)
+std::shared_ptr<loop_tree_node<ISA>> make_for_loop_node(
+    std::string var, int delta,
+    std::vector<std::shared_ptr<loop_tree_node<ISA>>> const& children)
 {
     return std::shared_ptr<loop_tree_node<ISA>>(
         new for_loop_node<ISA>(var, delta, children));
@@ -603,7 +607,7 @@ public:
             nullptr,
         std::vector<std::string> elementwise_postop_tensors   = {},
         std::optional<OptimizationConfiguration> optim_config = std::nullopt)
-        : super_type(node_kind::jitted_loop_nest_node_type)
+        : super_type(node_kind::jitted_loop_nest)
         , inputs(inputs)
         , output(output)
         , order(order)
@@ -621,9 +625,9 @@ public:
     }
 
     jitted_loop_nest_node(
-        std::shared_ptr<for_loop_node<ISA>>         for_node,
-        std::shared_ptr<jitted_loop_nest_node<ISA>> compute_jitter_node)
-        : super_type(node_kind::jitted_loop_nest_node_type)
+        std::shared_ptr<for_loop_node<ISA>> const&         for_node,
+        std::shared_ptr<jitted_loop_nest_node<ISA>> const& compute_jitter_node)
+        : super_type(node_kind::jitted_loop_nest)
         , inputs(compute_jitter_node->inputs)
         , output(compute_jitter_node->output)
         , order(compute_jitter_node->order)
@@ -644,9 +648,10 @@ public:
                      {for_node->get_var(), for_node->get_delta()});
     }
 
-    jitted_loop_nest_node(std::shared_ptr<for_loop_node<ISA>> for_node,
-                          std::shared_ptr<compute_node<ISA>>  compute_node)
-        : super_type(node_kind::jitted_loop_nest_node_type)
+    jitted_loop_nest_node(
+        std::shared_ptr<for_loop_node<ISA>> const& for_node,
+        std::shared_ptr<compute_node<ISA>> const&  compute_node)
+        : super_type(node_kind::jitted_loop_nest)
         , inputs(compute_node->get_inputs())
         , output(compute_node->get_output())
         , order({{for_node->get_var(), for_node->get_delta()}})
@@ -747,7 +752,9 @@ public:
         }
         else
         {
+            // TODO (throw an exception)
             assert("Exceeded number of allowed followed tensors" && false);
+            return loop_tree_fn_type();
         }
     }
 
@@ -785,7 +792,7 @@ public:
         std::vector<std::pair<std::string, int>>          order,
         std::map<std::string, std::map<std::string, int>> strides,
         std::optional<int> unroll_limit = std::nullopt)
-        : super_type(node_kind::jitted_transpose_node_type)
+        : super_type(node_kind::jitted_transpose)
         , input(input)
         , output(output)
         , order(order)
@@ -796,7 +803,7 @@ public:
 
     jitted_transpose_node(std::shared_ptr<for_loop_node<ISA>>  for_node,
                           std::shared_ptr<transpose_node<ISA>> transpose_node)
-        : super_type(node_kind::jitted_transpose_node_type)
+        : super_type(node_kind::jitted_transpose)
         , input(transpose_node->get_input())
         , output(transpose_node->get_output())
         , order({})
@@ -810,7 +817,7 @@ public:
     jitted_transpose_node(
         std::shared_ptr<for_loop_node<ISA>>         for_node,
         std::shared_ptr<jitted_transpose_node<ISA>> transpose_jitter)
-        : super_type(node_kind::jitted_transpose_node_type)
+        : super_type(node_kind::jitted_transpose)
         , input(transpose_jitter->input)
         , output(transpose_jitter->output)
         , order(transpose_jitter->order)
@@ -894,7 +901,7 @@ std::shared_ptr<loop_tree_node<ISA>>
 simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>> node,
                     int current_depth = 0, int max_interpreted_depth = 0)
 {
-    if (node->get_type() != node_kind::for_loop_node_type)
+    if (node->get_type() != node_kind::for_loop)
     {
         return node;
     }
@@ -925,30 +932,30 @@ simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>> node,
 
     switch (single_child->get_type())
     {
-    case node_kind::for_loop_node_type:
+    case node_kind::for_loop:
         // child is not jitted, so can't add on this node
         return node;
         break;
 
-    case node_kind::compute_node_type:
+    case node_kind::compute:
         return merge_loop_into_jitter(
             for_node,
             std::dynamic_pointer_cast<compute_node<ISA>>(single_child));
         break;
 
-    case node_kind::jitted_loop_nest_node_type:
+    case node_kind::jitted_loop_nest:
         return merge_loop_into_jitter(
             for_node, std::dynamic_pointer_cast<jitted_loop_nest_node<ISA>>(
                           single_child));
         break;
 
-    case node_kind::transpose_node_type:
+    case node_kind::transpose:
         return merge_loop_into_jitter(
             for_node,
             std::dynamic_pointer_cast<transpose_node<ISA>>(single_child));
         break;
 
-    case node_kind::jitted_transpose_node_type:
+    case node_kind::jitted_transpose:
         return merge_loop_into_jitter(
             for_node, std::dynamic_pointer_cast<jitted_transpose_node<ISA>>(
                           single_child));
@@ -960,7 +967,7 @@ simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>> node,
     }
 }
 
-std::int64_t get_tensor_size(
+inline std::int64_t get_tensor_size(
     std::string const&                                       name,
     std::map<std::string, std::map<std::string, int>> const& strides,
     std::map<std::string, int> const&                        sizes,
@@ -986,7 +993,7 @@ std::int64_t get_largest_intermediate_output_size(
     std::int64_t max_size = 0;
     switch (node->get_type())
     {
-    case node_kind::for_loop_node_type:
+    case node_kind::for_loop:
         for (auto const& child : node->get_children())
         {
             max_size =
@@ -994,13 +1001,13 @@ std::int64_t get_largest_intermediate_output_size(
         }
         return max_size;
         break;
-    case node_kind::compute_node_type:
+    case node_kind::compute:
         // fall through
-    case node_kind::transpose_node_type:
+    case node_kind::transpose:
         // fall through
-    case node_kind::jitted_loop_nest_node_type:
+    case node_kind::jitted_loop_nest:
         // fall through
-    case node_kind::jitted_transpose_node_type:
+    case node_kind::jitted_transpose:
         std::set<std::string> possible_intermediates =
             node->get_output_tensors();
 
