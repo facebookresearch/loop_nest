@@ -775,4 +775,151 @@ int main()
                   << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
+
+    {
+
+        int CIN  = 128;
+        int COUT = 128 + 3;
+        int OS   = 56 + 4;
+        int KS   = 3;
+        int IS   = OS + KS - 1;
+
+        auto tree = loop_tree_program<CT_ISA>(
+            {{"c_out", 16}, //
+             {"o_h", 1},
+             {"o_w", 28},
+             {"c_in", 16},
+             {"c_in", 1},
+             {"o_w", 1}, //
+             //{"o_w", 1},    //
+             {"k_h", 1},    //
+             {"k_w", 1},    //
+             {"c_out", 1}}, //
+            // The second argument is a map of the dimension sizes
+            {{"c_out", COUT},
+             {"o_w", OS},
+             {"k_w", KS},
+             {"c_in", CIN},
+             {"o_h", OS},
+             {"k_h", KS}},
+            // Vars of C (other variables are reduction variables)
+            {"c_out", "o_w", "o_h"},
+            // Variables of A, note that i_w and i_h are not used
+            {"c_in", "i_w", "i_h"},
+            // Variables of B
+            {"c_in", "c_out", "k_w", "k_h"},
+            // C's strides for each variable
+            {{"o_w", COUT}, {"c_out", 1}, {"o_h", COUT * OS}},
+            // A's strides for each variable Note how we
+            // provide strides for i/k_h and i/k_w, this is
+            // because the access to A is based on output
+            // and reduction variables
+            {{"o_w", CIN},
+             {"k_w", CIN},
+             {"c_in", 1},
+             {"o_h", IS * CIN},
+             {"k_h", IS * CIN}},
+            // B's strides for each variable
+            {{"c_out", 1},
+             {"c_in", COUT},
+             {"k_w", COUT * CIN},
+             {"k_h", COUT * CIN * KS}},
+            0, 250, nullptr, {}, nullptr, {}, std::nullopt,
+            MAX_INTERPRETED_DEPTH);
+
+        auto fn = tree.get_fn();
+
+        auto A  = getRandomVector<float>(CIN * IS * IS);
+        auto B  = getRandomVector<float>(COUT * CIN * KS * KS);
+        auto CN = std::vector<float>(COUT * OS * OS);
+        auto CJ = std::vector<float>(COUT * OS * OS);
+
+        baseline_Conv(COUT, CIN, OS, OS, KS, KS, A.data(), B.data(), CN.data());
+
+        fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS,
+                                CN.data())
+                  << "\n";
+    }
+
+    {
+        int OX = 101;
+        int OY = 101;
+        int OZ = 16 * 12 + 3;
+        int KX = 3;
+        int KY = 3;
+        int KZ = 3;
+        int IX = OX + KX - 1;
+        int IY = OY + KY - 1;
+        int IZ = OZ + KZ - 1;
+
+        auto tree = loop_tree_program<CT_ISA>(
+            // The first argument is the loop order in the form of
+            // {dimension, stride}.  For now the outer dimension has
+            // to divide the stride.  This is effectively the same as
+            // Halide's split into outer and inner variable, but can
+            // have arbitray number of splits.
+            {{"OX", 1},  // To block B in L2 cache
+             {"OY", 10}, // This and the next are for the register
+                         // blocking of C - 30 vector registers of
+                         // each holding 16 values
+             {"OY", 1},
+             {"OZ", 16},
+             {"KX", 1}, // broken up to allow for unrolling of 4
+             {"KY", 1}, // inner loops, should handle differently
+                        // later
+             {"KZ", 1},
+             {"OZ", 1}},
+            // The second argument is a map of the dimension sizes
+            {{"OX", OX},
+             {"OY", OY},
+             {"OZ", OZ},
+             {"KX", KX},
+             {"KY", KY},
+             {"KZ", KZ}},
+            // Vars of C (other variables are reduction variables)
+            {"OX", "OY", "OZ"},
+            // Variables of A
+            {"IX", "IY", "IZ"},
+            // Variables of B
+            {"KX", "KY", "KZ"},
+            // C's strides for each variable.  Note that the strides
+            // data is a superset of the previous argument (variables
+            // of C).  I'm still deciding on the final design,
+            // possibly allowing for null strides that will just
+            // deduce them from the sizes, or some special structs
+            // indicating the layout (ie row-major, col-major).  In
+            // this case the vars have to be ordered though...
+            // Many decisions to make...
+            {{"OX", OY * OZ}, {"OY", OZ}, {"OZ", 1}},
+            // A's strides for each variable
+            {{"OX", IY * IZ},
+             {"OY", IZ},
+             {"OZ", 1},
+             {"KX", IY * IZ},
+             {"KY", IZ},
+             {"KZ", 1}},
+            // B's strides for each variable
+            {{"KX", KY * KZ}, {"KY", KZ}, {"KZ", 1}}, 0, 1024, nullptr, {},
+            facebook::sysml::aot::elementwise_relu<CT_ISA>, {}, std::nullopt,
+            MAX_INTERPRETED_DEPTH);
+
+        auto fn = tree.get_fn();
+        auto A  = getRandomVector<float>(IX * IY * IZ);
+        auto B  = getRandomVector<float>(KX * KY * KZ);
+
+        auto CN = std::vector<float>(OX * OY * OZ);
+        auto CJ = std::vector<float>(OX * OY * OZ);
+
+        baseline_3DConv(OX, OY, OZ, KX, KY, KZ, A.data(), B.data(), CN.data());
+        apply_relu(CN.data(), CN.data() + CN.size());
+
+        fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ.data(), CJ.data() + OX * OY * OZ, CN.data())
+                  << "\n";
+    }
 }
