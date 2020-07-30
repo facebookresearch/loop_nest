@@ -475,9 +475,9 @@ private:
         }
 
         return [=](std::vector<int>& alpha_offsets, int adjustment) {
-            for (auto const& name : to_adjust)
+            for (auto const& idx : to_adjust)
             {
-                alpha_offsets[name] += adjustment;
+                alpha_offsets[idx] += adjustment;
             }
         };
     }
@@ -1019,8 +1019,6 @@ private:
 
     // map tensor names to indices
     std::map<std::string, int> tensors_idx;
-    // vector for eventual tensors
-    std::vector<float*> tensors_vec;
 
 public:
     loop_tree_program(std::vector<loop_tree_node_ptr<ISA>> const& nodes,
@@ -1058,7 +1056,6 @@ public:
                 }
             }
         };
-        tensors_vec = std::vector<float*>(idx);
     }
 
     std::vector<loop_tree_node_ptr<ISA>> const& get_children() { return nodes; }
