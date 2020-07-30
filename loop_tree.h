@@ -626,57 +626,40 @@ public:
     {
     }
 
-    jitted_loop_nest_node(
-        std::shared_ptr<for_loop_node<ISA>> const&         for_node,
-        std::shared_ptr<jitted_loop_nest_node<ISA>> const& compute_jitter_node)
-        : super_type(node_kind::jitted_loop_nest)
-        , inputs(compute_jitter_node->inputs)
-        , output(compute_jitter_node->output)
-        , order(compute_jitter_node->order)
-        , strides(compute_jitter_node->strides)
-        , plus(compute_jitter_node->plus)
-        , multiplies(compute_jitter_node->multiplies)
-        , alpha(compute_jitter_node->alpha)
-        , unroll_limit(compute_jitter_node->unroll_limit)
-        , elementwise_preop(compute_jitter_node->elementwise_preop)
-        , elementwise_preop_tensors(
-              compute_jitter_node->elementwise_preop_tensors)
-        , elementwise_postop(compute_jitter_node->elementwise_postop)
-        , elementwise_postop_tensors(
-              compute_jitter_node->elementwise_postop_tensors)
-        , optim_config(compute_jitter_node->optim_config)
-    {
-        order.insert(order.begin(),
-                     {for_node->get_var(), for_node->get_delta()});
-    }
+    jitted_loop_nest_node(jitted_loop_nest_node<ISA> const& other) = default;
 
+    // creates an initial loop nest
     jitted_loop_nest_node(
         std::shared_ptr<for_loop_node<ISA>> const& for_node,
         std::shared_ptr<compute_node<ISA>> const&  compute_node)
-        : super_type(node_kind::jitted_loop_nest)
-        , inputs(compute_node->get_inputs())
-        , output(compute_node->get_output())
-        , order({{for_node->get_var(), for_node->get_delta()}})
-        , strides(compute_node->get_tensor_strides())
-        , plus(compute_node->get_plus())
-        , multiplies(compute_node->get_multiplies())
-        , alpha(compute_node->get_alpha())
-        , unroll_limit(compute_node->get_unroll_limit())
-        , elementwise_preop(compute_node->get_elementwise_preop())
-        , elementwise_preop_tensors(
-              compute_node->get_elementwise_preop_tensors())
-        , elementwise_postop(compute_node->get_elementwise_postop())
-        , elementwise_postop_tensors(
-              compute_node->get_elementwise_postop_tensors())
-        , optim_config(compute_node->get_optim_config())
+        : jitted_loop_nest_node(
+              compute_node->get_inputs(), compute_node->get_output(),
+              {{for_node->get_var(), for_node->get_delta()}},
+              compute_node->get_tensor_strides(), compute_node->get_plus(),
+              compute_node->get_multiplies(), compute_node->get_alpha(),
+              compute_node->get_unroll_limit(),
+              compute_node->get_elementwise_preop(),
+              compute_node->get_elementwise_preop_tensors(),
+              compute_node->get_elementwise_postop(),
+              compute_node->get_elementwise_postop_tensors(),
+              compute_node->get_optim_config())
     {
+    }
+
+    // extends an existing loop nest
+    jitted_loop_nest_node(
+        std::shared_ptr<for_loop_node<ISA>> const&         for_node,
+        std::shared_ptr<jitted_loop_nest_node<ISA>> const& compute_jitter_node)
+        : jitted_loop_nest_node(*compute_jitter_node)
+    {
+        order.insert(order.begin(),
+                     {for_node->get_var(), for_node->get_delta()});
     }
 
     loop_tree_fn_type
     get_fn(std::map<std::string, int> const&                   sizes,
            std::map<std::string, std::set<std::string>> const& formulas) const
     {
-
         // contains followed tensors for pre/post ops
         std::vector<std::string> extra_tensors;
 
@@ -803,29 +786,25 @@ public:
     {
     }
 
+    jitted_transpose_node(const jitted_transpose_node<ISA>& other) = default;
+
+    // creates initial transpose nest
     jitted_transpose_node(
         std::shared_ptr<for_loop_node<ISA>> const&  for_node,
         std::shared_ptr<transpose_node<ISA>> const& transpose_node)
-        : super_type(node_kind::jitted_transpose)
-        , input(transpose_node->get_input())
-        , output(transpose_node->get_output())
-        , order({})
-        , strides(transpose_node->get_tensor_strides())
-        , unroll_limit(transpose_node->get_unroll_limit())
+        : jitted_transpose_node(transpose_node->get_input(),
+                                transpose_node->get_output(),
+                                {{for_node->get_var(), for_node->get_delta()}},
+                                transpose_node->get_tensor_strides(),
+                                transpose_node->get_unroll_limit())
     {
-        order.insert(order.begin(),
-                     {for_node->get_var(), for_node->get_delta()});
     }
 
+    // extends the tranpose nest
     jitted_transpose_node(
         std::shared_ptr<for_loop_node<ISA>> const&         for_node,
         std::shared_ptr<jitted_transpose_node<ISA>> const& transpose_jitter)
-        : super_type(node_kind::jitted_transpose)
-        , input(transpose_jitter->input)
-        , output(transpose_jitter->output)
-        , order(transpose_jitter->order)
-        , strides(transpose_jitter->strides)
-        , unroll_limit(transpose_jitter->unroll_limit)
+        : jitted_transpose_node(*transpose_jitter)
     {
         order.insert(order.begin(),
                      {for_node->get_var(), for_node->get_delta()});
