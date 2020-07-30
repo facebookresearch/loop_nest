@@ -130,6 +130,9 @@ private:
     Reg64 xtmp2     = x6;
     Reg64 loopReg_  = x7;
     Reg64 stackReg_ = x9;
+    Reg64 tmpCReg_  = x10;
+    Reg64 tmpAReg_  = x11;
+    Reg64 tmpBReg_  = x12;
     // std::vector<Reg64> elementwiseReg_;
 
     VReg ZeroVector_ = v0;
@@ -541,7 +544,8 @@ private:
         }
     };
 
-    void load_scalar(VReg const& vreg, Reg64 const& base, int offset)
+    void load_scalar(VReg const& vreg, Reg64 const& base, int offset,
+                     int increment = 0)
     {
         if (offset)
         {
@@ -549,27 +553,51 @@ private:
         }
 
         mov(vreg.b16, ZeroVector_.b16);
-
-        ldr(SReg(vreg.s4.getIdx()), ptr(base));
+        if (increment && increment < 256)
+        {
+            ldr(SReg(vreg.s4.getIdx()), post_ptr(base, increment));
+            increment = 0;
+        }
+        else
+        {
+            ldr(SReg(vreg.s4.getIdx()), ptr(base));
+        }
 
         if (offset)
         {
             sub_imm(base, offset);
         }
+        if (increment)
+        {
+            add_imm(base, increment);
+        }
     }
 
-    void store_scalar(VReg const& vreg, Reg64 const& base, int offset)
+    void store_scalar(VReg const& vreg, Reg64 const& base, int offset,
+                      int increment = 0)
     {
         if (offset)
         {
             add_imm(base, offset);
         }
 
-        st1(vreg.s4[0], ptr(base));
+        if (increment && increment < 256)
+        {
+            str(SReg(vreg.s4.getIdx()), post_ptr(base, increment));
+            increment = 0;
+        }
+        else
+        {
+            str(SReg(vreg.s4.getIdx()), ptr(base));
+        }
 
         if (offset)
         {
             sub_imm(base, offset);
+        }
+        if (increment)
+        {
+            add_imm(base, increment);
         }
     }
 
@@ -653,7 +681,8 @@ private:
         }
     }
 
-    void store_vector(VReg const& vreg, Reg64 const& base, int offset, int mask)
+    void store_vector(VReg const& vreg, Reg64 const& base, int offset, int mask,
+                      int increment = 0)
     {
         if (offset)
         {
@@ -662,7 +691,15 @@ private:
 
         if (mask == vector_size)
         {
-            st1(vreg.s4, ptr(base));
+            if (increment && increment < 256)
+            {
+                str(QReg(vreg.s4.getIdx()), post_ptr(base, increment));
+                increment = 0;
+            }
+            else
+            {
+                str(QReg(vreg.s4.getIdx()), ptr(base));
+            }
         }
         else
         {
@@ -679,10 +716,14 @@ private:
         {
             sub_imm(base, offset);
         }
+        if (increment)
+        {
+            add_imm(base, increment);
+        }
     }
 
     void scatter_vector(VReg const& vreg, Reg64 const& base, int offset,
-                        int mask, int stride)
+                        int mask, int stride, int increment = 0)
     {
         if (mask == 0)
         {
@@ -706,6 +747,10 @@ private:
         if (offset)
         {
             sub_imm(base, offset);
+        }
+        if (increment)
+        {
+            add_imm(base, increment);
         }
     }
 
@@ -743,30 +788,55 @@ private:
 
     void issue_C_loads(std::set<memory_argument> const& loads)
     {
+        std::vector<memory_argument> ordered_loads;
         for (auto const& c : loads)
+        {
+            ordered_loads.emplace_back(c);
+        }
+        std::sort(ordered_loads.begin(), ordered_loads.end(),
+                  [](const memory_argument& a, const memory_argument& b) {
+                      return a.offset < b.offset;
+                  });
+        std::vector<int> incrs;
+        int              prev_off = -1;
+        for (auto const& c : ordered_loads)
+        {
+            if (prev_off != -1)
+            {
+                incrs.emplace_back(c.offset - prev_off);
+            }
+            prev_off = c.offset;
+        }
+        mov(tmpCReg_, CReg_);
+        assert(ordered_loads.size());
+        add_imm(tmpCReg_, ordered_loads.front().offset * 4);
+        for (auto const& c : ordered_loads)
         {
             LN_LOG(INFO) << tabs.back() << "LOAD " << c.readable() << "\n";
 
             // Move the reg pointer
-            add_imm(CReg_, c.offset * 4);
+            auto incr = 0;
+            if (incrs.size())
+            {
+                incr = incrs.front() * 4;
+                incrs.erase(incrs.begin());
+            }
 
             switch (C_traits.access)
             {
             case SCALAR:
-                load_scalar(C_VMMs[c][0], CReg_, 0);
+                load_scalar(C_VMMs[c][0], tmpCReg_, 0, incr);
                 break;
 
             case VECTOR_PACKED:
-                load_vector(C_VMMs[c][0], CReg_, 0, c.mask);
+                load_vector(C_VMMs[c][0], tmpCReg_, 0, c.mask, incr);
                 break;
 
             case VECTOR_STRIDED:
-                gather_vector(C_VMMs[c][0], CReg_, 0, c.mask,
-                              C_traits.innermost_stride * 4);
+                gather_vector(C_VMMs[c][0], tmpCReg_, 0, c.mask,
+                              C_traits.innermost_stride * 4, incr);
                 break;
             }
-
-            sub_imm(CReg_, c.offset * 4);
 
             // Set auxiliary horizontal vector regs to zero
             for (int s = 1; s < C_VMMs[c].size(); ++s)
@@ -826,11 +896,38 @@ private:
                         std::optional<int> tail_mask, int max_alpha,
                         bool issue_max_alpha_logic)
     {
+        std::vector<memory_argument> ordered_stores;
         for (auto const& c : stores)
+        {
+            ordered_stores.emplace_back(c);
+        }
+        std::sort(ordered_stores.begin(), ordered_stores.end(),
+                  [](const memory_argument& a, const memory_argument& b) {
+                      return a.offset < b.offset;
+                  });
+        std::vector<int> incrs;
+        int              prev_off = -1;
+        for (auto const& c : ordered_stores)
+        {
+            if (prev_off != -1)
+            {
+                incrs.emplace_back(c.offset - prev_off);
+            }
+            prev_off = c.offset;
+        }
+        mov(tmpCReg_, CReg_);
+        assert(ordered_stores.size());
+        add_imm(tmpCReg_, ordered_stores.front().offset * 4);
+        for (auto const& c : ordered_stores)
         {
             LN_LOG(INFO) << tabs.back() << "STORE " << c.readable() << "\n";
 
-            add_imm(CReg_, c.offset * 4);
+            auto incr = 0;
+            if (incrs.size())
+            {
+                incr = incrs.front() * 4;
+                incrs.erase(incrs.begin());
+            }
 
             C_VMMs[c].reduce(*this);
 
@@ -838,20 +935,18 @@ private:
             {
             case SCALAR:
                 C_VMMs[c].full_reduce(*this, c.mask);
-                store_scalar(C_VMMs[c][0], CReg_, 0);
+                store_scalar(C_VMMs[c][0], tmpCReg_, 0, incr);
                 break;
 
             case VECTOR_PACKED:
-                store_vector(C_VMMs[c][0], CReg_, 0, c.mask);
+                store_vector(C_VMMs[c][0], tmpCReg_, 0, c.mask, incr);
                 break;
 
             case VECTOR_STRIDED:
-                scatter_vector(C_VMMs[c][0], CReg_, 0, c.mask,
-                               C_traits.innermost_stride * 4);
+                scatter_vector(C_VMMs[c][0], tmpCReg_, 0, c.mask,
+                               C_traits.innermost_stride * 4, incr);
                 break;
             }
-
-            sub_imm(CReg_, c.offset * 4);
         }
     }
 
@@ -972,7 +1067,8 @@ private:
                 auto base_reg = addr.traits->reg.getIdx();
                 if (!tmp_addresser.count(base_reg))
                 {
-                    int tmp                 = 11 + tmp_addresser.size();
+                    int tmp = base_reg == BReg_.getIdx() ? tmpBReg_.getIdx()
+                                                         : tmpAReg_.getIdx();
                     tmp_addresser[base_reg] = std::make_pair(tmp, addr.offset);
                     tmp_addresser_base[tmp] = addr.offset;
                     load_incrs[base_reg];
