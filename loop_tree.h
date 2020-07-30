@@ -70,6 +70,9 @@ get_operation_pair(arithmetic_op_kind plus_op, arithmetic_op_kind multiplies_op)
 }
 
 template <class ISA>
+class loop_tree_node;
+
+template <class ISA>
 class compute_node;
 
 template <class ISA>
@@ -84,16 +87,30 @@ class jitted_transpose_node;
 template <class ISA>
 class for_loop_node;
 
+// Type aliases for readability
 // void (map from name to tensors, map from name to alpha offset)
 using loop_tree_fn_type = std::function<void(
     std::map<std::string, float*> const&, std::map<std::string, int> const&)>;
 
+// map from name to map of strides
+using strides_map_type = std::map<std::string, std::map<std::string, int>>;
+
+// map from name to set of dimensions
+using formulas_map_type = std::map<std::string, std::set<std::string>>;
+
+template <class ISA>
+using elementwise_op_ptr = std::shared_ptr<elementwise_operation<ISA>>;
+
+template <class ISA>
+using loop_tree_node_ptr = std::shared_ptr<loop_tree_node<ISA>>;
+
 template <class ISA>
 class loop_tree_node
 {
+
 private:
-    node_kind                                         kind_;
-    std::vector<std::shared_ptr<loop_tree_node<ISA>>> children_;
+    node_kind                            kind_;
+    std::vector<loop_tree_node_ptr<ISA>> children_;
 
 public:
     virtual ~loop_tree_node(){};
@@ -103,20 +120,17 @@ public:
     {
     }
 
-    std::vector<std::shared_ptr<loop_tree_node<ISA>>> const&
-    get_children() const
+    std::vector<loop_tree_node_ptr<ISA>> const& get_children() const
     {
         return children_;
     }
 
-    void set_children(
-        std::vector<std::shared_ptr<loop_tree_node<ISA>>> const& children)
+    void set_children(std::vector<loop_tree_node_ptr<ISA>> const& children)
     {
         children_ = children;
     }
 
-    void
-    set_children(std::vector<std::shared_ptr<loop_tree_node<ISA>>>&& children)
+    void set_children(std::vector<loop_tree_node_ptr<ISA>>&& children)
     {
         children_ = std::move(children);
     }
@@ -124,16 +138,14 @@ public:
     node_kind get_type() const { return kind_; }
 
     // sizes, and tensor formulas
-    virtual loop_tree_fn_type
-    get_fn(std::map<std::string, int> const&,
-           std::map<std::string, std::set<std::string>> const&) const = 0;
+    virtual loop_tree_fn_type get_fn(std::map<std::string, int> const&,
+                                     formulas_map_type const&) const = 0;
 
     virtual std::set<std::string> get_tensors_used() const = 0;
 
     virtual std::set<std::string> get_output_tensors() const = 0;
 
-    virtual std::map<std::string, std::map<std::string, int>> const&
-    get_tensor_strides() const = 0;
+    virtual strides_map_type const& get_tensor_strides() const = 0;
 };
 
 template <class ISA>
@@ -143,31 +155,29 @@ private:
     using super_type = loop_tree_node<ISA>;
 
     // 0 -> A, 1 -> B, rest are followed tensors
-    std::vector<std::string>                          inputs;
-    std::string                                       output;
-    std::map<std::string, std::map<std::string, int>> strides;
-    arithmetic_op_kind                                plus;
-    arithmetic_op_kind                                multiplies;
-    int                                               alpha;
+    std::vector<std::string> inputs;
+    std::string              output;
+    strides_map_type         strides;
+    arithmetic_op_kind       plus;
+    arithmetic_op_kind       multiplies;
+    int                      alpha;
 
-    std::optional<int>                          unroll_limit;
-    std::shared_ptr<elementwise_operation<ISA>> elementwise_preop;
-    std::vector<std::string>                    elementwise_preop_tensors;
-    std::shared_ptr<elementwise_operation<ISA>> elementwise_postop;
-    std::vector<std::string>                    elementwise_postop_tensors;
-    std::optional<OptimizationConfiguration>    optim_config;
+    std::optional<int>                       unroll_limit;
+    elementwise_op_ptr<ISA>                  elementwise_preop;
+    std::vector<std::string>                 elementwise_preop_tensors;
+    elementwise_op_ptr<ISA>                  elementwise_postop;
+    std::vector<std::string>                 elementwise_postop_tensors;
+    std::optional<OptimizationConfiguration> optim_config;
 
 public:
     compute_node(
         std::vector<std::string> const& inputs, std::string const& output,
-        std::map<std::string, std::map<std::string, int>> const& strides,
-        arithmetic_op_kind plus, arithmetic_op_kind multiplies, int alpha,
-        std::optional<int> unroll_limit = std::nullopt,
-        std::shared_ptr<elementwise_operation<ISA>> const& elementwise_preop =
-            nullptr,
-        std::vector<std::string> const& elementwise_preop_tensors = {},
-        std::shared_ptr<elementwise_operation<ISA>> const& elementwise_postop =
-            nullptr,
+        strides_map_type const& strides, arithmetic_op_kind plus,
+        arithmetic_op_kind multiplies, int alpha,
+        std::optional<int>              unroll_limit      = std::nullopt,
+        elementwise_op_ptr<ISA> const&  elementwise_preop = nullptr,
+        std::vector<std::string> const& elementwise_preop_tensors  = {},
+        elementwise_op_ptr<ISA> const&  elementwise_postop         = nullptr,
         std::vector<std::string> const& elementwise_postop_tensors = {},
         std::optional<OptimizationConfiguration> optim_config = std::nullopt)
         : super_type(node_kind::compute)
@@ -224,7 +234,7 @@ public:
 
     std::optional<int> get_unroll_limit() const { return unroll_limit; }
 
-    std::shared_ptr<elementwise_operation<ISA>> get_elementwise_preop() const
+    elementwise_op_ptr<ISA> get_elementwise_preop() const
     {
         return elementwise_preop;
     }
@@ -234,7 +244,7 @@ public:
         return elementwise_preop_tensors;
     }
 
-    std::shared_ptr<elementwise_operation<ISA>> get_elementwise_postop() const
+    elementwise_op_ptr<ISA> get_elementwise_postop() const
     {
         return elementwise_postop;
     }
@@ -249,11 +259,7 @@ public:
         return optim_config;
     }
 
-    std::map<std::string, std::map<std::string, int>> const&
-    get_tensor_strides() const
-    {
-        return strides;
-    }
+    strides_map_type const& get_tensor_strides() const { return strides; }
 
     std::set<std::string> get_tensors_used() const
     {
@@ -270,9 +276,8 @@ public:
 
     std::set<std::string> get_output_tensors() const { return {output}; }
 
-    loop_tree_fn_type
-    get_fn(std::map<std::string, int> const& sizes,
-           std::map<std::string, std::set<std::string>> const&) const
+    loop_tree_fn_type get_fn(std::map<std::string, int> const& sizes,
+                             formulas_map_type const&) const
     {
         // TODO(j): if we want to support more ops, extend here otherwise only
         // supported through loop nest
@@ -307,20 +312,18 @@ public:
 
 // TODO (maybe name types for strides, elementwise_op_ptr, etc..
 template <class ISA>
-std::shared_ptr<loop_tree_node<ISA>> make_compute_node(
+loop_tree_node_ptr<ISA> make_compute_node(
     std::vector<std::string> const& inputs, std::string const& output,
-    std::map<std::string, std::map<std::string, int>> const& strides,
-    arithmetic_op_kind plus, arithmetic_op_kind multiplies, int alpha,
-    std::optional<int> unroll_limit = std::nullopt,
-    std::shared_ptr<elementwise_operation<ISA>> const& elementwise_preop =
-        nullptr,
-    std::vector<std::string> const& elementwise_preop_tensors = {},
-    std::shared_ptr<elementwise_operation<ISA>> const& elementwise_postop =
-        nullptr,
+    strides_map_type const& strides, arithmetic_op_kind plus,
+    arithmetic_op_kind multiplies, int alpha,
+    std::optional<int>                       unroll_limit      = std::nullopt,
+    elementwise_op_ptr<ISA> const&           elementwise_preop = nullptr,
+    std::vector<std::string> const&          elementwise_preop_tensors = {},
+    elementwise_op_ptr<ISA> const&           elementwise_postop = nullptr,
     std::vector<std::string> const&          elementwise_postop_tensors = {},
     std::optional<OptimizationConfiguration> optim_config = std::nullopt)
 {
-    return std::shared_ptr<loop_tree_node<ISA>>(new compute_node<ISA>(
+    return loop_tree_node_ptr<ISA>(new compute_node<ISA>(
         inputs, output, strides, plus, multiplies, alpha, unroll_limit,
         elementwise_preop, elementwise_preop_tensors, elementwise_postop,
         elementwise_postop_tensors, optim_config));
@@ -333,16 +336,15 @@ class transpose_node : public loop_tree_node<ISA>
 private:
     using super_type = loop_tree_node<ISA>;
 
-    std::string                                       input;
-    std::string                                       output;
-    std::map<std::string, std::map<std::string, int>> strides;
-    std::optional<int>                                unroll_limit;
+    std::string        input;
+    std::string        output;
+    strides_map_type   strides;
+    std::optional<int> unroll_limit;
 
 public:
-    transpose_node(
-        std::string const& input, std::string const& output,
-        std::map<std::string, std::map<std::string, int>> const& strides,
-        std::optional<int> unroll_limit = std::nullopt)
+    transpose_node(std::string const& input, std::string const& output,
+                   strides_map_type const& strides,
+                   std::optional<int>      unroll_limit = std::nullopt)
         : super_type(node_kind::transpose)
         , input(input)
         , output(output)
@@ -361,15 +363,10 @@ public:
 
     std::set<std::string> get_output_tensors() const { return {output}; }
 
-    std::map<std::string, std::map<std::string, int>> const&
-    get_tensor_strides() const
-    {
-        return strides;
-    }
+    strides_map_type const& get_tensor_strides() const { return strides; }
 
-    loop_tree_fn_type
-    get_fn(std::map<std::string, int> const&,
-           std::map<std::string, std::set<std::string>> const&) const
+    loop_tree_fn_type get_fn(std::map<std::string, int> const&,
+                             formulas_map_type const&) const
     {
         return [input = this->input, output = this->output](
                    std::map<std::string, float*> const& tensors,
@@ -385,12 +382,12 @@ public:
 };
 
 template <class ISA>
-std::shared_ptr<loop_tree_node<ISA>> make_transpose_node(
-    std::string const& input, std::string const& output,
-    std::map<std::string, std::map<std::string, int>> const& strides,
-    std::optional<int> unroll_limit = std::nullopt)
+loop_tree_node_ptr<ISA>
+make_transpose_node(std::string const& input, std::string const& output,
+                    strides_map_type const& strides,
+                    std::optional<int>      unroll_limit = std::nullopt)
 {
-    return std::shared_ptr<loop_tree_node<ISA>>(
+    return loop_tree_node_ptr<ISA>(
         new transpose_node<ISA>(input, output, strides, unroll_limit));
 }
 
@@ -405,7 +402,7 @@ private:
 
     std::set<std::string> in_scope_tensor_names;
     std::set<std::string> in_scope_output_tensor_names;
-    std::map<std::string, std::map<std::string, int>> in_scope_tensor_strides;
+    strides_map_type      in_scope_tensor_strides;
 
 private:
     void set_in_scope_tensor_info()
@@ -453,9 +450,8 @@ private:
     }
 
     std::function<void(std::map<std::string, int>&, int)>
-    get_alpha_offsets_adjuster(
-        std::set<std::string> const&                        output_tensor_names,
-        std::map<std::string, std::set<std::string>> const& formulas) const
+    get_alpha_offsets_adjuster(std::set<std::string> const& output_tensor_names,
+                               formulas_map_type const&     formulas) const
     {
 
         std::vector<std::string> to_adjust;
@@ -481,9 +477,8 @@ public:
     std::string const& get_var() const { return var; }
     int                get_delta() const { return delta; }
 
-    for_loop_node(
-        std::string var, int delta,
-        std::vector<std::shared_ptr<loop_tree_node<ISA>>> const& children)
+    for_loop_node(std::string var, int delta,
+                  std::vector<loop_tree_node_ptr<ISA>> const& children)
         : super_type(node_kind::for_loop)
         , var(var)
         , delta(delta)
@@ -502,15 +497,13 @@ public:
         return in_scope_output_tensor_names;
     }
 
-    std::map<std::string, std::map<std::string, int>> const&
-    get_tensor_strides() const override
+    strides_map_type const& get_tensor_strides() const override
     {
         return in_scope_tensor_strides;
     }
 
-    loop_tree_fn_type
-    get_fn(std::map<std::string, int> const&                   sizes,
-           std::map<std::string, std::set<std::string>> const& formulas) const
+    loop_tree_fn_type get_fn(std::map<std::string, int> const& sizes,
+                             formulas_map_type const&          formulas) const
     {
         auto var      = this->var;
         auto delta    = this->delta;
@@ -566,11 +559,11 @@ public:
 };
 
 template <class ISA>
-std::shared_ptr<loop_tree_node<ISA>> make_for_loop_node(
-    std::string var, int delta,
-    std::vector<std::shared_ptr<loop_tree_node<ISA>>> const& children)
+loop_tree_node_ptr<ISA>
+make_for_loop_node(std::string var, int delta,
+                   std::vector<loop_tree_node_ptr<ISA>> const& children)
 {
-    return std::shared_ptr<loop_tree_node<ISA>>(
+    return loop_tree_node_ptr<ISA>(
         new for_loop_node<ISA>(var, delta, children));
 }
 
@@ -580,33 +573,31 @@ class jitted_loop_nest_node : public loop_tree_node<ISA>
 private:
     using super_type = loop_tree_node<ISA>;
 
-    std::vector<std::string>                          inputs;
-    std::string                                       output;
-    std::vector<std::pair<std::string, int>>          order;
-    std::map<std::string, std::map<std::string, int>> strides;
-    arithmetic_op_kind                                plus;
-    arithmetic_op_kind                                multiplies;
-    int                                               alpha;
+    std::vector<std::string>                 inputs;
+    std::string                              output;
+    std::vector<std::pair<std::string, int>> order;
+    strides_map_type                         strides;
+    arithmetic_op_kind                       plus;
+    arithmetic_op_kind                       multiplies;
+    int                                      alpha;
 
-    std::optional<int>                          unroll_limit;
-    std::shared_ptr<elementwise_operation<ISA>> elementwise_preop;
-    std::vector<std::string>                    elementwise_preop_tensors;
-    std::shared_ptr<elementwise_operation<ISA>> elementwise_postop;
-    std::vector<std::string>                    elementwise_postop_tensors;
-    std::optional<OptimizationConfiguration>    optim_config;
+    std::optional<int>                       unroll_limit;
+    elementwise_op_ptr<ISA>                  elementwise_preop;
+    std::vector<std::string>                 elementwise_preop_tensors;
+    elementwise_op_ptr<ISA>                  elementwise_postop;
+    std::vector<std::string>                 elementwise_postop_tensors;
+    std::optional<OptimizationConfiguration> optim_config;
 
 public:
     jitted_loop_nest_node(
         std::vector<std::string> const& inputs, std::string const& output,
-        std::vector<std::pair<std::string, int>> const&          order,
-        std::map<std::string, std::map<std::string, int>> const& strides,
-        arithmetic_op_kind plus, arithmetic_op_kind multiplies, int alpha,
-        std::optional<int> unroll_limit = std::nullopt,
-        std::shared_ptr<elementwise_operation<ISA>> const& elementwise_preop =
-            nullptr,
-        std::vector<std::string> const& elementwise_preop_tensors = {},
-        std::shared_ptr<elementwise_operation<ISA>> const& elementwise_postop =
-            nullptr,
+        std::vector<std::pair<std::string, int>> const& order,
+        strides_map_type const& strides, arithmetic_op_kind plus,
+        arithmetic_op_kind multiplies, int alpha,
+        std::optional<int>              unroll_limit      = std::nullopt,
+        elementwise_op_ptr<ISA> const&  elementwise_preop = nullptr,
+        std::vector<std::string> const& elementwise_preop_tensors  = {},
+        elementwise_op_ptr<ISA> const&  elementwise_postop         = nullptr,
         std::vector<std::string> const& elementwise_postop_tensors = {},
         std::optional<OptimizationConfiguration> optim_config = std::nullopt)
         : super_type(node_kind::jitted_loop_nest)
@@ -656,9 +647,8 @@ public:
                      {for_node->get_var(), for_node->get_delta()});
     }
 
-    loop_tree_fn_type
-    get_fn(std::map<std::string, int> const&                   sizes,
-           std::map<std::string, std::set<std::string>> const& formulas) const
+    loop_tree_fn_type get_fn(std::map<std::string, int> const& sizes,
+                             formulas_map_type const&          formulas) const
     {
         // contains followed tensors for pre/post ops
         std::vector<std::string> extra_tensors;
@@ -752,8 +742,7 @@ public:
 
     std::set<std::string> get_output_tensors() const { return {output}; }
 
-    std::map<std::string, std::map<std::string, int>> const&
-    get_tensor_strides() const override
+    strides_map_type const& get_tensor_strides() const override
     {
         return strides;
     }
@@ -765,18 +754,17 @@ class jitted_transpose_node : public loop_tree_node<ISA>
 private:
     using super_type = loop_tree_node<ISA>;
 
-    std::string                                       input;
-    std::string                                       output;
-    std::vector<std::pair<std::string, int>>          order;
-    std::map<std::string, std::map<std::string, int>> strides;
-    std::optional<int>                                unroll_limit;
+    std::string                              input;
+    std::string                              output;
+    std::vector<std::pair<std::string, int>> order;
+    strides_map_type                         strides;
+    std::optional<int>                       unroll_limit;
 
 public:
-    jitted_transpose_node(
-        std::string const& input, std::string const& output,
-        std::vector<std::pair<std::string, int>> const&          order,
-        std::map<std::string, std::map<std::string, int>> const& strides,
-        std::optional<int> unroll_limit = std::nullopt)
+    jitted_transpose_node(std::string const& input, std::string const& output,
+                          std::vector<std::pair<std::string, int>> const& order,
+                          strides_map_type const& strides,
+                          std::optional<int>      unroll_limit = std::nullopt)
         : super_type(node_kind::jitted_transpose)
         , input(input)
         , output(output)
@@ -810,9 +798,8 @@ public:
                      {for_node->get_var(), for_node->get_delta()});
     }
 
-    loop_tree_fn_type
-    get_fn(std::map<std::string, int> const&                   sizes,
-           std::map<std::string, std::set<std::string>> const& formulas) const
+    loop_tree_fn_type get_fn(std::map<std::string, int> const& sizes,
+                             formulas_map_type const&          formulas) const
     {
         auto jit_fn = facebook::sysml::aot::transposer_jitter<ISA>(
                           order, sizes, strides.at(output), strides.at(input),
@@ -836,60 +823,55 @@ public:
 
     std::set<std::string> get_output_tensors() const { return {output}; }
 
-    std::map<std::string, std::map<std::string, int>> const&
-    get_tensor_strides() const override
+    strides_map_type const& get_tensor_strides() const override
     {
         return strides;
     }
 };
 
 template <class ISA>
-std::shared_ptr<loop_tree_node<ISA>>
+loop_tree_node_ptr<ISA>
 merge_loop_into_jitter(std::shared_ptr<for_loop_node<ISA>> const&         node,
                        std::shared_ptr<jitted_loop_nest_node<ISA>> const& child)
 {
-    return std::shared_ptr<loop_tree_node<ISA>>(
-        new jitted_loop_nest_node<ISA>(node, child));
+    return loop_tree_node_ptr<ISA>(new jitted_loop_nest_node<ISA>(node, child));
 }
 
 template <class ISA>
-std::shared_ptr<loop_tree_node<ISA>>
+loop_tree_node_ptr<ISA>
 merge_loop_into_jitter(std::shared_ptr<for_loop_node<ISA>> const& node,
                        std::shared_ptr<compute_node<ISA>> const&  child)
 {
-    return std::shared_ptr<loop_tree_node<ISA>>(
-        new jitted_loop_nest_node<ISA>(node, child));
+    return loop_tree_node_ptr<ISA>(new jitted_loop_nest_node<ISA>(node, child));
 }
 
 template <class ISA>
-std::shared_ptr<loop_tree_node<ISA>>
+loop_tree_node_ptr<ISA>
 merge_loop_into_jitter(std::shared_ptr<for_loop_node<ISA>> const&  node,
                        std::shared_ptr<transpose_node<ISA>> const& child)
 {
-    return std::shared_ptr<loop_tree_node<ISA>>(
-        new jitted_transpose_node<ISA>(node, child));
+    return loop_tree_node_ptr<ISA>(new jitted_transpose_node<ISA>(node, child));
 }
 
 template <class ISA>
-std::shared_ptr<loop_tree_node<ISA>>
+loop_tree_node_ptr<ISA>
 merge_loop_into_jitter(std::shared_ptr<for_loop_node<ISA>> const&         node,
                        std::shared_ptr<jitted_transpose_node<ISA>> const& child)
 {
-    return std::shared_ptr<loop_tree_node<ISA>>(
-        new jitted_transpose_node<ISA>(node, child));
+    return loop_tree_node_ptr<ISA>(new jitted_transpose_node<ISA>(node, child));
 }
 
 template <class ISA>
-std::shared_ptr<loop_tree_node<ISA>>
-simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>> const& node,
-                    int current_depth = 0, int max_interpreted_depth = 0)
+loop_tree_node_ptr<ISA> simplify_loop_nests(loop_tree_node_ptr<ISA> const& node,
+                                            int current_depth         = 0,
+                                            int max_interpreted_depth = 0)
 {
     if (node->get_type() != node_kind::for_loop)
     {
         return node;
     }
 
-    std::vector<std::shared_ptr<loop_tree_node<ISA>>> new_children;
+    std::vector<loop_tree_node_ptr<ISA>> new_children;
     for (auto c : node->get_children())
     {
         new_children.push_back(
@@ -911,7 +893,7 @@ simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>> const& node,
     }
 
     auto for_node = std::dynamic_pointer_cast<for_loop_node<ISA>>(node);
-    std::shared_ptr<loop_tree_node<ISA>> single_child = new_children.at(0);
+    loop_tree_node_ptr<ISA> single_child = new_children.at(0);
 
     switch (single_child->get_type())
     {
@@ -950,11 +932,10 @@ simplify_loop_nests(std::shared_ptr<loop_tree_node<ISA>> const& node,
     }
 }
 
-inline std::int64_t get_tensor_size(
-    std::string const&                                       name,
-    std::map<std::string, std::map<std::string, int>> const& strides,
-    std::map<std::string, int> const&                        sizes,
-    std::map<std::string, std::set<std::string>> const&      formulas)
+inline std::int64_t get_tensor_size(std::string const&                name,
+                                    strides_map_type const&           strides,
+                                    std::map<std::string, int> const& sizes,
+                                    formulas_map_type const&          formulas)
 {
     std::int64_t size = 1;
     for (auto const& s : sizes)
@@ -968,10 +949,9 @@ inline std::int64_t get_tensor_size(
 
 template <class ISA>
 std::int64_t get_largest_intermediate_output_size(
-    std::shared_ptr<loop_tree_node<ISA>> const&         node,
-    std::vector<std::string> const&                     provided_tensors,
-    std::map<std::string, int> const&                   sizes,
-    std::map<std::string, std::set<std::string>> const& formulas)
+    loop_tree_node_ptr<ISA> const&    node,
+    std::vector<std::string> const&   provided_tensors,
+    std::map<std::string, int> const& sizes, formulas_map_type const& formulas)
 {
     std::int64_t max_size = 0;
     switch (node->get_type())
@@ -1017,29 +997,28 @@ template <class ISA>
 class loop_tree_program
 {
 private:
-    std::vector<std::shared_ptr<loop_tree_node<ISA>>> nodes;
-    std::map<std::string, int>                        sizes;
-    std::map<std::string, std::set<std::string>>      formulas;
+    std::vector<loop_tree_node_ptr<ISA>> nodes;
+    std::map<std::string, int>           sizes;
+    formulas_map_type                    formulas;
     // for forcing partially interpreted trees (mainly for testing)
     int max_interpreted_depth;
 
-    static std::vector<std::shared_ptr<loop_tree_node<ISA>>>
-    loop_nest_compute_to_tree(
+    static std::vector<loop_tree_node_ptr<ISA>> loop_nest_compute_to_tree(
         std::vector<std::pair<std::string, int>> const& order,
         std::map<std::string, int> const&               C_strides,
         std::map<std::string, int> const&               A_strides,
         std::map<std::string, int> const& B_strides, int alpha,
-        std::optional<int>                                 unroll_limit,
-        std::shared_ptr<elementwise_operation<ISA>> const& elementwise_preop,
+        std::optional<int>             unroll_limit,
+        elementwise_op_ptr<ISA> const& elementwise_preop,
         std::vector<std::map<std::string, int>> const&
-                                                           elementwise_preop_strides,
-        std::shared_ptr<elementwise_operation<ISA>> const& elementwise_postop,
+                                       elementwise_preop_strides,
+        elementwise_op_ptr<ISA> const& elementwise_postop,
         std::vector<std::map<std::string, int>> const&
                                                  elementwise_postop_strides,
         std::optional<OptimizationConfiguration> optim_config)
     {
 
-        std::map<std::string, std::map<std::string, int>> tensor_strides = {
+        strides_map_type tensor_strides = {
             {"A", A_strides}, {"B", B_strides}, {"C", C_strides}};
 
         assert("Convenience wrapper handles single followed pre-op tensor" &&
@@ -1080,8 +1059,7 @@ private:
         return {current};
     }
 
-    std::vector<std::shared_ptr<loop_tree_node<ISA>>>
-    loop_nest_transpose_to_tree(
+    std::vector<loop_tree_node_ptr<ISA>> loop_nest_transpose_to_tree(
         std::vector<std::pair<std::string, int>> const& order,
         std::map<std::string, int> const&               C_strides,
         std::map<std::string, int> const&               A_strides,
@@ -1092,7 +1070,7 @@ private:
 
         for (auto it = order.rbegin(); it != order.rend(); it++)
         {
-            std::shared_ptr<loop_tree_node<ISA>> new_node =
+            loop_tree_node_ptr<ISA> new_node =
                 make_for_loop_node<ISA>(it->first, it->second, {current});
             current = new_node;
         }
@@ -1101,11 +1079,10 @@ private:
     }
 
 public:
-    loop_tree_program(
-        std::vector<std::shared_ptr<loop_tree_node<ISA>>> const& nodes,
-        std::map<std::string, int> const&                        sizes,
-        std::map<std::string, std::set<std::string>> const&      formulas,
-        std::optional<int> max_interpreted_depth = std::nullopt)
+    loop_tree_program(std::vector<loop_tree_node_ptr<ISA>> const& nodes,
+                      std::map<std::string, int> const&           sizes,
+                      formulas_map_type const&                    formulas,
+                      std::optional<int> max_interpreted_depth = std::nullopt)
         : nodes(nodes)
         , sizes(sizes)
         , formulas(formulas)
@@ -1114,7 +1091,7 @@ public:
     {
 
         LN_LOG(DEBUG) << "Pass: Simplifying loop nests\n";
-        std::vector<std::shared_ptr<loop_tree_node<ISA>>> new_nodes;
+        std::vector<loop_tree_node_ptr<ISA>> new_nodes;
         for (auto c : nodes)
         {
             new_nodes.push_back(
@@ -1123,10 +1100,7 @@ public:
         this->nodes = new_nodes;
     }
 
-    std::vector<std::shared_ptr<loop_tree_node<ISA>>> const& get_children()
-    {
-        return nodes;
-    }
+    std::vector<loop_tree_node_ptr<ISA>> const& get_children() { return nodes; }
 
     loop_tree_program(
         std::vector<std::pair<std::string, int>> const& order,
@@ -1137,13 +1111,11 @@ public:
         std::map<std::string, int> const&               C_strides,
         std::map<std::string, int> const&               A_strides,
         std::map<std::string, int> const& B_strides, int alpha = 0,
-        std::optional<int> unroll_limit = std::nullopt,
-        std::shared_ptr<elementwise_operation<ISA>> const& elementwise_preop =
-            nullptr,
+        std::optional<int>             unroll_limit      = std::nullopt,
+        elementwise_op_ptr<ISA> const& elementwise_preop = nullptr,
         std::vector<std::map<std::string, int>> const&
-                                                           elementwise_preop_strides = {},
-        std::shared_ptr<elementwise_operation<ISA>> const& elementwise_postop =
-            nullptr,
+                                       elementwise_preop_strides = {},
+        elementwise_op_ptr<ISA> const& elementwise_postop        = nullptr,
         std::vector<std::map<std::string, int>> const&
                                                  elementwise_postop_strides = {},
         std::optional<OptimizationConfiguration> optim_config = std::nullopt,
@@ -1209,11 +1181,11 @@ public:
 };
 
 template <class ISA>
-std::shared_ptr<loop_tree_program<ISA>> make_loop_tree_program(
-    std::vector<std::shared_ptr<loop_tree_node<ISA>>> const& nodes,
-    std::map<std::string, int> const&                        sizes,
-    std::map<std::string, std::set<std::string>> const&      formulas,
-    std::optional<int> max_interpreted_depth = std::nullopt)
+std::shared_ptr<loop_tree_program<ISA>>
+make_loop_tree_program(std::vector<loop_tree_node_ptr<ISA>> const& nodes,
+                       std::map<std::string, int> const&           sizes,
+                       formulas_map_type const&                    formulas,
+                       std::optional<int> max_interpreted_depth = std::nullopt)
 {
     return std::shared_ptr<loop_tree_program<ISA>>(new loop_tree_program<ISA>(
         nodes, sizes, formulas, max_interpreted_depth));
