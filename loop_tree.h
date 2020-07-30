@@ -281,13 +281,19 @@ public:
     {
         // TODO(j): if we want to support more ops, extend here otherwise only
         // supported through loop nest
-        assert("Interpreted compute only supports FMA" &&
-               (plus == arithmetic_op_kind::plus &&
-                multiplies == arithmetic_op_kind::multiplies));
+        if (plus != arithmetic_op_kind::plus ||
+            multiplies != arithmetic_op_kind::multiplies)
+        {
+            throw std::invalid_argument("Interpreted compute only supports "
+                                        "standard plus and multiplies");
+        }
 
-        assert("Interpreted doesn't support pre/post-ops" &&
-               (elementwise_preop_tensors.empty() &&
-                elementwise_postop_tensors.empty()));
+        if (!elementwise_preop_tensors.empty() ||
+            !elementwise_postop_tensors.empty())
+        {
+            throw std::invalid_argument("Interpreted compute doesn't support "
+                                        "pre/post op with followed tensors");
+        }
 
         return
             [inputs = this->inputs, output = this->output, alpha = this->alpha](
@@ -310,7 +316,6 @@ public:
     }
 };
 
-// TODO (maybe name types for strides, elementwise_op_ptr, etc..
 template <class ISA>
 loop_tree_node_ptr<ISA> make_compute_node(
     std::vector<std::string> const& inputs, std::string const& output,
@@ -667,10 +672,6 @@ public:
             extra_tensors.push_back(name);
         }
 
-        // loop nest currently supports at most 2 followed tensors for
-        // elementwise ops
-        assert(extra_tensors.size() <= 2);
-
         auto jit_fn =
             facebook::sysml::aot::FMA_loop_nest_jitter<ISA>(
                 order, sizes, formulas.at(output), formulas.at(inputs[0]),
@@ -727,8 +728,8 @@ public:
         }
         else
         {
-            // TODO (throw an exception)
-            assert("Exceeded number of allowed followed tensors" && false);
+            throw std::invalid_argument(
+                "loop_nest currently supports at most 2 followed tensors");
             return loop_tree_fn_type();
         }
     }
@@ -927,8 +928,7 @@ loop_tree_node_ptr<ISA> simplify_loop_nests(loop_tree_node_ptr<ISA> const& node,
         break;
 
     default:
-        assert("Unhandled node kind" && false);
-        return node;
+        throw std::runtime_error("Unhandled node kind");
     }
 }
 
@@ -989,7 +989,7 @@ std::int64_t get_largest_intermediate_output_size(
         return max_size;
         break;
     default:
-        assert("Unhandled node kind" && false);
+        throw std::runtime_error("Unhandled node kind");
     }
 }
 
@@ -1002,81 +1002,6 @@ private:
     formulas_map_type                    formulas;
     // for forcing partially interpreted trees (mainly for testing)
     int max_interpreted_depth;
-
-    static std::vector<loop_tree_node_ptr<ISA>> loop_nest_compute_to_tree(
-        std::vector<std::pair<std::string, int>> const& order,
-        std::map<std::string, int> const&               C_strides,
-        std::map<std::string, int> const&               A_strides,
-        std::map<std::string, int> const& B_strides, int alpha,
-        std::optional<int>             unroll_limit,
-        elementwise_op_ptr<ISA> const& elementwise_preop,
-        std::vector<std::map<std::string, int>> const&
-                                       elementwise_preop_strides,
-        elementwise_op_ptr<ISA> const& elementwise_postop,
-        std::vector<std::map<std::string, int>> const&
-                                                 elementwise_postop_strides,
-        std::optional<OptimizationConfiguration> optim_config)
-    {
-
-        strides_map_type tensor_strides = {
-            {"A", A_strides}, {"B", B_strides}, {"C", C_strides}};
-
-        assert("Convenience wrapper handles single followed pre-op tensor" &&
-               (elementwise_preop_strides.size() <= 1));
-        assert("Convenience wrapper handles single followed post-op tensor" &&
-               (elementwise_postop_strides.size() <= 1));
-
-        std::vector<std::string> preop_tensors;
-        std::vector<std::string> postop_tensors;
-
-        if (elementwise_preop != nullptr &&
-            (!elementwise_preop_strides.empty()))
-        {
-            tensor_strides["pre"] = elementwise_preop_strides[0];
-            preop_tensors.push_back("pre");
-        }
-
-        if (elementwise_postop != nullptr &&
-            (!elementwise_postop_strides.empty()))
-        {
-            tensor_strides["post"] = elementwise_postop_strides[0];
-            postop_tensors.push_back("post");
-        }
-
-        auto current = make_compute_node<ISA>(
-            {"A", "B"}, "C", tensor_strides, arithmetic_op_kind::plus,
-            arithmetic_op_kind::multiplies, alpha, unroll_limit,
-            elementwise_preop, preop_tensors, elementwise_postop,
-            postop_tensors, optim_config);
-
-        for (auto it = order.rbegin(); it != order.rend(); it++)
-        {
-            auto new_node =
-                make_for_loop_node<ISA>(it->first, it->second, {current});
-            current = new_node;
-        }
-
-        return {current};
-    }
-
-    std::vector<loop_tree_node_ptr<ISA>> loop_nest_transpose_to_tree(
-        std::vector<std::pair<std::string, int>> const& order,
-        std::map<std::string, int> const&               C_strides,
-        std::map<std::string, int> const&               A_strides,
-        std::optional<int>                              unroll_limit)
-    {
-        auto current = make_transpose_node<ISA>(
-            "A", "C", {{"A", A_strides}, {"C", C_strides}}, unroll_limit);
-
-        for (auto it = order.rbegin(); it != order.rend(); it++)
-        {
-            loop_tree_node_ptr<ISA> new_node =
-                make_for_loop_node<ISA>(it->first, it->second, {current});
-            current = new_node;
-        }
-
-        return {current};
-    }
 
 public:
     loop_tree_program(std::vector<loop_tree_node_ptr<ISA>> const& nodes,
@@ -1101,46 +1026,6 @@ public:
     }
 
     std::vector<loop_tree_node_ptr<ISA>> const& get_children() { return nodes; }
-
-    loop_tree_program(
-        std::vector<std::pair<std::string, int>> const& order,
-        std::map<std::string, int> const&               sizes,
-        std::set<std::string> const&                    C_formula,
-        std::set<std::string> const&                    A_formula,
-        std::set<std::string> const&                    B_formula,
-        std::map<std::string, int> const&               C_strides,
-        std::map<std::string, int> const&               A_strides,
-        std::map<std::string, int> const& B_strides, int alpha = 0,
-        std::optional<int>             unroll_limit      = std::nullopt,
-        elementwise_op_ptr<ISA> const& elementwise_preop = nullptr,
-        std::vector<std::map<std::string, int>> const&
-                                       elementwise_preop_strides = {},
-        elementwise_op_ptr<ISA> const& elementwise_postop        = nullptr,
-        std::vector<std::map<std::string, int>> const&
-                                                 elementwise_postop_strides = {},
-        std::optional<OptimizationConfiguration> optim_config = std::nullopt,
-        std::optional<int> max_interpreted_depth              = std::nullopt)
-        : loop_tree_program(
-              loop_nest_compute_to_tree(
-                  order, C_strides, A_strides, B_strides, alpha, unroll_limit,
-                  elementwise_preop, elementwise_preop_strides,
-                  elementwise_postop, elementwise_postop_strides, optim_config),
-              sizes, {{"C", C_formula}, {"A", A_formula}, {"B", B_formula}},
-              max_interpreted_depth)
-    {
-    }
-
-    loop_tree_program(std::vector<std::pair<std::string, int>> const& order,
-                      std::map<std::string, int> const&               sizes,
-                      std::map<std::string, int> const& Out_strides,
-                      std::map<std::string, int> const& In_strides,
-                      std::optional<int> unroll_limit          = std::nullopt,
-                      std::optional<int> max_interpreted_depth = std::nullopt)
-        : loop_tree_program(loop_nest_transpose_to_tree(
-                                order, Out_strides, In_strides, unroll_limit),
-                            sizes, {}, max_interpreted_depth)
-    {
-    }
 
     std::int64_t
     get_scratch_size(std::set<std::string> const& provided_tensors) const

@@ -14,6 +14,13 @@
 #define CT_ISA avx2
 #endif
 
+// just for testing
+// some examples are expensive to do
+// when testing no jitter
+#ifndef SKIP_EXPENSIVE
+#define SKIP_EXPENSIVE false
+#endif
+
 // just for testing:
 // forces a prefix in loop tree
 // to be interpreted (rather than
@@ -645,7 +652,8 @@ int main()
         }
 
         auto nodes = {curr};
-        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas);
+        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas,
+                                                   MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
 
@@ -708,7 +716,8 @@ int main()
         }
 
         auto nodes = {curr};
-        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas);
+        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas,
+                                                   MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
 
@@ -761,7 +770,8 @@ int main()
         // technically formulas aren't used in transpose so not
         //  necessary here
         // (but are always a required parameter for now)
-        auto tree = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas);
+        auto tree = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas,
+                                                   MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
 
@@ -833,7 +843,8 @@ int main()
         }
 
         auto nodes = {curr};
-        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas);
+        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas,
+                                                   MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
 
@@ -912,7 +923,8 @@ int main()
         }
 
         auto nodes = {curr};
-        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas);
+        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas,
+                                                   MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
 
@@ -937,85 +949,6 @@ int main()
 
         std::cout << "MAXABSDIFF: "
                   << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
-                  << "\n";
-    }
-#endif
-
-    {
-        // convolution example
-
-        /*
-        ----------> Definition
-        */
-        int CIN  = 128;
-        int COUT = 128 + 3;
-        int OS   = 56 + 4;
-        int KS   = 3;
-        int IS   = OS + KS - 1;
-
-        // schedule
-        std::vector<std::pair<std::string, int>> order = {
-            {"c_out", 16}, {"o_h", 1}, {"o_w", 28}, {"c_in", 16}, {"c_in", 1},
-            {"o_w", 1},    {"k_h", 1}, {"k_w", 1},  {"c_out", 1}};
-
-        // sizes of dimensions
-        std::map<std::string, int> sizes = {{"c_out", COUT}, {"o_w", OS},
-                                            {"k_w", KS},     {"c_in", CIN},
-                                            {"o_h", OS},     {"k_h", KS}};
-
-        // dimensions in each tensor
-        std::map<std::string, std::set<std::string>> formulas = {
-            {"C", {"c_out", "o_w", "o_h"}},
-            {"A", {"c_in", "i_w", "i_h"}},
-            {"B", {"c_in", "c_out", "k_w", "k_h"}}};
-
-        // strides defining innermost computation
-        std::map<std::string, std::map<std::string, int>> strides = {
-            {"C", {{"o_w", COUT}, {"c_out", 1}, {"o_h", COUT * OS}}},
-            {"A",
-             {{"o_w", CIN},
-              {"k_w", CIN},
-              {"c_in", 1},
-              {"o_h", IS * CIN},
-              {"k_h", IS * CIN}}},
-            {"B",
-             {{"c_out", 1},
-              {"c_in", COUT},
-              {"k_w", COUT * CIN},
-              {"k_h", COUT * CIN * KS}}}};
-
-        // innermost op with zero init
-        auto mm = make_compute_node<CT_ISA>({"A", "B"}, "C", strides,
-                                            arithmetic_op_kind::plus,
-                                            arithmetic_op_kind::multiplies, 0);
-
-        // add for-loops from the order
-        auto curr = mm;
-        for (auto it = order.rbegin(); it != order.rend(); it++)
-        {
-            curr = make_for_loop_node<CT_ISA>(it->first, it->second, {curr});
-        }
-
-        auto nodes = {curr};
-        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas);
-
-        auto fn = tree->get_fn();
-
-        /*
-        ----------> Execution
-        */
-        auto A  = getRandomVector<float>(CIN * IS * IS);
-        auto B  = getRandomVector<float>(COUT * CIN * KS * KS);
-        auto CN = std::vector<float>(COUT * OS * OS);
-        auto CJ = std::vector<float>(COUT * OS * OS);
-
-        baseline_Conv(COUT, CIN, OS, OS, KS, KS, A.data(), B.data(), CN.data());
-
-        fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
-
-        std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS,
-                                CN.data())
                   << "\n";
     }
 
@@ -1076,7 +1009,8 @@ int main()
         }
 
         auto nodes = {curr};
-        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas);
+        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas,
+                                                   MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
 
@@ -1088,13 +1022,102 @@ int main()
         auto CN = std::vector<float>(OX * OY * OZ);
         auto CJ = std::vector<float>(OX * OY * OZ);
 
-        baseline_3DConv(OX, OY, OZ, KX, KY, KZ, A.data(), B.data(), CN.data());
-        apply_relu(CN.data(), CN.data() + CN.size());
+        if (!SKIP_EXPENSIVE)
+        {
+            baseline_3DConv(OX, OY, OZ, KX, KY, KZ, A.data(), B.data(),
+                            CN.data());
+            apply_relu(CN.data(), CN.data() + CN.size());
 
-        fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
+            fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
 
-        std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + OX * OY * OZ, CN.data())
-                  << "\n";
+            std::cout << "MAXABSDIFF: "
+                      << maxAbsDiff(CJ.data(), CJ.data() + OX * OY * OZ,
+                                    CN.data())
+                      << "\n";
+        }
+    }
+#endif
+
+    {
+        // another convolution example
+
+        /*
+        ----------> Definition
+        */
+        int CIN  = 128;
+        int COUT = 128 + 3;
+        int OS   = 56 + 4;
+        int KS   = 3;
+        int IS   = OS + KS - 1;
+
+        // schedule
+        std::vector<std::pair<std::string, int>> order = {
+            {"c_out", 16}, {"o_h", 1}, {"o_w", 28}, {"c_in", 16}, {"c_in", 1},
+            {"o_w", 1},    {"k_h", 1}, {"k_w", 1},  {"c_out", 1}};
+
+        // sizes of dimensions
+        std::map<std::string, int> sizes = {{"c_out", COUT}, {"o_w", OS},
+                                            {"k_w", KS},     {"c_in", CIN},
+                                            {"o_h", OS},     {"k_h", KS}};
+
+        // dimensions in each tensor
+        std::map<std::string, std::set<std::string>> formulas = {
+            {"C", {"c_out", "o_w", "o_h"}},
+            {"A", {"c_in", "i_w", "i_h"}},
+            {"B", {"c_in", "c_out", "k_w", "k_h"}}};
+
+        // strides defining innermost computation
+        std::map<std::string, std::map<std::string, int>> strides = {
+            {"C", {{"o_w", COUT}, {"c_out", 1}, {"o_h", COUT * OS}}},
+            {"A",
+             {{"o_w", CIN},
+              {"k_w", CIN},
+              {"c_in", 1},
+              {"o_h", IS * CIN},
+              {"k_h", IS * CIN}}},
+            {"B",
+             {{"c_out", 1},
+              {"c_in", COUT},
+              {"k_w", COUT * CIN},
+              {"k_h", COUT * CIN * KS}}}};
+
+        // innermost op with zero init
+        auto mm = make_compute_node<CT_ISA>({"A", "B"}, "C", strides,
+                                            arithmetic_op_kind::plus,
+                                            arithmetic_op_kind::multiplies, 0);
+
+        // add for-loops from the order
+        auto curr = mm;
+        for (auto it = order.rbegin(); it != order.rend(); it++)
+        {
+            curr = make_for_loop_node<CT_ISA>(it->first, it->second, {curr});
+        }
+
+        auto nodes = {curr};
+        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas,
+                                                   MAX_INTERPRETED_DEPTH);
+
+        auto fn = tree->get_fn();
+
+        /*
+        ----------> Execution
+        */
+        auto A  = getRandomVector<float>(CIN * IS * IS);
+        auto B  = getRandomVector<float>(COUT * CIN * KS * KS);
+        auto CN = std::vector<float>(COUT * OS * OS);
+        auto CJ = std::vector<float>(COUT * OS * OS);
+
+        if (!SKIP_EXPENSIVE)
+        {
+            baseline_Conv(COUT, CIN, OS, OS, KS, KS, A.data(), B.data(),
+                          CN.data());
+
+            fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
+
+            std::cout << "MAXABSDIFF: "
+                      << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS,
+                                    CN.data())
+                      << "\n";
+        }
     }
 }

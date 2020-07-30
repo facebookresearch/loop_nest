@@ -16,9 +16,10 @@ g++ -g -Wall -Wpedantic -std=c++17 loop_tree.cpp \
 -Wno-sign-compare \
 -DCT_ISA=avx2  \
 -DNDEBUG=1 \
--DNOPTIM \
+-DMAX_INTERPRETED_DEPTH=1000 \
 -DNELEMENTWISE \
--o test.out 2>/dev/null && ./test.out | grep "MAXABSDIFF"
+-DSKIP_EXPENSIVE=true \
+-o test.out 2>/dev/null && ./test.out | grep -e "MAXABSDIFF"
 
 # only jitting part of the loop nest (top levels interpreted)
 echo "Partial jitting (depth=3)"
