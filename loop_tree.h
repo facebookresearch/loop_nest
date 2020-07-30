@@ -88,9 +88,9 @@ template <class ISA>
 class for_loop_node;
 
 // Type aliases for readability
-// void (map from name to tensors, map from name to alpha offset)
-using loop_tree_fn_type = std::function<void(
-    std::map<std::string, float*> const&, std::map<std::string, int> const&)>;
+// void (vector of tensors, vector of alpha offsets)
+using loop_tree_fn_type =
+    std::function<void(std::vector<float*> const&, std::vector<int> const&)>;
 
 // map from name to map of strides
 using strides_map_type = std::map<std::string, std::map<std::string, int>>;
@@ -137,8 +137,9 @@ public:
 
     node_kind get_type() const { return kind_; }
 
-    // sizes, and tensor formulas
+    // tensor positions, dimension sizes, and tensor formulas
     virtual loop_tree_fn_type get_fn(std::map<std::string, int> const&,
+                                     std::map<std::string, int> const&,
                                      formulas_map_type const&) const = 0;
 
     virtual std::set<std::string> get_tensors_used() const = 0;
@@ -276,7 +277,8 @@ public:
 
     std::set<std::string> get_output_tensors() const { return {output}; }
 
-    loop_tree_fn_type get_fn(std::map<std::string, int> const& sizes,
+    loop_tree_fn_type get_fn(std::map<std::string, int> const& tensors_idx,
+                             std::map<std::string, int> const& sizes,
                              formulas_map_type const&) const
     {
         // TODO(j): if we want to support more ops, extend here otherwise only
@@ -295,24 +297,22 @@ public:
                                         "pre/post op with followed tensors");
         }
 
-        return
-            [inputs = this->inputs, output = this->output, alpha = this->alpha](
-                std::map<std::string, float*> const& tensors,
-                std::map<std::string, int> const&    alpha_offsets) {
-                assert(tensors.count(inputs[0]) && tensors.count(inputs[1]) &&
-                       tensors.count(output));
+        return [inputs = this->inputs, output = this->output,
+                alpha = this->alpha, input_idx_0 = tensors_idx.at(inputs[0]),
+                input_idx_1 = tensors_idx.at(inputs[1]),
+                output_idx  = tensors_idx.at(output)](
+                   std::vector<float*> const& tensors,
+                   std::vector<int> const&    alpha_offsets) {
+            float* A = tensors[input_idx_0];
+            float* B = tensors[input_idx_1];
+            float* C = tensors[output_idx];
+            if ((alpha + alpha_offsets[output_idx]) == 0)
+            {
+                C[0] = 0.0;
+            }
 
-                float* A = tensors.at(inputs[0]);
-                float* B = tensors.at(inputs[1]);
-                float* C = tensors.at(output);
-
-                if ((alpha + alpha_offsets.at(output)) == 0)
-                {
-                    C[0] = 0.0;
-                }
-
-                C[0] += A[0] * B[0];
-            };
+            C[0] += A[0] * B[0];
+        };
     }
 };
 
@@ -370,19 +370,22 @@ public:
 
     strides_map_type const& get_tensor_strides() const { return strides; }
 
-    loop_tree_fn_type get_fn(std::map<std::string, int> const&,
+    loop_tree_fn_type get_fn(std::map<std::string, int> const& tensors_idx,
+                             std::map<std::string, int> const&,
                              formulas_map_type const&) const
     {
-        return [input = this->input, output = this->output](
-                   std::map<std::string, float*> const& tensors,
-                   std::map<std::string, int> const&) {
-            assert(tensors.count(input));
-            assert(tensors.count(output));
+        return
+            [input = this->input, output = this->output,
+             input_idx  = tensors_idx.at(input),
+             output_idx = tensors_idx.at(output)](
+                std::vector<float*> const& tensors, std::vector<int> const&) {
+                assert(tensors[input_idx]);
+                assert(tensors[output_idx]);
 
-            float* A = tensors.at(input);
-            float* C = tensors.at(output);
-            C[0]     = A[0];
-        };
+                float* A = tensors[input_idx];
+                float* C = tensors[output_idx];
+                C[0]     = A[0];
+            };
     }
 };
 
@@ -430,10 +433,11 @@ private:
         }
     }
 
-    std::function<void(std::map<std::string, float*>&)>
-    get_tensor_advancer(std::set<std::string> const& tensor_names) const
+    std::function<void(std::vector<float*>&)>
+    get_tensor_advancer(std::map<std::string, int> const& tensors_idx,
+                        std::set<std::string> const&      tensor_names) const
     {
-        std::vector<std::pair<std::string, std::int64_t>> to_advance;
+        std::vector<std::pair<int, std::int64_t>> to_advance;
 
         for (auto const& name : tensor_names)
         {
@@ -441,38 +445,38 @@ private:
             {
                 std::int64_t offset =
                     in_scope_tensor_strides.at(name).at(var) * delta;
-                to_advance.push_back({name, offset});
+                int idx = tensors_idx.at(name);
+                to_advance.push_back({idx, offset});
             }
         }
 
-        return [=](std::map<std::string, float*>& tensors) {
+        return [=](std::vector<float*>& tensors) {
             for (auto const& p : to_advance)
             {
-                assert(tensors.count(p.first));
                 tensors[p.first] += p.second;
             }
         };
     }
 
-    std::function<void(std::map<std::string, int>&, int)>
-    get_alpha_offsets_adjuster(std::set<std::string> const& output_tensor_names,
+    std::function<void(std::vector<int>&, int)>
+    get_alpha_offsets_adjuster(std::map<std::string, int> const& tensors_idx,
+                               std::set<std::string> const& output_tensor_names,
                                formulas_map_type const&     formulas) const
     {
 
-        std::vector<std::string> to_adjust;
+        std::vector<int> to_adjust;
         for (auto const& name : output_tensor_names)
         {
             if (formulas.count(name) && formulas.at(name).count(var) == 0)
             {
                 // reduction variable, so adjust the tensor's alpha
-                to_adjust.push_back(name);
+                to_adjust.push_back(tensors_idx.at(name));
             }
         }
 
-        return [=](std::map<std::string, int>& alpha_offsets, int adjustment) {
+        return [=](std::vector<int>& alpha_offsets, int adjustment) {
             for (auto const& name : to_adjust)
             {
-                assert(alpha_offsets.count(name));
                 alpha_offsets[name] += adjustment;
             }
         };
@@ -507,7 +511,8 @@ public:
         return in_scope_tensor_strides;
     }
 
-    loop_tree_fn_type get_fn(std::map<std::string, int> const& sizes,
+    loop_tree_fn_type get_fn(std::map<std::string, int> const& tensors_idx,
+                             std::map<std::string, int> const& sizes,
                              formulas_map_type const&          formulas) const
     {
         auto var      = this->var;
@@ -526,40 +531,40 @@ public:
             {
                 auto s = sizes;
                 s[var] = delta;
-                full_fns.push_back(c->get_fn(s, formulas));
+                full_fns.push_back(c->get_fn(tensors_idx, s, formulas));
             }
             if (rest)
             {
                 auto s = sizes;
                 s[var] = rest;
-                tail_fns.push_back(c->get_fn(s, formulas));
+                tail_fns.push_back(c->get_fn(tensors_idx, s, formulas));
             }
         }
 
-        auto advancer = get_tensor_advancer(get_tensors_used());
-        auto alpha_offsets_adjuster =
-            get_alpha_offsets_adjuster(get_output_tensors(), formulas);
+        auto advancer = get_tensor_advancer(tensors_idx, get_tensors_used());
+        auto alpha_offsets_adjuster = get_alpha_offsets_adjuster(
+            tensors_idx, get_output_tensors(), formulas);
 
         LN_LOG(DEBUG) << "loop_tree: Executing interpreted for(" << var << ","
                       << delta << ")\n";
 
-        return [=](std::map<std::string, float*> tensors,
-                   std::map<std::string, int>    alpha_offsets) {
-            for (int i = 0; i < full; ++i)
-            {
-                for (auto const& fn : full_fns)
+        return
+            [=](std::vector<float*> tensors, std::vector<int> alpha_offsets) {
+                for (int i = 0; i < full; ++i)
+                {
+                    for (auto const& fn : full_fns)
+                    {
+                        fn(tensors, alpha_offsets);
+                    }
+                    advancer(tensors);
+                    alpha_offsets_adjuster(alpha_offsets, 2);
+                }
+
+                for (auto const& fn : tail_fns)
                 {
                     fn(tensors, alpha_offsets);
                 }
-                advancer(tensors);
-                alpha_offsets_adjuster(alpha_offsets, 2);
-            }
-
-            for (auto const& fn : tail_fns)
-            {
-                fn(tensors, alpha_offsets);
-            }
-        };
+            };
     }
 };
 
@@ -652,7 +657,8 @@ public:
                      {for_node->get_var(), for_node->get_delta()});
     }
 
-    loop_tree_fn_type get_fn(std::map<std::string, int> const& sizes,
+    loop_tree_fn_type get_fn(std::map<std::string, int> const& tensors_idx,
+                             std::map<std::string, int> const& sizes,
                              formulas_map_type const&          formulas) const
     {
         // contains followed tensors for pre/post ops
@@ -688,11 +694,13 @@ public:
 
         if (extra_tensors.size() == 0)
         {
-            return [jit_fn, output, inputs,
-                    alpha](std::map<std::string, float*> const& tensors,
-                           std::map<std::string, int> const&    alpha_offsets) {
-                jit_fn(tensors.at(output), tensors.at(inputs[0]),
-                       tensors.at(inputs[1]), alpha + alpha_offsets.at(output));
+            return [jit_fn, alpha, input_idx_0 = tensors_idx.at(inputs[0]),
+                    input_idx_1 = tensors_idx.at(inputs[1]),
+                    output_idx  = tensors_idx.at(output)](
+                       std::vector<float*> const& tensors,
+                       std::vector<int> const&    alpha_offsets) {
+                jit_fn(tensors[output_idx], tensors[input_idx_0],
+                       tensors[input_idx_1], alpha + alpha_offsets[output_idx]);
             };
         }
         else if (extra_tensors.size() == 1)
@@ -701,13 +709,16 @@ public:
                 aot_fn_cast<void(float*, float const*, float const*, int,
                                  float const*)>(std::move(jit_fn));
 
-            return [jit_fn_cast, output, inputs, alpha, extra_tensors](
-                       std::map<std::string, float*> const& tensors,
-                       std::map<std::string, int> const&    alpha_offsets) {
-                jit_fn_cast(tensors.at(output), tensors.at(inputs[0]),
-                            tensors.at(inputs[1]),
-                            alpha + alpha_offsets.at(output),
-                            tensors.at(extra_tensors[0]));
+            return [jit_fn_cast, alpha, input_idx_0 = tensors_idx.at(inputs[0]),
+                    input_idx_1      = tensors_idx.at(inputs[1]),
+                    output_idx       = tensors_idx.at(output),
+                    extra_tensor_idx = tensors_idx.at(extra_tensors[0])](
+                       std::vector<float*> const& tensors,
+                       std::vector<int> const&    alpha_offsets) {
+                jit_fn_cast(tensors[output_idx], tensors[input_idx_0],
+                            tensors[input_idx_1],
+                            alpha + alpha_offsets[output_idx],
+                            tensors[extra_tensor_idx]);
             };
         }
         else if (extra_tensors.size() == 2)
@@ -717,13 +728,17 @@ public:
                                  float const*, float const*)>(
                     std::move(jit_fn));
 
-            return [jit_fn_cast, output, inputs, alpha, extra_tensors](
-                       std::map<std::string, float*> const& tensors,
-                       std::map<std::string, int> const&    alpha_offsets) {
+            return [jit_fn_cast, alpha, input_idx_0 = tensors_idx.at(inputs[0]),
+                    input_idx_1        = tensors_idx.at(inputs[1]),
+                    output_idx         = tensors_idx.at(output),
+                    extra_tensor_idx_0 = tensors_idx.at(extra_tensors[0]),
+                    extra_tensor_idx_1 = tensors_idx.at(extra_tensors[1])](
+                       std::vector<float*> const& tensors,
+                       std::vector<int> const&    alpha_offsets) {
                 jit_fn_cast(
-                    tensors.at(output), tensors.at(inputs[0]),
-                    tensors.at(inputs[1]), alpha + alpha_offsets.at(output),
-                    tensors.at(extra_tensors[0]), tensors.at(extra_tensors[1]));
+                    tensors[output_idx], tensors[input_idx_0],
+                    tensors[input_idx_1], alpha + alpha_offsets[output_idx],
+                    tensors[extra_tensor_idx_0], tensors[extra_tensor_idx_1]);
             };
         }
         else
@@ -799,7 +814,8 @@ public:
                      {for_node->get_var(), for_node->get_delta()});
     }
 
-    loop_tree_fn_type get_fn(std::map<std::string, int> const& sizes,
+    loop_tree_fn_type get_fn(std::map<std::string, int> const& tensors_idx,
+                             std::map<std::string, int> const& sizes,
                              formulas_map_type const&          formulas) const
     {
         auto jit_fn = facebook::sysml::aot::transposer_jitter<ISA>(
@@ -807,14 +823,12 @@ public:
                           unroll_limit)
                           .get_shared();
 
-        auto output = this->output;
-        auto input  = this->input;
-
-        return [jit_fn, output,
-                input](std::map<std::string, float*> const& tensors,
-                       std::map<std::string, int> const&) {
-            jit_fn(tensors.at(output), tensors.at(input));
-        };
+        return
+            [jit_fn, output_idx = tensors_idx.at(output),
+             input_idx = tensors_idx.at(input)](
+                std::vector<float*> const& tensors, std::vector<int> const&) {
+                jit_fn(tensors[output_idx], tensors[input_idx]);
+            };
     }
 
     std::set<std::string> get_tensors_used() const override
@@ -1003,6 +1017,11 @@ private:
     // for forcing partially interpreted trees (mainly for testing)
     int max_interpreted_depth;
 
+    // map tensor names to indices
+    std::map<std::string, int> tensors_idx;
+    // vector for eventual tensors
+    std::vector<float*> tensors_vec;
+
 public:
     loop_tree_program(std::vector<loop_tree_node_ptr<ISA>> const& nodes,
                       std::map<std::string, int> const&           sizes,
@@ -1023,6 +1042,23 @@ public:
                 simplify_loop_nests(c, 0, this->max_interpreted_depth));
         }
         this->nodes = new_nodes;
+
+        LN_LOG(DEBUG) << "Pass: Map tensor names to indices in vector\n";
+        int idx = 0;
+        for (auto const& c : this->nodes)
+        {
+            // all (used) tensors need to provide strides
+            // so this covers everything we need to map
+            for (auto const& t : c->get_tensor_strides())
+            {
+                if (tensors_idx.count(t.first) == 0)
+                {
+                    tensors_idx[t.first] = idx;
+                    idx += 1;
+                }
+            }
+        };
+        tensors_vec = std::vector<float*>(idx);
     }
 
     std::vector<loop_tree_node_ptr<ISA>> const& get_children() { return nodes; }
@@ -1044,22 +1080,29 @@ public:
     {
         std::vector<loop_tree_fn_type> sub_functions;
         // added to alpha at runtime to handle tensor initialization
-        std::map<std::string, int> alpha_offsets;
+        std::vector<int> alpha_offsets(tensors_idx.size());
 
         for (auto const& c : this->nodes)
         {
-            sub_functions.push_back(c->get_fn(sizes, formulas));
+            sub_functions.push_back(c->get_fn(tensors_idx, sizes, formulas));
             for (auto const& t : c->get_output_tensors())
             {
-                alpha_offsets[t] = 0;
+                alpha_offsets[tensors_idx.at(t)] = 0;
             }
         }
 
-        return [sub_functions,
-                alpha_offsets](std::map<std::string, float*> const& tensors) {
+        return [sub_functions, alpha_offsets, tensors_idx = this->tensors_idx](
+                   std::map<std::string, float*> const& tensors) {
+            std::vector<float*> tensors_vec(tensors_idx.size());
+            for (auto const& e : tensors)
+            {
+                int idx          = tensors_idx.at(e.first);
+                tensors_vec[idx] = e.second;
+            }
+
             for (auto const& f : sub_functions)
             {
-                f(tensors, alpha_offsets);
+                f(tensors_vec, alpha_offsets);
             }
         };
     }
