@@ -4,3 +4,4 @@
 [submodule "xbyak_aarch64"]
 	path = xbyak_aarch64
 	url = https://github.com/zlateski/xbyak_aarch64
+	branch = fjmaster
