@@ -1,9 +1,10 @@
 #pragma once
 
-#define XBYAK_NO_OP_NAMES
-#include "xbyak/xbyak.h"
+#include "xbyak.h"
 
+#if !defined(LOOP_NEST_ARM)
 #include "aot_perf.h"
+#endif
 
 #include <cstdint>
 #include <fstream>
@@ -61,7 +62,7 @@ public:
     mprotect_deleter_wrapper&
     operator=(mprotect_deleter_wrapper const&) = default;
 
-    void operator()(Xbyak::uint8* ptr) const
+    void operator()(xbyak_buffer_type* ptr) const
     {
         Xbyak::CodeArray::protect(ptr, size_, Xbyak::CodeArray::PROTECT_RW);
         deleter_(ptr);
@@ -76,15 +77,15 @@ public:
 
 private:
     using deleter_type =
-        mprotect_deleter_wrapper<std::function<void(Xbyak::uint8*)>>;
+        mprotect_deleter_wrapper<std::function<void(xbyak_buffer_type*)>>;
 
-    std::unique_ptr<Xbyak::uint8, deleter_type> executable_buffer_;
-    std::size_t                                 size_ = 0;
+    std::unique_ptr<xbyak_buffer_type, deleter_type> executable_buffer_;
+    std::size_t                                      size_ = 0;
 
     friend class basic_code_generator;
 
     template <typename Deleter>
-    unique_aot_fn(Xbyak::uint8* buffer, std::size_t size, Deleter deleter)
+    unique_aot_fn(xbyak_buffer_type* buffer, std::size_t size, Deleter deleter)
         : executable_buffer_(buffer, deleter_type(deleter, size))
         , size_(size)
     {
@@ -132,11 +133,13 @@ public:
         fout.write(reinterpret_cast<char*>(executable_buffer_.get()), size_);
     }
 
+#if !defined(LOOP_NEST_ARM)
     void register_perf(std::string const& name = "")
     {
         get_xbyak_profiler().set(name.c_str(), executable_buffer_.get(),
                                  (int)size_);
     }
+#endif
 };
 
 template <typename ReturnType, typename... Args>
@@ -146,13 +149,13 @@ public:
     using function_pointer_type = ReturnType (*)(Args...);
 
 private:
-    std::shared_ptr<Xbyak::uint8> executable_buffer_;
-    std::size_t                   size_ = 0;
+    std::shared_ptr<xbyak_buffer_type> executable_buffer_;
+    std::size_t                        size_ = 0;
 
     friend class weak_aot_fn<ReturnType(Args...)>;
 
-    shared_aot_fn(std::weak_ptr<Xbyak::uint8> const& weak_buffer,
-                  std::size_t                        size)
+    shared_aot_fn(std::weak_ptr<xbyak_buffer_type> const& weak_buffer,
+                  std::size_t                             size)
         : executable_buffer_(weak_buffer.lock())
         , size_(size)
     {
@@ -161,7 +164,7 @@ private:
     friend class basic_code_generator;
 
     template <typename Deleter>
-    shared_aot_fn(Xbyak::uint8* buffer, std::size_t size, Deleter deleter)
+    shared_aot_fn(xbyak_buffer_type* buffer, std::size_t size, Deleter deleter)
         : executable_buffer_(buffer,
                              mprotect_deleter_wrapper<Deleter>(deleter, size))
         , size_(size)
@@ -216,11 +219,13 @@ public:
         fout.write(reinterpret_cast<char*>(executable_buffer_.get()), size_);
     }
 
+#if !defined(LOOP_NEST_ARM)
     void register_perf(std::string const& name = "")
     {
         get_xbyak_profiler().set(name.c_str(), executable_buffer_.get(),
                                  (int)size_);
     }
+#endif
 };
 
 template <typename ReturnType, typename... Args>
@@ -230,8 +235,8 @@ public:
     using function_pointer_type = ReturnType (*)(Args...);
 
 private:
-    std::weak_ptr<Xbyak::uint8> weak_buffer_;
-    std::size_t                 size_ = 0;
+    std::weak_ptr<xbyak_buffer_type> weak_buffer_;
+    std::size_t                      size_ = 0;
 
     using matching_shared_fn = shared_aot_fn<ReturnType(Args...)>;
 
@@ -268,12 +273,12 @@ public:
     using function_pointer_type = ReturnType (*)(Args...);
 
 private:
-    Xbyak::uint8* executable_buffer_ptr_ = nullptr;
-    std::size_t   size_                  = 0;
+    xbyak_buffer_type* executable_buffer_ptr_ = nullptr;
+    std::size_t        size_                  = 0;
 
     friend class basic_code_generator;
 
-    explicit aot_fn_ref(Xbyak::uint8* buffer, std::size_t size) noexcept
+    explicit aot_fn_ref(xbyak_buffer_type* buffer, std::size_t size) noexcept
         : executable_buffer_ptr_(buffer)
         , size_(size)
     {
@@ -315,11 +320,13 @@ public:
         fout.write(reinterpret_cast<char*>(executable_buffer_ptr_), size_);
     }
 
+#if !defined(LOOP_NEST_ARM)
     void register_perf(std::string const& name = "")
     {
         get_xbyak_profiler().set(name.c_str(), executable_buffer_ptr_,
                                  (int)size_);
     }
+#endif
 };
 
 template <class RetTo, class... ArgsTo, class RetFrom, class... ArgsFrom>

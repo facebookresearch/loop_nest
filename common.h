@@ -1,8 +1,6 @@
 #pragma once
 
-#define XBYAK_NO_OP_NAMES
-#include "xbyak/xbyak.h"
-#include "xbyak/xbyak_util.h"
+#include "xbyak.h"
 
 #include <cassert>
 #include <cstring>
@@ -36,7 +34,7 @@ struct tensor_traits
 {
     std::string   name;
     access_kind   access;
-    Xbyak::Reg64  reg;
+    Xbyak::Reg64  reg = Xbyak::Reg64(0);
     Xbyak::Label* stridesLabel;
     int           innermost_stride;
     int           access_len;
@@ -60,14 +58,14 @@ struct memory_argument_type
 
     bool operator<(memory_argument_type const& o) const
     {
-        return std::tie(offset, traits->name) <
-               std::tie(o.offset, o.traits->name);
+        return std::tie(offset, mask, traits->name) <
+               std::tie(o.offset, mask, o.traits->name);
     }
 
     bool operator==(memory_argument_type const& o) const
     {
-        return std::tie(offset, traits->name) ==
-               std::tie(o.offset, o.traits->name);
+        return std::tie(offset, mask, traits->name) ==
+               std::tie(o.offset, mask, o.traits->name);
     }
 
     std::string readable() const
@@ -75,7 +73,8 @@ struct memory_argument_type
         assert(traits);
         return traits->name + "[" + std::to_string(offset) + ":" +
                std::to_string(traits->access == SCALAR ? 1 : vector_size) +
-               "]{" + std::to_string(traits->innermost_stride) + "}";
+               "]{" + std::to_string(traits->innermost_stride) + "}{" +
+               std::to_string(mask) + "}";
     }
 };
 
@@ -86,8 +85,8 @@ struct in_register_tensor_pointer_type
     std::map<std::string, int> strides;
 };
 
-int get_cursor_offset(std::map<std::string, int> coordinates,
-                      std::map<std::string, int> strides)
+inline int get_cursor_offset(std::map<std::string, int> coordinates,
+                             std::map<std::string, int> strides)
 {
     int off = 0;
     for (auto const& s : strides)

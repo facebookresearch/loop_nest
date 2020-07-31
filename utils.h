@@ -61,6 +61,13 @@ aligned_vector<Float> getRandomVector(unsigned size,
     return res;
 }
 
+template <class Float>
+aligned_vector<Float> getZeroVector(unsigned size, unsigned extra_elements = 16)
+{
+    aligned_vector<Float> res(size + extra_elements);
+    return res;
+}
+
 template <class Fn>
 double measureFastestWithWarmup(Fn&& fn, int warmupIterations,
                                 int measuredIterations = 1)
@@ -96,9 +103,13 @@ double measureFastestWithWarmup(Fn&& fn, int warmupIterations,
 
 inline std::uint64_t rdtsc()
 {
+#if !defined(LOOP_NEST_ARM)
     unsigned hi, lo;
     __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi));
     return ((std::uint64_t)lo) | (((std::uint64_t)hi) << 32);
+#else
+    return 0;
+#endif
 }
 
 template <class Fn>

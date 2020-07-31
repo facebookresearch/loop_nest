@@ -11,6 +11,10 @@
 
 #pragma once
 
+#if defined(LOOP_NEST_ARM)
+#include "arm_loop_nest.h"
+#else
+
 #include "address_packer.h"
 #include "arithmetic_operation.h"
 #include "code_generator.h"
@@ -3125,3 +3129,5 @@ public:
 } // namespace aot
 } // namespace sysml
 } // namespace facebook
+
+#endif
