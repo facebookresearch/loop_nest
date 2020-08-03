@@ -2,6 +2,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cstdlib>
 #include <map>
 #include <set>
 #include <sstream>
@@ -22,18 +23,23 @@ namespace aot
 {
 
 // post-ops
-class halide_elementwise_op {};
-class halide_relu_op: public halide_elementwise_op {};
-inline std::shared_ptr<halide_elementwise_op> const halide_relu = std::make_shared<halide_relu_op>();
+class halide_elementwise_op
+{
+};
+class halide_relu_op : public halide_elementwise_op
+{
+};
+inline std::shared_ptr<halide_elementwise_op> const halide_relu =
+    std::make_shared<halide_relu_op>();
 
 template <class ISA>
 class LoopNestToHalide
 {
 private:
     // loop_nest inputs
-    std::shared_ptr<halide_elementwise_op> elementwise;
-    std::vector<std::pair<std::string, int>>                     order;
-    std::map<std::string, int>                                   sizes;
+    std::shared_ptr<halide_elementwise_op>   elementwise;
+    std::vector<std::pair<std::string, int>> order;
+    std::map<std::string, int>               sizes;
 
     std::set<std::string> C_formula;
     std::set<std::string> A_formula;
@@ -49,12 +55,13 @@ private:
     static constexpr int alignment = vector_size * 4;
 
     // Halide info
-    std::int64_t       A_size;
-    std::int64_t       B_size;
-    std::int64_t       C_size;
-    Halide::ImageParam A_param;
-    Halide::ImageParam B_param;
-    std::vector<int>   C_dim_sizes;
+    std::int64_t A_size;
+    std::int64_t B_size;
+    std::int64_t C_size;
+
+    Halide::Buffer<float> A_param;
+    Halide::Buffer<float> B_param;
+    std::vector<int>      C_dim_sizes;
     Halide::Target halide_target = Halide::get_jit_target_from_environment();
     Halide::Func   halide_program;
 
@@ -98,12 +105,13 @@ private:
         return vec;
     }
 
-    Halide::ImageParam create_image_param(const std::string& name)
+    Halide::Buffer<float> create_buffer(const std::string& name,
+                                        std::int64_t       size)
     {
-        // we create image params with single dimension (flattened out)
-        Halide::ImageParam tensor(Halide::type_of<float>(), 1, name);
-        halide_code << "ImageParam " << name << "(Float(32), 1, \"" << name
-                    << "\");\n";
+        // we create buffer with single dimension (flattened out)
+        Halide::Buffer tensor(Halide::type_of<float>(), size, name);
+        halide_code << "Buffer " << name << "(Float(32), " << size << ", \""
+                    << name << "\");\n";
         return tensor;
     }
 
@@ -290,15 +298,20 @@ private:
             }
         }
         std::vector<int> C_s;
-        for (auto it: C_strides) { C_s.push_back(it.second); }
+        for (auto it : C_strides)
+        {
+            C_s.push_back(it.second);
+        }
         std::sort(C_s.begin(), C_s.end());
-        for (int i = 0; i < C.dimensions(); ++i){
-          C.output_buffer().dim(i).set_min(0);
-          C.output_buffer().dim(i).set_stride(C_s[i]);
-          if (i+1 < C_s.size()) {
-            int extent = C_s[i+1] / C_s[i];
-            C.output_buffer().dim(i).set_extent(extent);
-          }
+        for (int i = 0; i < C.dimensions(); ++i)
+        {
+            C.output_buffer().dim(i).set_min(0);
+            C.output_buffer().dim(i).set_stride(C_s[i]);
+            if (i + 1 < C_s.size())
+            {
+                int extent = C_s[i + 1] / C_s[i];
+                C.output_buffer().dim(i).set_extent(extent);
+            }
         }
         return C;
     }
@@ -332,9 +345,9 @@ private:
         C_size      = total_size;
     }
 
-    Halide::Expr image_access(Halide::ImageParam&               image,
-                              const std::map<std::string, int>& strides,
-                              std::string                       name)
+    Halide::Expr flat_buffer_access(Halide::Buffer<float>&            buf,
+                                    const std::map<std::string, int>& strides,
+                                    std::string                       name)
     {
         Halide::Expr      index = 0;
         std::stringstream index_str;
@@ -361,7 +374,7 @@ private:
 
         halide_code << name << "(" << index_str.str() << ")";
 
-        return image(index);
+        return buf(index);
     }
 
     Halide::Func define_fma()
@@ -393,16 +406,16 @@ private:
         halide_code << "C(" << C_dims_str.str() << ") = 0.0f;\n";
 
         halide_code << "C(" << C_dims_str.str() << ") += ";
-        Halide::Expr A_expr = image_access(A_param, A_strides, "A");
+        Halide::Expr A_expr = flat_buffer_access(A_param, A_strides, "A");
         halide_code << " * ";
-        Halide::Expr B_expr = image_access(B_param, B_strides, "B");
+        Halide::Expr B_expr = flat_buffer_access(B_param, B_strides, "B");
         halide_code << ";\n";
 
         C(C_dims) += A_expr * B_expr;
 
         if (elementwise == facebook::sysml::aot::halide_relu)
         {
-            C(C_dims) = max(0.0f, C(C_dims));
+            C(C_dims) = Halide::max(0.0f, C(C_dims));
             halide_code << "C(" << C_dims_str.str() << ") = max(0.0f, C("
                         << C_dims_str.str() << "));\n";
         }
@@ -445,7 +458,7 @@ private:
             int   unrolls = std::ceil(extent / stride);
             instructions_unrolled *= unrolls;
 
-            if (instructions_unrolled <= default_max_fmas_unrolled)
+            if (instructions_unrolled <= max_fmas_unrolled)
             {
                 C.update(0).unroll(*it);
 
@@ -618,14 +631,44 @@ private:
     }
 
 private:
+    void set_jit_target_features()
+    {
+        halide_target.set_feature(Halide::Target::Feature::NoAsserts, true);
+        halide_target.set_feature(Halide::Target::Feature::NoBoundsQuery, true);
+
+        // assertions to make sure picked up correctly
+        assert(halide_target.has_feature(Halide::Target::Feature::NoAsserts));
+        assert(halide_target.has_feature(Halide::Target::Feature::NoBoundsQuery));
+
+        if (std::is_same_v<ISA, avx512>)
+        {
+            halide_target.set_feature(Halide::Target::Feature::AVX512, true);
+            assert(halide_target.has_feature(Halide::Target::Feature::AVX512));
+
+        }
+        else if (std::is_same_v<ISA, avx2>)
+        {
+            halide_target.set_feature(Halide::Target::Feature::AVX2, true);
+            halide_target.set_feature(Halide::Target::Feature::AVX512, false);
+
+            assert(halide_target.has_feature(Halide::Target::Feature::AVX2));
+            assert(!halide_target.has_feature(Halide::Target::Feature::AVX512));
+
+        }
+        else
+        {
+            assert("Unhandled ISA" && false);
+        }
+    }
+
     void generate_halide_program()
     {
         set_tensor_sizes();
         set_reduction_dims();
         create_rdom();
         create_initial_vars_and_rvars();
-        A_param        = create_image_param("A");
-        B_param        = create_image_param("B");
+        A_param        = create_buffer("A", A_size);
+        B_param        = create_buffer("B", B_size);
         Halide::Func C = define_fma();
         bound_initial_vars(C);
         schedule_fma(C);
@@ -645,7 +688,7 @@ public:
         std::map<std::string, int> const&               C_strides,
         std::map<std::string, int> const&               A_strides,
         std::map<std::string, int> const&               B_strides,
-        std::optional<int> user_fma_unroll_limit = std::nullopt,
+        std::optional<int> user_fma_unroll_limit           = std::nullopt,
         std::shared_ptr<halide_elementwise_op> elementwise = nullptr)
         : order(_order)
         , sizes(sizes)
@@ -661,6 +704,7 @@ public:
 
     {
         generate_halide_program();
+        set_jit_target_features();
         halide_program.print_loop_nest();
         print_halide();
     }
@@ -681,11 +725,16 @@ public:
         // (8 for AVX2 and 16 for AVX512)
         // we still need to put the pointers into appropriate
         // Halide buffers before we can .realize
-        Halide::Buffer<float> A_buf(A_mem, A_size);
-        Halide::Buffer<float> B_buf(B_mem, B_size);
+
         Halide::Buffer<float> C_buf(C_mem, C_dim_sizes);
-        halide_program.realize(C_buf, halide_target,
-                               {{A_param, A_buf}, {B_param, B_buf}});
+
+        halide_buffer_t* A_param_buf = A_param.get()->raw_buffer();
+        A_param_buf->host            = (uint8_t*)A_mem;
+
+        halide_buffer_t* B_param_buf = B_param.get()->raw_buffer();
+        B_param_buf->host            = (uint8_t*)B_mem;
+
+        halide_program.realize(C_buf);
     }
 
     void run_on_unaligned_data(float* C_mem, float* A_mem, float* B_mem)
@@ -694,9 +743,9 @@ public:
         // for completeness, in case a user wants to run on arbitrarily
         // allocated input data
         //
-        // we allocate our own pointers with necessary alignment and vector size
-        // multiples, and memcpy over the inputs before running as aligned
-        // then return back to original memory
+        // we allocate our own pointers with necessary alignment and vector
+        // size multiples, and memcpy over the inputs before running as
+        // aligned then return back to original memory
         alignas(alignment) float A_aligned[int(
             std::ceil(A_size / float(vector_size)) * vector_size)];
         alignas(alignment) float B_aligned[int(
