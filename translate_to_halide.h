@@ -22,18 +22,23 @@ namespace aot
 {
 
 // post-ops
-class halide_elementwise_op {};
-class halide_relu_op: public halide_elementwise_op {};
-inline std::shared_ptr<halide_elementwise_op> const halide_relu = std::make_shared<halide_relu_op>();
+class halide_elementwise_op
+{
+};
+class halide_relu_op : public halide_elementwise_op
+{
+};
+inline std::shared_ptr<halide_elementwise_op> const halide_relu =
+    std::make_shared<halide_relu_op>();
 
 template <class ISA>
 class LoopNestToHalide
 {
 private:
     // loop_nest inputs
-    std::shared_ptr<halide_elementwise_op> elementwise;
-    std::vector<std::pair<std::string, int>>                     order;
-    std::map<std::string, int>                                   sizes;
+    std::shared_ptr<halide_elementwise_op>   elementwise;
+    std::vector<std::pair<std::string, int>> order;
+    std::map<std::string, int>               sizes;
 
     std::set<std::string> C_formula;
     std::set<std::string> A_formula;
@@ -290,15 +295,20 @@ private:
             }
         }
         std::vector<int> C_s;
-        for (auto it: C_strides) { C_s.push_back(it.second); }
+        for (auto it : C_strides)
+        {
+            C_s.push_back(it.second);
+        }
         std::sort(C_s.begin(), C_s.end());
-        for (int i = 0; i < C.dimensions(); ++i){
-          C.output_buffer().dim(i).set_min(0);
-          C.output_buffer().dim(i).set_stride(C_s[i]);
-          if (i+1 < C_s.size()) {
-            int extent = C_s[i+1] / C_s[i];
-            C.output_buffer().dim(i).set_extent(extent);
-          }
+        for (int i = 0; i < C.dimensions(); ++i)
+        {
+            C.output_buffer().dim(i).set_min(0);
+            C.output_buffer().dim(i).set_stride(C_s[i]);
+            if (i + 1 < C_s.size())
+            {
+                int extent = C_s[i + 1] / C_s[i];
+                C.output_buffer().dim(i).set_extent(extent);
+            }
         }
         return C;
     }
@@ -645,7 +655,7 @@ public:
         std::map<std::string, int> const&               C_strides,
         std::map<std::string, int> const&               A_strides,
         std::map<std::string, int> const&               B_strides,
-        std::optional<int> user_fma_unroll_limit = std::nullopt,
+        std::optional<int> user_fma_unroll_limit           = std::nullopt,
         std::shared_ptr<halide_elementwise_op> elementwise = nullptr)
         : order(_order)
         , sizes(sizes)
@@ -670,6 +680,20 @@ public:
     {
         // factoring out so we can time compilation time separately
         halide_program.compile_jit();
+    }
+
+    void compile_to_assembly(std::string const& filename,
+                             std::string const& fn_name)
+    {
+        Halide::Buffer<float> A_buf(nullptr, A_size);
+        Halide::Buffer<float> B_buf(nullptr, B_size);
+        Halide::Buffer<float> C_buf(nullptr, C_dim_sizes);
+
+        Halide::Argument A_arg(A_buf);
+        Halide::Argument B_arg(B_buf);
+        Halide::Argument C_arg(C_buf);
+
+        halide_program.compile_to_assembly(filename, {A_arg, B_arg}, fn_name);
     }
 
     void run_on_aligned_data(float* C_mem, float* A_mem, float* B_mem)

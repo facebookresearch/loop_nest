@@ -134,6 +134,7 @@ private:
     Reg64 tmpAReg_  = x11;
     Reg64 tmpBReg_  = x12;
     // std::vector<Reg64> elementwiseReg_;
+    std::map<int, Reg64> const_regs;
 
     VReg ZeroVector_ = v0;
 
@@ -985,8 +986,33 @@ private:
         issue_C_stores(stores, tail_mask, max_alpha, issue_max_alpha_logic);
     }
 
+    void issue_unrolled_fmas_scalar_vector(std::vector<fma_operation> fmas)
+    {
+        std::cout << "ZI WAS HERE\n";
+    }
+
     void issue_unrolled_fmas(std::vector<fma_operation> fmas)
     {
+        if (0 && fmas.size())
+        {
+            if (fmas[0].src1.traits->access == SCALAR &&
+                fmas[0].src2.traits->access == VECTOR_PACKED)
+            {
+                issue_unrolled_fmas_scalar_vector(std::move(fmas));
+                return;
+            }
+            else if (fmas[0].src1.traits->access == VECTOR_PACKED &&
+                     fmas[0].src2.traits->access == SCALAR)
+            {
+                for (auto& f : fmas)
+                {
+                    std::swap(f.src1, f.src2);
+                }
+                issue_unrolled_fmas_scalar_vector(std::move(fmas));
+                return;
+            }
+        }
+
         most_frequent_queue<memory_argument> queue;
 
         // coalesce broadcasting loads
