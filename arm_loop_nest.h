@@ -648,24 +648,6 @@ private:
         }
     }
 
-    void load_dual_vector(VReg const& vreg0, VReg const& vreg1,
-                          Reg64 const& base, int increment = 0)
-    {
-        if (increment && increment < 256)
-        {
-            ldp(QReg(vreg0.s4.getIdx()), QReg(vreg1.s4.getIdx()),
-                post_ptr(base, increment));
-            increment = 0;
-        }
-        else
-        {
-            ldp(QReg(vreg0.s4.getIdx()), QReg(vreg1.s4.getIdx()), ptr(base));
-        }
-        if (increment)
-        {
-            add_imm(base, increment);
-        }
-    }
     void load_vector(VReg const& vreg, Reg64 const& base, int offset, int mask,
                      int increment = 0)
     {
@@ -1091,52 +1073,6 @@ private:
                         std::max(load_mask[src2], idx);
                 }
             }
-            auto find_delay =
-                [&](int             idx,
-                    memory_argument addr) -> std::optional<memory_argument>
-
-            {
-                if (idx >= loads.size())
-                {
-                    return std::nullopt;
-                }
-                bool valid_access = addr.traits->access == VECTOR_PACKED;
-                valid_access |= addr.traits->access == SCALAR &&
-                                load_mask.count(addr) &&
-                                load_mask.at(addr) == vector_size - 1;
-                if (!valid_access)
-                {
-                    return std::nullopt;
-                }
-                for (; idx < loads.size(); ++idx)
-                {
-                    auto next_addr = loads.at(idx);
-                    if (next_addr.traits->reg.getIdx() !=
-                        addr.traits->reg.getIdx())
-                    {
-                        continue;
-                    }
-                    if (next_addr.offset != addr.offset + vector_size)
-                    {
-                        continue;
-                    }
-                    bool valid_access =
-                        next_addr.traits->access == VECTOR_PACKED;
-                    valid_access |= next_addr.traits->access == SCALAR &&
-                                    load_mask.count(next_addr) &&
-                                    load_mask.at(next_addr) == vector_size - 1;
-                    if (!valid_access)
-                    {
-                        continue;
-                    }
-                    // we can delay this load!
-                    if (next_addr.mask == addr.mask && addr.mask == vector_size)
-                    {
-                        return next_addr;
-                    }
-                }
-                return std::nullopt;
-            };
 
             std::vector<fma_operation> in_vmm_fmas;
             for (auto it = fmas.begin(); it != fmas.end();)
@@ -1207,13 +1143,9 @@ private:
                 add_imm(Reg64(tmp_reg), orig_base * 4);
             }
 
-            // next_addr -> addr
-            std::map<memory_argument, memory_argument> delayed;
-            int                                        next_idx = 0;
-            std::set<memory_argument>                  loaded;
             for (auto const& addr : loads)
             {
-                next_idx++;
+
                 auto reg = Vmm(vmm_map.at(addr));
                 auto addr_reg =
                     Reg64(tmp_addresser.at(addr.traits->reg.getIdx()).first);
@@ -1222,83 +1154,32 @@ private:
                 {
                     inc = post_ptr_map.at(addr) * 4;
                 }
-                if (inc == 16 && !delayed.count(addr))
+                switch (addr.traits->access)
                 {
-                    auto dn = find_delay(next_idx, addr);
-                    if (dn)
+                case SCALAR:
+                    if (can_implicit_broadcast.count(addr))
                     {
-                        memory_argument next_addr = dn.value();
-                        delayed.insert({next_addr, addr});
-                        continue;
-                    }
-                }
-                else if (delayed.count(addr))
-                {
-                    auto daddr = delayed.at(addr);
-                    if (post_ptr_map.count(daddr))
-                    {
-                        inc += post_ptr_map.at(daddr) * 4;
-                    }
-                    delayed.erase(addr);
-                    loaded.insert(daddr);
-                    auto delayed_reg = Vmm(vmm_map.at(daddr));
-                    load_dual_vector(delayed_reg, reg, addr_reg, inc);
-                }
-                else
-                {
-                    switch (addr.traits->access)
-                    {
-                    case SCALAR:
-                        if (can_implicit_broadcast.count(addr))
-                        {
-                            load_vector(reg, addr_reg, 0,
-                                        load_mask.count(addr)
-                                            ? load_mask.at(addr) + 1
-                                            : vector_size,
-                                        inc);
-                        }
-                        else
-                        {
-                            broadcast_scalar(reg, addr_reg, 0, addr.mask, inc);
-                        }
-                        break;
-                    case VECTOR_PACKED:
-                        load_vector(reg, addr_reg, 0, vector_size, inc);
-                        break;
-
-                    case VECTOR_STRIDED:
-                        gather_vector(reg, addr_reg, 0, addr.mask,
-                                      addr.traits->innermost_stride * 4, inc);
-                        break;
-                    }
-                }
-                loaded.insert(addr);
-                // emit fmas
-                for (auto it = in_vmm_fmas.begin(); it != in_vmm_fmas.end();)
-                {
-                    auto fma = *it;
-                    if (!loaded.count(fma.src1) || !loaded.count(fma.src2))
-                    {
-                        ++it;
-                        continue;
-                    }
-                    it            = in_vmm_fmas.erase(it);
-                    auto arg1_reg = Vmm(vmm_map.at(fma.src1));
-                    auto arg2_reg =
-                        Vmm(vmm_map.at(normalize_broadcast(fma.src2)));
-                    if (fma.src2.traits->access == SCALAR)
-                    {
-                        auto idx = fma.src2.offset % vector_size;
-                        fmla((C_VMMs[fma.dest]++).s4, arg1_reg.s4,
-                             arg2_reg.s4[idx]);
+                        load_vector(reg, addr_reg, 0,
+                                    load_mask.count(addr)
+                                        ? load_mask.at(addr) + 1
+                                        : vector_size,
+                                    inc);
                     }
                     else
                     {
-                        fmla((C_VMMs[fma.dest]++).s4, arg1_reg.s4, arg2_reg.s4);
+                        broadcast_scalar(reg, addr_reg, 0, addr.mask, inc);
                     }
+                    break;
+                case VECTOR_PACKED:
+                    load_vector(reg, addr_reg, 0, vector_size, inc);
+                    break;
+
+                case VECTOR_STRIDED:
+                    gather_vector(reg, addr_reg, 0, addr.mask,
+                                  addr.traits->innermost_stride * 4, inc);
+                    break;
                 }
             }
-            assert(delayed.size() == 0);
 
             // emit fmas
             for (auto const& fma : in_vmm_fmas)
