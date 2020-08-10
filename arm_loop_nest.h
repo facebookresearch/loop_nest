@@ -61,6 +61,22 @@ private:
 
     void meta_pop(XReg const& op) { ldr(op, pre_ptr(stackReg_, -8)); }
 
+    void meta_push(std::vector<XReg> const& regs)
+    {
+        for (auto const& r : regs)
+        {
+            meta_push(r);
+        }
+    }
+
+    void meta_pop(std::vector<XReg> const& regs)
+    {
+        for (auto it = regs.crbegin(); it != regs.crend(); ++it)
+        {
+            meta_pop(*it);
+        }
+    }
+
     void prepare_stack()
     {
         // stack_offset = 0;
