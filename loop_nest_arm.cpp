@@ -1,5 +1,5 @@
-#include "baselines.h"
 #include "arm_loop_nest.h"
+#include "baselines.h"
 #include "loop_nest_baseline.h"
 #include "one_constant.h"
 #include "utils.h"
@@ -22,11 +22,11 @@
 
 int main()
 {
+    using facebook::sysml::aot::aarch64;
     using facebook::sysml::aot::aot_fn_cast;
     using facebook::sysml::aot::avx2;
     using facebook::sysml::aot::avx2_plus;
     using facebook::sysml::aot::avx512;
-    using facebook::sysml::aot::aarch64;
 
     // WOW this is actually pretty efficient!
     // Playing with weird schedules
@@ -99,7 +99,7 @@ int main()
         auto CN = getRandomVector<float>(ArCr * BcCc);
         auto CJ = CN;
 
-        baseline_MM(ArCr, AcBr, BcCc, 1, ArCr, 1, AcBr, 1, ArCr, A.data(),
+        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
                     B.data(), CN.data(), 0);
 
         // apply_relu(CN.data(), CN.data() + CN.size());
