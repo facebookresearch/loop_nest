@@ -1101,29 +1101,27 @@ private:
                 overloaded{
                     [&](load_instruction const& i) {
                         int ptr_reg_idx = i.tensor_location.tensor_idx;
-                        int ptr_offset  = i.tensor_location.tensor_offset;
+                        int delta       = i.tensor_location.tensor_offset;
 
-                        auto delta = ptr_offset - tensor_offsets[ptr_reg_idx];
-
-                        tensor_offsets[ptr_reg_idx] = ptr_offset;
+                        tensor_offsets[ptr_reg_idx] += delta;
 
                         if (i.num_lanes == 1)
                         {
                             if (delta && delta < 256 && delta >= -256)
                             {
                                 ldr(SReg(i.vreg),
-                                    pre_ptr(XReg(ptr_reg_idx), delta));
+                                    post_ptr(XReg(ptr_reg_idx), delta));
                             }
                             // else if (delta_xreg_map.count(delta))
                             // {
                             //     ldr(SReg(i.vreg),
-                            //         pre_ptr(XReg(ptr_reg_idx),
-                            //                 XReg(delta_xreg_map[delta])));
+                            //         post_ptr(XReg(ptr_reg_idx),
+                            //                  XReg(delta_xreg_map[delta])));
                             // }
                             else
                             {
-                                sadd_imm(XReg(ptr_reg_idx), delta);
                                 ldr(SReg(i.vreg), ptr(XReg(ptr_reg_idx)));
+                                sadd_imm(XReg(ptr_reg_idx), delta);
                             }
                         }
                         else if (i.num_lanes == 2)
@@ -1131,18 +1129,18 @@ private:
                             if (delta && delta < 256 && delta >= -256)
                             {
                                 ldr(DReg(i.vreg),
-                                    pre_ptr(XReg(ptr_reg_idx), delta));
+                                    post_ptr(XReg(ptr_reg_idx), delta));
                             }
                             // else if (delta_xreg_map.count(delta))
                             // {
                             //     ldr(DReg(i.vreg),
-                            //         pre_ptr(XReg(ptr_reg_idx),
-                            //                 XReg(delta_xreg_map[delta])));
+                            //         post_ptr(XReg(ptr_reg_idx),
+                            //                  XReg(delta_xreg_map[delta])));
                             // }
                             else
                             {
-                                sadd_imm(XReg(ptr_reg_idx), delta);
                                 ldr(DReg(i.vreg), ptr(XReg(ptr_reg_idx)));
+                                sadd_imm(XReg(ptr_reg_idx), delta);
                             }
                         }
                         else
@@ -1150,18 +1148,18 @@ private:
                             if (delta && delta < 256 && delta >= -256)
                             {
                                 ldr(QReg(i.vreg),
-                                    pre_ptr(XReg(ptr_reg_idx), delta));
+                                    post_ptr(XReg(ptr_reg_idx), delta));
                             }
                             // else if (delta_xreg_map.count(delta))
                             // {
                             //     ldr(QReg(i.vreg),
-                            //         pre_ptr(XReg(ptr_reg_idx),
-                            //                 XReg(delta_xreg_map[delta])));
+                            //         post_ptr(XReg(ptr_reg_idx),
+                            //                  XReg(delta_xreg_map[delta])));
                             // }
                             else
                             {
-                                sadd_imm(XReg(ptr_reg_idx), delta);
                                 ldr(QReg(i.vreg), ptr(XReg(ptr_reg_idx)));
+                                sadd_imm(XReg(ptr_reg_idx), delta);
                             }
                         }
                     },
@@ -1211,8 +1209,6 @@ private:
         {
             sadd_imm(XReg(offs.first), -offs.second);
         }
-
-        std::cout << "ZI WAS HERE\n";
     }
 
     void issue_unrolled_fmas(std::vector<fma_operation> fmas)
@@ -2483,26 +2479,93 @@ private:
             }
         }
 
+        // {
+        //     std::map<int, int> tensor_offsets;
+
+        //     for (auto const& insn : instructions)
+        //     {
+        //         std::visit(
+        //             overloaded{
+        //                 [&](load_instruction const& i) {
+        //                     int ptr_reg_idx = i.tensor_location.tensor_idx;
+        //                     int ptr_offset  =
+        //                     i.tensor_location.tensor_offset;
+
+        //                     auto delta =
+        //                         ptr_offset - tensor_offsets[ptr_reg_idx];
+
+        //                     tensor_offsets[ptr_reg_idx] = ptr_offset;
+
+        //                     sadd_freq[delta] += num_iterations;
+        //                 },
+        //                 [&](fmla_instruction const&) {}, [](std::monostate)
+        //                 {}},
+        //             insn);
+        //     }
+        // }
+
+        // Move loads
+        for (int i = 1; i < instructions.size(); ++i)
         {
-            std::map<int, int> tensor_offsets;
-
-            for (auto const& insn : instructions)
+            if (std::holds_alternative<load_instruction>(instructions[i]))
             {
-                std::visit(
-                    overloaded{
-                        [&](load_instruction const& i) {
-                            int ptr_reg_idx = i.tensor_location.tensor_idx;
-                            int ptr_offset  = i.tensor_location.tensor_offset;
+                auto load = std::get<load_instruction>(instructions[i]);
+                for (int pos = i, moves = 0; pos > 0 && moves < 10;
+                     --pos, ++moves)
+                {
+                    if (std::holds_alternative<fmla_instruction>(
+                            instructions[pos - 1]))
+                    {
+                        auto fma =
+                            std::get<fmla_instruction>(instructions[pos - 1]);
+                        if (load.vreg != fma.left_src.number &&
+                            load.vreg != fma.right_src.number)
+                        {
+                            std::swap(instructions[pos], instructions[pos - 1]);
+                        }
+                        else
+                        {
+                            pos = 1; // break;
+                        }
+                    }
+                    else
+                    {
+                        pos = 1; // break
+                    }
+                }
+            }
+        }
 
-                            auto delta =
-                                ptr_offset - tensor_offsets[ptr_reg_idx];
+        // Change offset to post increment
+        {
+            std::map<int, int> reg_to_location;
 
-                            tensor_offsets[ptr_reg_idx] = ptr_offset;
+            for (auto it = instructions.rbegin(); it != instructions.rend();
+                 ++it)
+            {
+                auto& insn = *it;
+                if (std::holds_alternative<load_instruction>(insn))
+                {
+                    auto& load = std::get<load_instruction>(insn);
+                    if (reg_to_location.count(load.tensor_location.tensor_idx))
+                    {
+                        auto delta =
+                            reg_to_location[load.tensor_location.tensor_idx] -
+                            load.tensor_location.tensor_offset;
 
-                            sadd_freq[delta] += num_iterations;
-                        },
-                        [&](fmla_instruction const&) {}, [](std::monostate) {}},
-                    insn);
+                        reg_to_location[load.tensor_location.tensor_idx] =
+                            load.tensor_location.tensor_offset;
+                        load.tensor_location.tensor_offset = delta;
+
+                        sadd_freq[delta] += num_iterations;
+                    }
+                    else
+                    {
+                        reg_to_location[load.tensor_location.tensor_idx] =
+                            load.tensor_location.tensor_offset;
+                        load.tensor_location.tensor_offset = 0;
+                    }
+                }
             }
         }
 

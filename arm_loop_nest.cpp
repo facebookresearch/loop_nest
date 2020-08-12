@@ -33,9 +33,9 @@ int main()
     {
         std::cout << "Benchmark: 7" << std::endl;
 
-        int ArCr = 64;
-        int AcBr = 64;
-        int BcCc = 64;
+        int ArCr = 128;
+        int AcBr = 128;
+        int BcCc = 128;
 
         auto gen_loop_nest = [&]() {
             return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
@@ -44,9 +44,9 @@ int main()
                        // has to divide the stride.  This is effectively the
                        // same as Halide's split into outer and inner
                        // variable, but can have arbitray number of splits.
-                       {{"ArCr", 8},
-                        {"BcCc", 4},
-                        {"AcBr", 4},
+                       {{"ArCr", 4},
+                        {"BcCc", 12},
+                        {"AcBr", 8},
                         {"AcBr", 1},
                         {"ArCr", 1},
                         {"BcCc", 1}},
