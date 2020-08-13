@@ -1,8 +1,9 @@
 #pragma once
+#include <limits>
 
-void baseline_MM(unsigned ArCr, unsigned AcBr, unsigned BcCc, int LDA, int LDB,
-                 int LDC, float const* AData, float const* BData, float* CData,
-                 int alpha = 0)
+inline void baseline_MM(unsigned ArCr, unsigned AcBr, unsigned BcCc, int LDA,
+                        int LDB, int LDC, float const* AData,
+                        float const* BData, float* CData, int alpha = 0)
 {
     for (int arcr = 0; arcr < ArCr; ++arcr)
     {
@@ -21,9 +22,10 @@ void baseline_MM(unsigned ArCr, unsigned AcBr, unsigned BcCc, int LDA, int LDB,
     }
 }
 
-void baseline_MM(unsigned ArCr, unsigned AcBr, unsigned BcCc, int ARS, int ACS,
-                 int BRS, int BCS, int CRS, int CCS, float const* AData,
-                 float const* BData, float* CData, int alpha = 0)
+inline void baseline_MM(unsigned ArCr, unsigned AcBr, unsigned BcCc, int ARS,
+                        int ACS, int BRS, int BCS, int CRS, int CCS,
+                        float const* AData, float const* BData, float* CData,
+                        int alpha = 0)
 {
     for (int arcr = 0; arcr < ArCr; ++arcr)
     {
@@ -42,28 +44,65 @@ void baseline_MM(unsigned ArCr, unsigned AcBr, unsigned BcCc, int ARS, int ACS,
     }
 }
 
-void baseline_matrix_bias(unsigned ArCr, unsigned BcCc, int CRS, int CCS,
-int bias_RS, int bias_CS, float* CData, float const* bias) {
-    for(int arcr = 0; arcr < ArCr; ++arcr) {
-        for(int bccc = 0; bccc < BcCc; ++bccc) {
-            CData[arcr * CRS + bccc * CCS] += bias[arcr * bias_RS + bccc * bias_CS];
+inline void baseline_matrix_bias(unsigned ArCr, unsigned BcCc, int CRS, int CCS,
+                                 int bias_RS, int bias_CS, float* CData,
+                                 float const* bias)
+{
+    for (int arcr = 0; arcr < ArCr; ++arcr)
+    {
+        for (int bccc = 0; bccc < BcCc; ++bccc)
+        {
+            CData[arcr * CRS + bccc * CCS] +=
+                bias[arcr * bias_RS + bccc * bias_CS];
         }
     }
 }
 
-void baseline_matrix_elementwise_multiply(unsigned ArCr, unsigned BcCc, int CRS, int CCS,
-int other_RS, int other_CS, float* CData, float const* other) {
-    for(int arcr = 0; arcr < ArCr; ++arcr) {
-        for(int bccc = 0; bccc < BcCc; ++bccc) {
-            CData[arcr * CRS + bccc * CCS] *= other[arcr * other_RS + bccc * other_CS];
+inline void baseline_matrix_elementwise_multiply(unsigned ArCr, unsigned BcCc,
+                                                 int CRS, int CCS, int other_RS,
+                                                 int other_CS, float* CData,
+                                                 float const* other)
+{
+    for (int arcr = 0; arcr < ArCr; ++arcr)
+    {
+        for (int bccc = 0; bccc < BcCc; ++bccc)
+        {
+            CData[arcr * CRS + bccc * CCS] *=
+                other[arcr * other_RS + bccc * other_CS];
         }
     }
 }
 
+template <class PlusOp, class MultipliesOp>
+inline void baseline_MM_op_pair(unsigned ArCr, unsigned AcBr, unsigned BcCc,
+                                int ARS, int ACS, int BRS, int BCS, int CRS,
+                                int CCS, float const* AData, float const* BData,
+                                float* CData, int alpha, float identity_value,
+                                PlusOp plus_op, MultipliesOp multiplies_op)
+{
+    for (int arcr = 0; arcr < ArCr; ++arcr)
+    {
+        for (int bccc = 0; bccc < BcCc; ++bccc)
+        {
+            if (alpha == 0)
+            {
+                CData[arcr * CRS + bccc * CCS] = identity_value;
+            }
+            for (int i = 0; i < AcBr; ++i)
+            {
+                float mult = multiplies_op(AData[arcr * ARS + i * ACS],
+                                           BData[i * BRS + bccc * BCS]);
+                CData[arcr * CRS + bccc * CCS] =
+                    plus_op(CData[arcr * CRS + bccc * CCS], mult);
+            }
+        }
+    }
+}
 
-void baseline_MM_row_col_major(unsigned ArCr, unsigned AcBr, unsigned BcCc,
-                               int LDA, int LDB, int LDC, float const* AData,
-                               float const* BData, float* CData)
+inline void baseline_MM_row_col_major(unsigned ArCr, unsigned AcBr,
+                                      unsigned BcCc, int LDA, int LDB, int LDC,
+                                      float const* AData, float const* BData,
+                                      float* CData)
 {
     for (int arcr = 0; arcr < ArCr; ++arcr)
     {
@@ -79,8 +118,9 @@ void baseline_MM_row_col_major(unsigned ArCr, unsigned AcBr, unsigned BcCc,
     }
 }
 
-void baseline_Conv(unsigned COUT, unsigned CIN, unsigned OH, int OW, int KH,
-                   int KW, float const* AData, float const* BData, float* CData)
+inline void baseline_Conv(unsigned COUT, unsigned CIN, unsigned OH, int OW,
+                          int KH, int KW, float const* AData,
+                          float const* BData, float* CData)
 {
     // int IH = OH + KH - 1;
     int IW = OW + KW - 1;
@@ -110,8 +150,9 @@ void baseline_Conv(unsigned COUT, unsigned CIN, unsigned OH, int OW, int KH,
     }
 }
 
-void baseline_3DConv(int OX, int OY, int OZ, int KX, int KY, int KZ,
-                     float const* AData, float const* BData, float* CData)
+inline void baseline_3DConv(int OX, int OY, int OZ, int KX, int KY, int KZ,
+                            float const* AData, float const* BData,
+                            float* CData)
 {
     // int IX = OX + KX - 1;
     int IY = OY + KY - 1;
@@ -142,9 +183,10 @@ void baseline_3DConv(int OX, int OY, int OZ, int KX, int KY, int KZ,
     }
 }
 
-void baseline_Conv_NCHW8c(unsigned GOUT, unsigned COUT, unsigned GIN,
-                          unsigned CIN, unsigned OH, int OW, int KH, int KW,
-                          float const* AData, float const* BData, float* CData)
+inline void baseline_Conv_NCHW8c(unsigned GOUT, unsigned COUT, unsigned GIN,
+                                 unsigned CIN, unsigned OH, int OW, int KH,
+                                 int KW, float const* AData, float const* BData,
+                                 float* CData)
 {
     int IH = OH + KH - 1;
     int IW = OW + KW - 1;
@@ -181,6 +223,66 @@ void baseline_Conv_NCHW8c(unsigned GOUT, unsigned COUT, unsigned GIN,
                                                kw) *
                                                   COUT +
                                               cout];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+inline void baseline_Conv_NCHW8c_multiplies_max(unsigned GOUT, unsigned COUT,
+                                                unsigned GIN, unsigned CIN,
+                                                unsigned OH, int OW, int KH,
+                                                int KW, float const* AData,
+                                                float const* BData,
+                                                float*       CData)
+{
+    int IH = OH + KH - 1;
+    int IW = OW + KW - 1;
+    for (int gout = 0; gout < GOUT; ++gout)
+    {
+        for (int cout = 0; cout < COUT; ++cout)
+        {
+            for (int oh = 0; oh < OH; ++oh)
+            {
+                for (int ow = 0; ow < OW; ++ow)
+                {
+                    // C[gout][h][w][cout]
+                    CData[((gout * OH + oh) * OW + ow) * COUT + cout] =
+                        -std::numeric_limits<float>::infinity();
+                    for (int gin = 0; gin < GIN; ++gin)
+                    {
+                        for (int cin = 0; cin < CIN; ++cin)
+                        {
+                            for (int kh = 0; kh < KH; ++kh)
+                            {
+                                for (int kw = 0; kw < KW; ++kw)
+                                {
+                                    float temp =
+                                        AData[((gin * IH + (oh + kh)) * IW +
+                                               (ow + kw)) *
+                                                  CIN +
+                                              cin] *
+                                        // B[gin][gout][cin][kh][kw][cout]
+                                        BData[((((gin * GOUT + gout) * CIN +
+                                                 cin) *
+                                                    KH +
+                                                kh) *
+                                                   KW +
+                                               kw) *
+                                                  COUT +
+                                              cout];
+
+                                    float curr =
+                                        CData[((gout * OH + oh) * OW + ow) *
+                                                  COUT +
+                                              cout];
+
+                                    CData[((gout * OH + oh) * OW + ow) * COUT +
+                                          cout] = temp > curr ? temp : curr;
                                 }
                             }
                         }
