@@ -1725,6 +1725,7 @@ private:
             case VECTOR_PACKED:
                 if (C_traits.access == SCALAR && addr.mask != vector_size)
                 {
+                    op_pair->set_to_identity(*this, arg2_register);
                     ensure_initalized_mask(addr.mask);
                     vmaskmovps(arg1_reg, ymm_tail_mask,
                                ptr[addressers.at(addr.traits->reg.getIdx())
@@ -3105,6 +3106,18 @@ public:
 
         // Regs to be saved: RBX and R12-R15 (we don't use RBP)
         push({r15, r14, r13, r12, rbx});
+
+        if (C_traits.access == SCALAR)
+        {
+            vzeroall();
+            if constexpr (std::is_same_v<ISA, avx512>)
+            {
+                for (int i = 16; i < 32; ++i)
+                {
+                    vxorpd(Zmm(i), Zmm(i), Zmm(i));
+                }
+            }
+        }
 
         for (auto const& p : addressers)
         {
