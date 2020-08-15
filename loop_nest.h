@@ -15,6 +15,8 @@
 #include "arm_loop_nest.h"
 #else
 
+#include "denormals.h"
+
 #include "address_packer.h"
 #include "arithmetic_operation.h"
 #include "code_generator.h"
