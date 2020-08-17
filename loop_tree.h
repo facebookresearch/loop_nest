@@ -10,6 +10,7 @@
 
 #include "log.h"
 #include "loop_nest.h"
+#include "serialization.h"
 #include "transposer.h"
 
 namespace facebook
@@ -677,6 +678,17 @@ public:
             postop_strides.push_back(strides.at(name));
             extra_tensors.push_back(name);
         }
+
+#ifdef SERIALIZE_LOOP_NEST
+#define serialize_xstr(s) serialize_str(s)
+#define serialize_str(s) #s
+        save_loop_nest_inputs(
+            serialize_xstr(SERIALIZE_LOOP_NEST), order, sizes, formulas.at(output),
+            formulas.at(inputs[0]), formulas.at(inputs[1]), strides.at(output),
+            strides.at(inputs[0]), strides.at(inputs[1]), unroll_limit);
+#undef serialize_str
+#undef serialize_xstr
+#endif
 
         auto jit_fn =
             facebook::sysml::aot::FMA_loop_nest_jitter<ISA>(

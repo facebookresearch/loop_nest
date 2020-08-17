@@ -246,6 +246,28 @@ private:
                     reduction_dims_position.size();
             }
         }
+
+        // degenerate schedules can have
+        // reduction dimensions not mentioned in the order
+        // in general this doens't happen, but here for completeness
+        for (auto const& e : A_strides)
+        {
+            if ((C_formula.count(e.first) == 0) &&
+                (reduction_dims_position.count(e.first) == 0))
+            {
+                reduction_dims_position[e.first] =
+                    reduction_dims_position.size();
+            }
+        }
+        for (auto const& e : B_strides)
+        {
+            if ((C_formula.count(e.first) == 0) &&
+                (reduction_dims_position.count(e.first) == 0))
+            {
+                reduction_dims_position[e.first] =
+                    reduction_dims_position.size();
+            }
+        }
     }
 
     bool is_reduction_dim(const std::string& dim) const
@@ -297,22 +319,44 @@ private:
                             << size << ");\n";
             }
         }
-        std::vector<int> C_s;
+        std::vector<std::pair<std::string, int>> C_s;
+
         for (auto it : C_strides)
         {
-            C_s.push_back(it.second);
+            C_s.push_back({it.first, it.second});
         }
-        std::sort(C_s.begin(), C_s.end());
+        std::sort(
+            C_s.begin(), C_s.end(),
+            [](std::pair<std::string, int> a, std::pair<std::string, int> b) {
+                return a.second < b.second;
+            });
+
         for (int i = 0; i < C.dimensions(); ++i)
         {
+            std::string dim_name = C_s.at(i).first;
+
             C.output_buffer().dim(i).set_min(0);
-            C.output_buffer().dim(i).set_stride(C_s[i]);
+            C.output_buffer().dim(i).set_stride(C_strides.at(dim_name));
             if (i + 1 < C_s.size())
             {
-                int extent = C_s[i + 1] / C_s[i];
+                std::string next_dim_name = C_s.at(i + 1).first;
+                int extent     = C_strides[next_dim_name] / C_strides[dim_name];
+                int max_extent = sizes.at(dim_name);
+                // Occasionally we can have loop_nest inputs that
+                // state a stride > size of a dimension
+                // loop_nest handles this appropriately and simply never
+                // advances... however, for halide, we need to
+                // set the extent to 1 and the stride of the following output
+                // dimension in C to 1, to avoid bound constraint errors
+                if (extent > max_extent)
+                {
+                    extent                   = max_extent;
+                    C_strides[next_dim_name] = 1;
+                }
                 C.output_buffer().dim(i).set_extent(extent);
             }
         }
+
         return C;
     }
 
@@ -502,8 +546,7 @@ private:
             // when there are multiple loops
             if (order.size() > 1)
             {
-                std::string       prior_dim = (order.rbegin() + 1)->first;
-                Halide::VarOrRVar prior_obj = get_current_dim_obj(prior_dim);
+                Halide::VarOrRVar prior_obj = get_current_dim_obj(innermost_step->first);
 
                 // .compute_at does not overload on VarOrRVar so explicit
                 if (prior_obj.is_rvar)
@@ -638,13 +681,13 @@ private:
 
         // assertions to make sure picked up correctly
         assert(halide_target.has_feature(Halide::Target::Feature::NoAsserts));
-        assert(halide_target.has_feature(Halide::Target::Feature::NoBoundsQuery));
+        assert(
+            halide_target.has_feature(Halide::Target::Feature::NoBoundsQuery));
 
         if (std::is_same_v<ISA, avx512>)
         {
             halide_target.set_feature(Halide::Target::Feature::AVX512, true);
             assert(halide_target.has_feature(Halide::Target::Feature::AVX512));
-
         }
         else if (std::is_same_v<ISA, avx2>)
         {
@@ -653,7 +696,6 @@ private:
 
             assert(halide_target.has_feature(Halide::Target::Feature::AVX2));
             assert(!halide_target.has_feature(Halide::Target::Feature::AVX512));
-
         }
         else
         {
