@@ -51,8 +51,8 @@ int main()
                        // same as Halide's split into outer and inner
                        // variable, but can have arbitray number of splits.
                        {{"AcBr", 256},
-                        {"ArCr", 3},
-                        {"BcCc", 16},
+                        {"ArCr", 5},
+                        {"BcCc", 4 * 16},
                         {"AcBr", 1},
                         {"AcBr", 1},
                         {"ArCr", 1},
@@ -122,7 +122,7 @@ int main()
             1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
     }
 
-    // return 0;
+    return 0;
 
     // 2D convolution on NCHW16c layout example:
     // O(g_out, c_out, o_h, o_w) = I(g_in, c_in, o_h + k_h, ow + k_w) *

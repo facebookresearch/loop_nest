@@ -182,25 +182,6 @@ private:
         }
     };
 
-    struct memory_source
-    {
-        int tensor_id;
-        int offset;
-        int num_lanes;
-
-        friend bool operator<(memory_source const& lhs,
-                              memory_source const& rhs)
-        {
-            return std::tie(lhs.tensor_id, lhs.offset, lhs.num_lanes) <
-                   std::tie(rhs.tensor_id, rhs.offset, lhs.num_lanes);
-        }
-
-        memory_source following_location() const
-        {
-            return {tensor_id, offset + 4 * num_lanes, num_lanes};
-        }
-    };
-
     struct load_instruction
     {
         int vreg;

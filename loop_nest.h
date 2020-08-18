@@ -15,26 +15,33 @@
 #include "arm_loop_nest.h"
 #else
 
-#include "denormals.h"
-
 #include "address_packer.h"
 #include "arithmetic_operation.h"
 #include "code_generator.h"
 #include "common.h"
 #include "configuration.h"
+#include "denormals.h"
 #include "elementwise_operation.h"
 #include "isa.h"
 #include "log.h"
 #include "math.h"
 #include "most_frequent_queue.h"
 #include "multi_vmm.h"
+#include "utils.h"
+
+#include <boost/multi_index/composite_key.hpp>
+#include <boost/multi_index/member.hpp>
+#include <boost/multi_index/ordered_index.hpp>
+#include <boost/multi_index_container.hpp>
 
 #include <cstdint>
+#include <deque>
 #include <map>
 #include <numeric>
 #include <set>
 #include <tuple>
 #include <type_traits>
+#include <variant>
 #include <vector>
 
 namespace facebook
@@ -100,6 +107,59 @@ private:
     }
 
     auto at_stack_offset(int off) { return rsp + (stack_offset - off) * 8; }
+
+    struct tensor_location_t
+    {
+        int idx;
+        int offset;
+
+        friend bool operator<(tensor_location_t const& lhs,
+                              tensor_location_t const& rhs)
+        {
+            return std::tie(lhs.idx, lhs.offset) <
+                   std::tie(rhs.idx, rhs.offset);
+        }
+    };
+
+    struct memory_src
+    {
+        int  idx;
+        int  offset;
+        bool broadcast;
+    };
+
+    struct fmla_instruction
+    {
+        int                           dst;
+        int                           left_src;
+        std::variant<int, memory_src> right_src;
+
+        friend bool operator<(fmla_instruction const& lhs,
+                              fmla_instruction const& rhs)
+        {
+            return std::tie(lhs.dst, lhs.left_src, lhs.right_src) <
+                   std::tie(rhs.dst, rhs.left_src, rhs.right_src);
+        }
+    };
+
+    struct load_instruction
+    {
+        int vmm_idx;
+        int does_broadcast;
+
+        tensor_location_t tensor_loc;
+
+        friend bool operator<(load_instruction const& lhs,
+                              load_instruction const& rhs)
+        {
+            return std::tie(lhs.vreg, lhs.num_lanes, lhs.tensor_location) <
+                   std::tie(rhs.vreg, rhs.num_lanes, rhs.tensor_location);
+        }
+    };
+
+    using instruction_t = std::variant<load_instruction, fmla_instruction>;
+
+    std::deque<std::vector<instruction_t>> instruction_IRs;
 
 private:
     Reg64              CReg_     = rdi;
@@ -1241,12 +1301,137 @@ private:
 
     template <class R = ISA>
     std::enable_if_t<std::is_same_v<R, avx512> || std::is_same_v<R, avx2_plus>>
+    issue_unrolled_fmas_scalar_vector()
+    {
+        auto instructions = std::move(instruction_IRs.front());
+        instruction_IRs.pop_front();
+
+        for (auto const& insn : instructions)
+        {
+            std::visit(
+                overloaded{
+                    [&](load_instruction const& i) {
+                        if (i.does_broadcast)
+                        {
+                            vbroadcastss(Vmm(i.vmm_idx),
+                                         ptr[Reg64(i.tensor_loc.idx) +
+                                             i.tensor_loc.offset]);
+                        }
+                        else
+                        {
+                            vmovups(Vmm(i.vmm_idx),
+                                    ptr[Reg64(i.tensor_loc.idx) +
+                                        i.tensor_loc.offset]);
+                        }
+                    },
+                    [&](fmla_instruction const& fml) {
+                        if (std::holds_alternative<int>(fml.right_src))
+                        {
+                            int rreg = std::get<int>(fml.right_src);
+                            if (op_pair->can_fuse())
+                            {
+                                op_pair->fuse(*this, Vmm(fml.dst),
+                                              Vmm(fml.left_src), Vmm(rreg));
+                            }
+                            else
+                            {
+                                op_pair->multiplies(*this, Vmm(0),
+                                                    Vmm(fml.left_src),
+                                                    Vmm(rreg));
+                                op_pair->plus(*this, Vmm(fml.dst), Vmm(fml.dst),
+                                              Vmm(0));
+                            }
+                        }
+                        else
+                        {
+                            auto loc = std::get<memory_src>(fml.right_src);
+
+                            if (loc.broadcast)
+                            {
+                                if (op_pair->can_fuse())
+                                {
+                                    op_pair->fuse(
+                                        *this, Vmm(fml.dst), Vmm(fml.left_src),
+                                        ptr_b[Reg64(loc.idx) + loc.offset]);
+                                }
+                                else
+                                {
+                                    op_pair->multiplies(
+                                        *this, Vmm(0), Vmm(fml.left_src),
+                                        ptr_b[Reg64(loc.idx) + loc.offset]);
+                                    op_pair->plus(*this, Vmm(fml.dst),
+                                                  Vmm(fml.dst), Vmm(0));
+                                }
+                            }
+                            else
+                            {
+                                if (op_pair->can_fuse())
+                                {
+                                    op_pair->fuse(
+                                        *this, Vmm(fml.dst), Vmm(fml.left_src),
+                                        ptr[Reg64(loc.idx) + loc.offset]);
+                                }
+                                else
+                                {
+                                    op_pair->multiplies(
+                                        *this, Vmm(0), Vmm(fml.left_src),
+                                        ptr[Reg64(loc.idx) + loc.offset]);
+                                    op_pair->plus(*this, Vmm(fml.dst),
+                                                  Vmm(fml.dst), Vmm(0));
+                                }
+                            }
+                        }
+                    }},
+                insn);
+        }
+
+        // for (auto const& insn : instructions)
+        // {
+        //     std::visit(
+        //         overloaded{[&](load_instruction const& i) {
+        //                        int ptr_reg_idx =
+        //                        i.tensor_location.tensor_idx; int ptr_offset =
+        //                        i.tensor_location.tensor_offset;
+
+        //                        LN_LOG(INFO)
+        //                            << tabs.back() << "::LOAD Vreg(" << i.vreg
+        //                            << ")[" << i.num_lanes << "], X_"
+        //                            << ptr_reg_idx << "[" << ptr_offset <<
+        //                            "]\n";
+        //                    },
+        //                    [&](fmla_instruction const& fml) {
+        //                        LN_LOG(INFO) << tabs.back() << "::FMLA Vreg("
+        //                                     << fml.dst.number << "), Vreg("
+        //                                     << fml.left_src.number << "),
+        //                                     Vreg("
+        //                                     << fml.right_src.number << ") ["
+        //                                     << fml.right_src.lane << "]\n";
+        //                    },
+        //                    [](std::monostate) {}},
+        //         insn);
+        // }
+
+        // for (auto const& offs : tensor_offsets)
+        // {
+        //     sadd_imm(XReg(offs.first), -offs.second);
+        // }
+    }
+
+    template <class R = ISA>
+    std::enable_if_t<std::is_same_v<R, avx512> || std::is_same_v<R, avx2_plus>>
     issue_unrolled_fmas(
         std::vector<fma_operation>                            fmas,
         std::map<int, std::shared_ptr<address_packer>> const& addressers,
         std::optional<int>                                    tail_mask)
 
     {
+
+        if ((A_traits.access == SCALAR && B_traits.access == VECTOR_PACKED) ||
+            (A_traits.access == VECTOR_PACKED && B_traits.access == SCALAR))
+        {
+            issue_unrolled_fmas_scalar_vector();
+            return;
+        }
         // Assignment of vector registers
         Vmm arg1_register, arg2_register;
         Vmm arg_A_strides, arg_B_strides; // TODO (if same, use same register)
@@ -2889,6 +3074,482 @@ private:
                           unroll_stage, addressers, true, 1, true);
     }
 
+    template <class R = ISA>
+    std::enable_if_t<std::is_same_v<R, avx512> || std::is_same_v<R, avx2_plus>>
+    issue_unrolled_fmas_dry_run(std::vector<fma_operation> fmas,
+                                int                        num_iterations)
+    {
+        if (fmas.size())
+        {
+            if (fmas[0].src1.traits->access == VECTOR_PACKED &&
+                fmas[0].src2.traits->access == SCALAR)
+            {
+                for (auto& f : fmas)
+                {
+                    std::swap(f.src1, f.src2);
+                }
+            }
+            else
+            {
+                assert(fmas[0].src1.traits->access == SCALAR &&
+                       fmas[0].src2.traits->access == VECTOR_PACKED);
+            }
+        }
+        else
+        {
+            return;
+        }
+
+        // List of usages
+
+        int src1_reg = fmas[0].src1.traits->reg.getIdx();
+        int src2_reg = fmas[0].src2.traits->reg.getIdx();
+
+        std::map<tensor_location_t, std::deque<int>> remaining_usages;
+
+        for (int i = 0; i < fmas.size(); ++i)
+        {
+            remaining_usages[{src1_reg, fmas[i].src1.offset * 4}].push_back(i);
+            remaining_usages[{src2_reg, fmas[i].src2.offset * 4}].push_back(i);
+        }
+
+        auto num_regs =
+            isa_traits<ISA>::total_vector_registers - first_unused_vmm_register;
+
+        std::deque<int> free_regs;
+
+        for (int i = op_pair->can_fuse() ? 0 : 1; i < auxiliary_registers; ++i)
+        {
+            free_regs.push_back(i);
+        }
+
+        for (auto i = 0; i < num_regs; ++i)
+        {
+            free_regs.push_back(first_unused_vmm_register + i);
+        }
+
+        struct table_entry
+        {
+            tensor_location_t tensor_location;
+
+            int vmm_idx;
+            int next_usage;
+        };
+
+        using namespace boost::multi_index;
+
+        // clang-format off
+
+        using table_container = multi_index_container<
+            table_entry,
+            indexed_by<
+                ordered_unique<
+                    member<table_entry,
+                           tensor_location_t,
+                           &table_entry::tensor_location>
+                    >,
+                ordered_non_unique<
+                    member<table_entry, int, &table_entry::vmm_idx>
+                    >,
+                ordered_non_unique<
+                    member<table_entry, int, &table_entry::next_usage>,
+                    std::greater<int>
+                    >
+                >
+            >;
+
+        // clang-format on
+
+        table_container table;
+
+        auto& tensor_location_index = table.template get<0>();
+        auto& vreg_index            = table.template get<1>();
+        auto& next_usage_index      = table.template get<2>();
+
+        std::vector<instruction_t> instructions;
+
+        auto add_load_instruction = [&](int vmm_idx, int tensor_idx, int offset,
+                                        int does_broadcast) {
+            load_instruction insn{
+                vmm_idx, does_broadcast, {tensor_idx, offset}};
+
+            assert(remaining_usages.count(insn.tensor_loc) &&
+                   remaining_usages[insn.tensor_loc].size() > 0);
+
+            int next_usage = remaining_usages[insn.tensor_loc].front();
+
+            table.insert(table_entry{insn.tensor_loc, vmm_idx, next_usage});
+
+            instructions.push_back(insn);
+        };
+
+        auto free_a_register = [&]() {
+            auto nu_it = next_usage_index.begin();
+            assert(nu_it != next_usage_index.end());
+
+            int reg_no = nu_it->vmm_idx;
+
+            auto it = vreg_index.find(reg_no);
+            while (it != vreg_index.end())
+            {
+                vreg_index.erase(it);
+                it = vreg_index.find(reg_no);
+            }
+
+            return reg_no;
+        };
+
+        auto maybe_issue_load = [&](tensor_location_t const& mem_location,
+                                    bool does_broadcast, bool folding_allowed) {
+            if (auto it = tensor_location_index.find(mem_location);
+                it == tensor_location_index.end())
+            {
+                if (folding_allowed &&
+                    remaining_usages[mem_location].size() == 1)
+                {
+                    return;
+                }
+
+                int r = 0;
+                if (free_regs.size())
+                {
+                    r = free_regs.front();
+                    free_regs.pop_front();
+                }
+                else
+                {
+                    r = free_a_register();
+                }
+
+                add_load_instruction(r, mem_location.idx, mem_location.offset,
+                                     does_broadcast);
+            }
+        };
+
+        auto mark_usage = [&](tensor_location_t const& mem_location) {
+            remaining_usages[mem_location].pop_front();
+            if (auto it = tensor_location_index.find(mem_location);
+                it != tensor_location_index.end())
+            {
+                auto v = *it;
+                tensor_location_index.erase(it);
+                if (remaining_usages[mem_location].size())
+                {
+                    v.next_usage = remaining_usages[mem_location].front();
+                    table.insert(v);
+                }
+                else
+                {
+                    remaining_usages.erase(mem_location);
+                    free_regs.push_back(v.vmm_idx);
+                }
+            }
+        };
+
+        for (int i = 0; i < fmas.size(); ++i)
+        {
+            tensor_location_t left_loc  = {src1_reg, fmas[i].src1.offset * 4};
+            tensor_location_t right_loc = {src2_reg, fmas[i].src2.offset * 4};
+
+            if (auto it = tensor_location_index.find(left_loc);
+                it == tensor_location_index.end() &&
+                remaining_usages[left_loc].size() == 1)
+            {
+                std::swap(left_loc, right_loc);
+                std::swap(fmas[i].src1, fmas[i].src2);
+            }
+
+            maybe_issue_load(left_loc, fmas[i].src1.traits->access == SCALAR,
+                             false);
+            maybe_issue_load(right_loc, fmas[i].src2.traits->access == SCALAR,
+                             true);
+
+            auto left_it  = tensor_location_index.find(left_loc);
+            auto right_it = tensor_location_index.find(right_loc);
+
+            assert(left_it != tensor_location_index.end());
+            assert((right_it != tensor_location_index.end()) ||
+                   remaining_usages[right_loc].size() == 1);
+
+            if (right_it != tensor_location_index.end())
+            {
+                instructions.push_back(
+                    fmla_instruction{(int)((C_VMMs[fmas[i].dest]++).getIdx()),
+                                     left_it->vmm_idx, right_it->vmm_idx});
+            }
+            else
+            {
+                instructions.push_back(fmla_instruction{
+                    (int)((C_VMMs[fmas[i].dest]++).getIdx()), left_it->vmm_idx,
+                    memory_src{right_loc.idx, right_loc.offset,
+                               fmas[i].src2.traits->access == SCALAR}});
+            }
+
+            mark_usage(left_loc);
+            mark_usage(right_loc);
+        }
+
+        // for (int i = 0; i < fmas.size(); ++i)
+        // {
+        //     tensor_location_t scalar_loc = {src1_reg, fmas[i].src1.offset *
+        //     4}; tensor_location_t vector_loc = {src2_reg, fmas[i].src2.offset
+        //     * 4};
+
+        //     if (auto it = tensor_location_index.find(scalar_loc);
+        //         it == tensor_location_index.end())
+        //     {
+        //         if (free_regs.size() == 0)
+        //         {
+        //             free_regs.push_back(free_a_register());
+        //         }
+
+        //         load_scalar(free_regs.front(), src1_reg,
+        //                     fmas[i].src1.offset * 4);
+        //         free_regs.pop_front();
+
+        //         assert(tensor_location_index.find(scalar_loc) !=
+        //                tensor_location_index.end());
+        //     }
+
+        //     if (auto it = tensor_location_index.find(vector_loc);
+        //         it == tensor_location_index.end())
+        //     {
+        //         if (free_regs.size() == 0)
+        //         {
+        //             free_regs.push_back(free_a_register());
+        //         }
+
+        //         load_vector(free_regs.front(), src2_reg,
+        //                     fmas[i].src2.offset * 4);
+        //         free_regs.pop_front();
+
+        //         assert(tensor_location_index.find(vector_loc) !=
+        //                tensor_location_index.end());
+        //     }
+
+        //     auto s_it = tensor_location_index.find(scalar_loc);
+        //     auto v_it = tensor_location_index.find(vector_loc);
+
+        //     assert(s_it != tensor_location_index.end());
+        //     assert(v_it != tensor_location_index.end());
+
+        //     // issue FMA
+        //     instructions.push_back(fmla_instruction{
+        //         {(int)((C_VMMs[fmas[i].dest]++).getIdx()), vector_size},
+        //         {v_it->vreg_idx, v_it->vreg_lane},
+        //         {s_it->vreg_idx, s_it->vreg_lane}}); // update datastructures
+
+        //     assert(remaining_usages.count(scalar_loc) &&
+        //            remaining_usages[scalar_loc].size() &&
+        //            remaining_usages[scalar_loc].front() == s_it->next_usage);
+
+        //     assert(remaining_usages.count(vector_loc) &&
+        //            remaining_usages[vector_loc].size() &&
+        //            remaining_usages[vector_loc].front() == v_it->next_usage);
+
+        //     // Update scalar
+        //     {
+        //         auto s = *s_it;
+        //         tensor_location_index.erase(s_it);
+        //         remaining_usages[scalar_loc].pop_front();
+        //         if (remaining_usages[scalar_loc].size())
+        //         {
+        //             s.next_usage = remaining_usages[scalar_loc].front();
+        //             table.insert(s);
+        //         }
+        //         else
+        //         {
+        //             remaining_usages.erase(scalar_loc);
+        //             if (vreg_index.find(s.vreg_idx) == vreg_index.end())
+        //             {
+        //                 free_regs.push_back(s.vreg_idx);
+        //             }
+        //         }
+        //     }
+
+        //     // Update vector
+        //     {
+        //         auto v = *v_it;
+        //         tensor_location_index.erase(v_it);
+        //         remaining_usages[vector_loc].pop_front();
+        //         if (remaining_usages[vector_loc].size())
+        //         {
+        //             v.next_usage = remaining_usages[vector_loc].front();
+        //             table.insert(v);
+        //         }
+        //         else
+        //         {
+        //             remaining_usages.erase(vector_loc);
+        //             if (vreg_index.find(v.vreg_idx) == vreg_index.end())
+        //             {
+        //                 free_regs.push_back(v.vreg_idx);
+        //             }
+        //         }
+        //     }
+        // }
+
+        // // {
+        // //     std::map<int, int> tensor_offsets;
+
+        // //     for (auto const& insn : instructions)
+        // //     {
+        // //         std::visit(
+        // //             overloaded{
+        // //                 [&](load_instruction const& i) {
+        // //                     int ptr_reg_idx =
+        // i.tensor_location.tensor_idx;
+        // //                     int ptr_offset  =
+        // //                     i.tensor_location.tensor_offset;
+
+        // //                     auto delta =
+        // //                         ptr_offset - tensor_offsets[ptr_reg_idx];
+
+        // //                     tensor_offsets[ptr_reg_idx] = ptr_offset;
+
+        // //                     sadd_freq[delta] += num_iterations;
+        // //                 },
+        // //                 [&](fmla_instruction const&) {},
+        // [](std::monostate)
+        // //                 {}},
+        // //             insn);
+        // //     }
+        // // }
+
+        // // Move loads
+        // for (int i = 1; i < instructions.size(); ++i)
+        // {
+        //     if (std::holds_alternative<load_instruction>(instructions[i]))
+        //     {
+        //         auto load = std::get<load_instruction>(instructions[i]);
+        //         for (int pos = i, moves = 0; pos > 0 && moves < 10;
+        //              --pos, ++moves)
+        //         {
+        //             if (std::holds_alternative<fmla_instruction>(
+        //                     instructions[pos - 1]))
+        //             {
+        //                 auto fma =
+        //                     std::get<fmla_instruction>(instructions[pos -
+        //                     1]);
+        //                 if (load.vreg != fma.left_src.number &&
+        //                     load.vreg != fma.right_src.number)
+        //                 {
+        //                     std::swap(instructions[pos], instructions[pos -
+        //                     1]);
+        //                 }
+        //                 else
+        //                 {
+        //                     pos = 1; // break;
+        //                 }
+        //             }
+        //             else
+        //             {
+        //                 pos = 1; // break
+        //             }
+        //         }
+        //     }
+        // }
+
+        // // Change offset to post increment
+        // {
+        //     std::map<int, int> reg_to_location;
+
+        //     for (auto it = instructions.rbegin(); it != instructions.rend();
+        //          ++it)
+        //     {
+        //         auto& insn = *it;
+        //         if (std::holds_alternative<load_instruction>(insn))
+        //         {
+        //             auto& load = std::get<load_instruction>(insn);
+        //             if
+        //             (reg_to_location.count(load.tensor_location.tensor_idx))
+        //             {
+        //                 auto delta =
+        //                     reg_to_location[load.tensor_location.tensor_idx]
+        //                     - load.tensor_location.tensor_offset;
+
+        //                 reg_to_location[load.tensor_location.tensor_idx] =
+        //                     load.tensor_location.tensor_offset;
+        //                 load.tensor_location.tensor_offset = delta;
+
+        //                 sadd_freq[delta] += num_iterations;
+        //             }
+        //             else
+        //             {
+        //                 reg_to_location[load.tensor_location.tensor_idx] =
+        //                     load.tensor_location.tensor_offset;
+        //                 load.tensor_location.tensor_offset = 0;
+        //             }
+        //         }
+        //     }
+        // }
+
+        instruction_IRs.push_back(std::move(instructions));
+    }
+
+    void issue_loop_dry_run_helper(int depth, int unroll_stage,
+                                   int num_iterations)
+    {
+        LN_LOG(INFO) << tabs.back() << "// DRY_RUN DEPTH: " << depth << "\n";
+
+        std::vector<fma_operation> unrolled_fmas;
+
+        if (depth == unroll_stage)
+        {
+            unrolled_fmas = collect_unrolled_FMAs_below(depth);
+            issue_unrolled_fmas_dry_run(unrolled_fmas, num_iterations);
+        }
+        else
+        {
+            auto const& loop = loops[depth];
+
+            std::string var_name = loop.var + "_" + std::to_string(loop.delta);
+
+            auto loop_end        = limits[loop.var].back();
+            auto full_iterations = loop_end / loop.delta;
+            auto tail            = loop_end % loop.delta;
+
+            if (full_iterations > 0)
+            {
+                LN_LOG(INFO)
+                    << tabs.back() << "FOR: " << var_name << " FROM 0 TO "
+                    << loop_end << " BY " << loop.delta << " {\n";
+            }
+
+            if (full_iterations > 0)
+            {
+                limits[loop.var].push_back(loop.delta);
+                tabs.push_back(tabs.back() + "    ");
+                issue_loop_dry_run_helper(depth + 1, unroll_stage,
+                                          num_iterations * full_iterations);
+                tabs.pop_back();
+                limits[loop.var].pop_back();
+            }
+
+            if (full_iterations > 0)
+            {
+                LN_LOG(INFO) << tabs.back() << "} END FOR\n";
+            }
+
+            if (tail)
+            {
+                LN_LOG(INFO) << tabs.back() << "TAIL: " << var_name << " OF "
+                             << tail << " {\n";
+                limits[loop.var].push_back(tail);
+                tabs.push_back(tabs.back() + "    ");
+                issue_loop_dry_run_helper(depth + 1, unroll_stage,
+                                          num_iterations);
+                tabs.pop_back();
+                limits[loop.var].pop_back();
+                LN_LOG(INFO) << tabs.back() << "} END TAIL\n";
+            }
+        }
+    }
+
+    void issue_loops_dry_run(int unroll_stage)
+    {
+        issue_loop_dry_run_helper(0, unroll_stage, 1);
+    }
+
 private:
     std::int64_t effective_flops_, masked_out_flops_;
     std::int64_t A_memory_, B_memory_, C_memory_, total_memory_;
@@ -3119,6 +3780,12 @@ public:
                     vxorpd(Zmm(i), Zmm(i), Zmm(i));
                 }
             }
+        }
+
+        if ((A_traits.access == SCALAR && B_traits.access == VECTOR_PACKED) ||
+            (A_traits.access == VECTOR_PACKED && B_traits.access == SCALAR))
+        {
+            issue_loops_dry_run(unroll_stage);
         }
 
         for (auto const& p : addressers)
