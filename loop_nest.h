@@ -1299,9 +1299,7 @@ private:
         issue_C_stores(stores, tail_mask, max_alpha, issue_max_alpha_logic);
     }
 
-    template <class R = ISA>
-    std::enable_if_t<std::is_same_v<R, avx512> || std::is_same_v<R, avx2_plus>>
-    issue_unrolled_fmas_scalar_vector()
+    void issue_unrolled_fmas_scalar_vector()
     {
         auto instructions = std::move(instruction_IRs.front());
         instruction_IRs.pop_front();
@@ -1425,13 +1423,13 @@ private:
         std::optional<int>                                    tail_mask)
 
     {
-
         if ((A_traits.access == SCALAR && B_traits.access == VECTOR_PACKED) ||
             (A_traits.access == VECTOR_PACKED && B_traits.access == SCALAR))
         {
             issue_unrolled_fmas_scalar_vector();
             return;
         }
+
         // Assignment of vector registers
         Vmm arg1_register, arg2_register;
         Vmm arg_A_strides, arg_B_strides; // TODO (if same, use same register)
@@ -1744,6 +1742,12 @@ private:
         std::optional<int>                                    tail_mask)
 
     {
+        if ((A_traits.access == SCALAR && B_traits.access == VECTOR_PACKED) ||
+            (A_traits.access == VECTOR_PACKED && B_traits.access == SCALAR))
+        {
+            issue_unrolled_fmas_scalar_vector();
+            return;
+        }
 
         // TODO(zi) Implement the new strategies when possible. With
         // all in-reg arguments for the FMAs
@@ -3074,10 +3078,8 @@ private:
                           unroll_stage, addressers, true, 1, true);
     }
 
-    template <class R = ISA>
-    std::enable_if_t<std::is_same_v<R, avx512> || std::is_same_v<R, avx2_plus>>
-    issue_unrolled_fmas_dry_run(std::vector<fma_operation> fmas,
-                                int                        num_iterations)
+    void issue_unrolled_fmas_dry_run(std::vector<fma_operation> fmas,
+                                     int                        num_iterations)
     {
         if (fmas.size())
         {
@@ -3255,14 +3257,19 @@ private:
                 it == tensor_location_index.end() &&
                 remaining_usages[left_loc].size() == 1)
             {
-                std::swap(left_loc, right_loc);
-                std::swap(fmas[i].src1, fmas[i].src2);
+                if (fmas[i].src1.traits->access != SCALAR ||
+                    !std::is_same_v<ISA, avx2>)
+                {
+                    std::swap(left_loc, right_loc);
+                    std::swap(fmas[i].src1, fmas[i].src2);
+                }
             }
 
             maybe_issue_load(left_loc, fmas[i].src1.traits->access == SCALAR,
                              false);
             maybe_issue_load(right_loc, fmas[i].src2.traits->access == SCALAR,
-                             true);
+                             fmas[i].src2.traits->access != SCALAR ||
+                                 !std::is_same_v<ISA, avx2>);
 
             auto left_it  = tensor_location_index.find(left_loc);
             auto right_it = tensor_location_index.find(right_loc);
@@ -3482,6 +3489,42 @@ private:
         //         }
         //     }
         // }
+
+        constexpr int max_load_moves = 16;
+
+        // Move loads
+        for (int i = 1; i < instructions.size(); ++i)
+        {
+            if (std::holds_alternative<load_instruction>(instructions[i]))
+            {
+                auto load = std::get<load_instruction>(instructions[i]);
+                for (int pos = i, moves = 0; pos > 0 && moves < max_load_moves;
+                     --pos, ++moves)
+                {
+                    if (std::holds_alternative<fmla_instruction>(
+                            instructions[pos - 1]))
+                    {
+                        auto fma =
+                            std::get<fmla_instruction>(instructions[pos - 1]);
+                        if (load.vmm_idx != fma.left_src &&
+                            (std::holds_alternative<memory_src>(
+                                 fma.right_src) ||
+                             (std::get<int>(fma.right_src) != load.vmm_idx)))
+                        {
+                            std::swap(instructions[pos], instructions[pos - 1]);
+                        }
+                        else
+                        {
+                            pos = 1; // break;
+                        }
+                    }
+                    else
+                    {
+                        pos = 1; // break
+                    }
+                }
+            }
+        }
 
         instruction_IRs.push_back(std::move(instructions));
     }

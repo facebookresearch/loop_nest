@@ -50,14 +50,23 @@ int main()
                        // has to divide the stride.  This is effectively the
                        // same as Halide's split into outer and inner
                        // variable, but can have arbitray number of splits.
+                       // {{"AcBr", 256},
+                       //  {"ArCr", 5},
+                       //  {"BcCc", 4 * 16},
+                       //  {"AcBr", 16},
+                       //  {"AcBr", 1},
+                       //  {"ArCr", 1},
+                       //  {"BcCc", 1}},
+
                        {{"AcBr", 256},
-                        {"ArCr", 5},
-                        {"BcCc", 4 * 16},
-                        {"AcBr", 1},
+                        {"ArCr", 4},
+                        {"BcCc", 3 * 8},
+                        {"AcBr", 16},
                         {"AcBr", 1},
                         {"ArCr", 1},
                         {"BcCc", 1}},
-                       // The second argument is a map of the dimension sizes
+
+// The second argument is a map of the dimension sizes
                        {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
                        // Vars of C (other variables are reduction variables)
                        {"ArCr", "BcCc"},
