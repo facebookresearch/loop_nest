@@ -1,5 +1,5 @@
-#include "baselines.h"
 #include "loop_nest.h"
+#include "baselines.h"
 #include "loop_nest_baseline.h"
 #include "one_constant.h"
 #include "utils.h"
@@ -60,13 +60,13 @@ int main()
 
                        {{"AcBr", 256},
                         {"ArCr", 4},
-                        {"BcCc", 3 * 8},
+                        {"BcCc", 3 * 16},
                         {"AcBr", 16},
                         {"AcBr", 1},
                         {"ArCr", 1},
                         {"BcCc", 1}},
 
-// The second argument is a map of the dimension sizes
+                       // The second argument is a map of the dimension sizes
                        {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
                        // Vars of C (other variables are reduction variables)
                        {"ArCr", "BcCc"},
@@ -131,7 +131,7 @@ int main()
             1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
     }
 
-    return 0;
+    // return 0;
 
     // 2D convolution on NCHW16c layout example:
     // O(g_out, c_out, o_h, o_w) = I(g_in, c_in, o_h + k_h, ow + k_w) *
@@ -151,23 +151,24 @@ int main()
         auto gen_loop_nest = [&]() {
             return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
                        {{"g_out", 1}, //
-                        {"o_w", 28},
-                        {"o_h", 1},
+                        {"o_h", 4},
+                        {"o_w", 4},
                         {"g_in", 1},
                         {"c_in", 1},
-                        {"o_w", 1}, //
-                        //{"o_w", 1},    //
                         {"k_h", 1},    //
                         {"k_w", 1},    //
+                        {"o_h", 1},
+                        {"o_w", 1}, //
+                        //{"o_w", 1},    //
                         {"c_out", 1}}, //
                        // The second argument is a map of the dimension sizes
                        {{"g_out", GOUT},
                         {"c_out", COUT},
-                        {"o_w", OS},
-                        {"k_w", KS},
                         {"g_in", GIN},
                         {"c_in", CIN},
+                        {"o_w", OS},
                         {"o_h", OS},
+                        {"k_w", KS},
                         {"k_h", KS}},
                        // Vars of C (other variables are reduction variables)
                        {"g_out", "c_out", "o_w", "o_h"},
@@ -236,7 +237,7 @@ int main()
         std::cout << "GFLOPS: " << (gflops / secs) << "\n";
     }
 
-    // return 0;
+    return 0;
 
     // Simple reduction of matrix columns using the FMA loop nest
     // The trick is to use a fake tensor "A" - that is a tensor with

@@ -161,6 +161,9 @@ private:
 
     std::deque<std::vector<instruction_t>> instruction_IRs;
 
+    std::map<int, std::vector<int>> load_offsets;
+    bool                            load_offsets_first_pass = true;
+
 private:
     Reg64              CReg_     = rdi;
     Reg64              AReg_     = rsi;
@@ -300,7 +303,7 @@ private:
         // will point to the 5th and 6th arguments in the function
         // generated (as per x86 64 ABI)
 
-        assert(elementwise_strides.size() <= 2);
+        strong_assert(elementwise_strides.size() <= 2);
         for (int i = 0; i < elementwise_strides.size(); i++)
         {
             Reg64 reg = addressing_registers[0];
@@ -483,7 +486,7 @@ private:
 
         if (depth == nest_depth - 1) // last, vectorized loop
         {
-            assert(loop.delta == 1);
+            strong_assert(loop.delta == 1);
 
             auto fullIterations = limits[loop.var].back() / vector_size;
             auto rest           = limits[loop.var].back() % vector_size;
@@ -720,10 +723,10 @@ private:
             mov(r12, (1 << (*tail_mask)) - 1);
             kmovw(tail_k_mask, r12.cvt32());
 
-            assert(C_traits.access != SCALAR);
+            strong_assert(C_traits.access != SCALAR);
         }
 
-        assert(next_vector_register <= auxiliary_registers);
+        strong_assert(next_vector_register <= auxiliary_registers);
 
         for (auto const& c : loads)
         {
@@ -787,7 +790,7 @@ private:
                     ptr[rip + maskLabel_ + 4 * (8 - (*tail_mask))]);
         }
 
-        assert(next_vector_register <= auxiliary_registers);
+        strong_assert(next_vector_register <= auxiliary_registers);
 
         // issue loads
         for (auto const& c : loads)
@@ -848,7 +851,7 @@ private:
                 mov(r12, (1 << (*tail_mask)) - 1);
                 kmovw(tail_k_mask, r12.cvt32());
 
-                assert(C_traits.access_len != 1);
+                strong_assert(C_traits.access_len != 1);
             }
 
             std::vector<std::pair<memory_argument, Vmm>> loads_and_regs;
@@ -950,7 +953,7 @@ private:
         {
             if (c.mask != vector_size)
             {
-                assert(!tail_mask || *tail_mask == c.mask);
+                strong_assert(!tail_mask || *tail_mask == c.mask);
                 tail_mask = c.mask;
             }
         }
@@ -1047,7 +1050,7 @@ private:
                     mov(r12, (1 << (*tail_mask)) - 1);
                     kmovw(tail_k_mask, r12.cvt32());
 
-                    assert(C_traits.access_len != 1);
+                    strong_assert(C_traits.access_len != 1);
                 }
 
                 elementwise_postop->process_batch(
@@ -1071,14 +1074,14 @@ private:
             // if not necessary
         }
 
-        assert(next_vector_register <= auxiliary_registers);
+        strong_assert(next_vector_register <= auxiliary_registers);
 
         if (tail_mask)
         {
             mov(r12, (1 << (*tail_mask)) - 1);
             kmovw(tail_k_mask, r12.cvt32());
 
-            assert(C_traits.access_len != 1);
+            strong_assert(C_traits.access_len != 1);
         }
 
         for (auto const& c : stores)
@@ -1223,7 +1226,7 @@ private:
                     ptr[rip + maskLabel_ + 4 * (8 - (*tail_mask))]);
         }
 
-        assert(next_vector_register <= auxiliary_registers);
+        strong_assert(next_vector_register <= auxiliary_registers);
 
         for (auto const& c : stores)
         {
@@ -1291,7 +1294,7 @@ private:
         {
             if (c.mask != vector_size)
             {
-                assert(!tail_mask || *tail_mask == c.mask);
+                strong_assert(!tail_mask || *tail_mask == c.mask);
                 tail_mask = c.mask;
             }
         }
@@ -1458,7 +1461,7 @@ private:
             vmovups(arg_B_strides, ptr[rip + B_access_strides_label]);
         }
 
-        assert(next_vector_register <= auxiliary_registers);
+        strong_assert(next_vector_register <= auxiliary_registers);
 
         if (A_traits.access == VECTOR_STRIDED ||
             B_traits.access == VECTOR_STRIDED)
@@ -1471,8 +1474,8 @@ private:
 
         // TODO(zi) issue mask only when required (for avx512 as well)
         auto const ensure_initalized_mask = [&](int mask) {
-            assert(tail_mask && "Tail mask was not detected");
-            assert(mask == *tail_mask);
+            strong_assert(tail_mask && "Tail mask was not detected");
+            strong_assert(mask == *tail_mask);
 
             if (mask_size == -1)
             {
@@ -1493,7 +1496,7 @@ private:
         {
             // Ensures no instructions are added to the unrolled
             // loop tails
-            assert(is_inside_current_limits(inst.coordinates));
+            strong_assert(is_inside_current_limits(inst.coordinates));
             queue.inc(inst.src1);
             queue.inc(inst.src2);
         }
@@ -1827,7 +1830,7 @@ private:
             ymm_temp_register = Vmm(next_vector_register++);
         }
 
-        assert(next_vector_register <= auxiliary_registers);
+        strong_assert(next_vector_register <= auxiliary_registers);
 
         most_frequent_queue<memory_argument> queue;
 
@@ -1838,7 +1841,7 @@ private:
 
         for (auto const& inst : fmas)
         {
-            assert(is_inside_current_limits(inst.coordinates));
+            strong_assert(is_inside_current_limits(inst.coordinates));
             queue.inc(inst.src1);
             queue.inc(inst.src2);
         }
@@ -1847,8 +1850,8 @@ private:
 
         // TODO(zi) issue mask only when required (for avx512 as well)
         auto const ensure_initalized_mask = [&](int mask) {
-            assert(tail_mask && "Tail mask was not detected");
-            assert(mask == *tail_mask);
+            strong_assert(tail_mask && "Tail mask was not detected");
+            strong_assert(mask == *tail_mask);
 
             if (mask_size == -1)
             {
@@ -2113,7 +2116,7 @@ private:
         auto update_tail_mask = [&](int m) {
             if (m != vector_size)
             {
-                assert(!tail_mask || *tail_mask == m);
+                strong_assert(!tail_mask || *tail_mask == m);
                 tail_mask = m;
             }
         };
@@ -2517,7 +2520,7 @@ private:
         // to register_required = 1 at some point.
         if (registers_required > available_registers)
         {
-            assert(it == it_end);
+            strong_assert(it == it_end);
             while (C_formula.count(it->first) == 0 && it != order.begin())
             {
                 ranges[it->first].pop_back();
@@ -2538,7 +2541,7 @@ private:
                 --first_loop_that_can_hold_C;
             }
 
-            // assert(it_end != order.begin());
+            // strong_assert(it_end != order.begin());
 
             auto pair = *it;
 
@@ -2659,7 +2662,7 @@ private:
                 next += per_register;
             }
 
-            assert(next <= isa_traits<ISA>::total_vector_registers);
+            strong_assert(next <= isa_traits<ISA>::total_vector_registers);
 
             return next;
         }
@@ -2699,7 +2702,7 @@ private:
                 {
                     // std::cout << loops[i].var << " :: " << loops[i].end
                     //          << std::endl;
-                    assert((loops[i].end % vector_size) == 0);
+                    strong_assert((loops[i].end % vector_size) == 0);
                 }
             }
         }
@@ -2729,7 +2732,7 @@ private:
 
     std::map<int, std::shared_ptr<address_packer>> create_null_addressers()
     {
-        assert(!optim_config.use_address_packer());
+        strong_assert(!optim_config.use_address_packer());
 
         std::map<int, std::shared_ptr<address_packer>> addressers;
 
@@ -3093,8 +3096,8 @@ private:
             }
             else
             {
-                assert(fmas[0].src1.traits->access == SCALAR &&
-                       fmas[0].src2.traits->access == VECTOR_PACKED);
+                strong_assert(fmas[0].src1.traits->access == SCALAR &&
+                              fmas[0].src2.traits->access == VECTOR_PACKED);
             }
         }
         else
@@ -3175,8 +3178,8 @@ private:
             load_instruction insn{
                 vmm_idx, does_broadcast, {tensor_idx, offset}};
 
-            assert(remaining_usages.count(insn.tensor_loc) &&
-                   remaining_usages[insn.tensor_loc].size() > 0);
+            strong_assert(remaining_usages.count(insn.tensor_loc) &&
+                          remaining_usages[insn.tensor_loc].size() > 0);
 
             int next_usage = remaining_usages[insn.tensor_loc].front();
 
@@ -3187,7 +3190,7 @@ private:
 
         auto free_a_register = [&]() {
             auto nu_it = next_usage_index.begin();
-            assert(nu_it != next_usage_index.end());
+            strong_assert(nu_it != next_usage_index.end());
 
             int reg_no = nu_it->vmm_idx;
 
@@ -3274,9 +3277,9 @@ private:
             auto left_it  = tensor_location_index.find(left_loc);
             auto right_it = tensor_location_index.find(right_loc);
 
-            assert(left_it != tensor_location_index.end());
-            assert((right_it != tensor_location_index.end()) ||
-                   remaining_usages[right_loc].size() == 1);
+            strong_assert(left_it != tensor_location_index.end());
+            strong_assert((right_it != tensor_location_index.end()) ||
+                          remaining_usages[right_loc].size() == 1);
 
             if (right_it != tensor_location_index.end())
             {
@@ -3314,7 +3317,7 @@ private:
         //                     fmas[i].src1.offset * 4);
         //         free_regs.pop_front();
 
-        //         assert(tensor_location_index.find(scalar_loc) !=
+        //         strong_assert(tensor_location_index.find(scalar_loc) !=
         //                tensor_location_index.end());
         //     }
 
@@ -3330,15 +3333,15 @@ private:
         //                     fmas[i].src2.offset * 4);
         //         free_regs.pop_front();
 
-        //         assert(tensor_location_index.find(vector_loc) !=
+        //         strong_assert(tensor_location_index.find(vector_loc) !=
         //                tensor_location_index.end());
         //     }
 
         //     auto s_it = tensor_location_index.find(scalar_loc);
         //     auto v_it = tensor_location_index.find(vector_loc);
 
-        //     assert(s_it != tensor_location_index.end());
-        //     assert(v_it != tensor_location_index.end());
+        //     strong_assert(s_it != tensor_location_index.end());
+        //     strong_assert(v_it != tensor_location_index.end());
 
         //     // issue FMA
         //     instructions.push_back(fmla_instruction{
@@ -3346,11 +3349,11 @@ private:
         //         {v_it->vreg_idx, v_it->vreg_lane},
         //         {s_it->vreg_idx, s_it->vreg_lane}}); // update datastructures
 
-        //     assert(remaining_usages.count(scalar_loc) &&
+        //     strong_assert(remaining_usages.count(scalar_loc) &&
         //            remaining_usages[scalar_loc].size() &&
         //            remaining_usages[scalar_loc].front() == s_it->next_usage);
 
-        //     assert(remaining_usages.count(vector_loc) &&
+        //     strong_assert(remaining_usages.count(vector_loc) &&
         //            remaining_usages[vector_loc].size() &&
         //            remaining_usages[vector_loc].front() == v_it->next_usage);
 
@@ -3498,6 +3501,13 @@ private:
             if (std::holds_alternative<load_instruction>(instructions[i]))
             {
                 auto load = std::get<load_instruction>(instructions[i]);
+
+                if (load_offsets_first_pass)
+                {
+                    load_offsets[load.tensor_loc.idx].push_back(
+                        load.tensor_loc.offset);
+                }
+
                 for (int pos = i, moves = 0; pos > 0 && moves < max_load_moves;
                      --pos, ++moves)
                 {
@@ -3525,6 +3535,8 @@ private:
                 }
             }
         }
+
+        load_offsets_first_pass = false;
 
         instruction_IRs.push_back(std::move(instructions));
     }
@@ -3749,7 +3761,7 @@ public:
         // innermost loop is over a dummy variable.
 
         // TODO (nicer error message).
-        assert(is_C_vectorized || is_B_vectorized || is_A_vectorized);
+        strong_assert(is_C_vectorized || is_B_vectorized || is_A_vectorized);
 
         vectorized_var = order.back().first;
         LN_LOG(DEBUG) << "Vectorized along: " << vectorized_var << "\n";
@@ -3787,7 +3799,7 @@ public:
 
         initialize_loops_data();
 
-        assert(unroll_stage < loops.size());
+        strong_assert(unroll_stage < loops.size());
 
         int depth_for_register_blocked_C = first_loop_that_can_hold_C;
         int inner_fma_operations         = total_required_fma_operations;
@@ -3806,7 +3818,7 @@ public:
         std::vector<fma_operation> unrolled_fmas =
             collect_default_unrolled_FMAs_at(unroll_stage);
 
-        assert(unrolled_fmas.size() == total_required_fma_operations);
+        strong_assert(unrolled_fmas.size() == total_required_fma_operations);
 
         auto addressers = create_addressers(std::move(unrolled_fmas));
 
@@ -3837,6 +3849,14 @@ public:
         }
 
         issue_loops(depth_for_register_blocked_C, unroll_stage, addressers);
+
+        for (auto const& lo : load_offsets)
+        {
+            std::cout << lo.first << ":";
+            for (auto const& o : lo.second)
+                std::cout << " " << o;
+            std::cout << "\n";
+        }
 
         pop({r15, r14, r13, r12, rbx});
 
