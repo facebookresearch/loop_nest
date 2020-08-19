@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <random>
+#include <stdexcept>
 #include <vector>
 
 #include "AlignedVec.h"
@@ -14,11 +15,7 @@
 #define strong_assert(condition)                                               \
     if (!(condition))                                                          \
     {                                                                          \
-        std::cout << "Assertion " << LOOP_NEST_STRINGIFY(condition)            \
-                  << " failed "                                                \
-                  << "file: " << __FILE__ << " line: " << __LINE__             \
-                  << std::endl;                                                \
-        std::abort();                                                          \
+        throw std::runtime_error(LOOP_NEST_STRINGIFY(condition));              \
     }                                                                          \
     static_cast<void>(0)
 
