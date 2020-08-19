@@ -3852,10 +3852,10 @@ public:
 
         for (auto const& lo : load_offsets)
         {
-            std::cout << lo.first << ":";
+             LN_LOG(INFO) << lo.first << ":";
             for (auto const& o : lo.second)
-                std::cout << " " << o;
-            std::cout << "\n";
+                 LN_LOG(INFO) << " " << o;
+             LN_LOG(INFO) << "\n";
         }
 
         pop({r15, r14, r13, r12, rbx});
