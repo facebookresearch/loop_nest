@@ -16,6 +16,8 @@
 #include <string>
 #include <vector>
 
+// WHEN ALL TENSORS VECTORIZED USE NEW SCHEDULER
+
 #ifndef CT_ISA
 #define CT_ISA avx2
 #endif
@@ -26,6 +28,98 @@ int main()
     using facebook::sysml::aot::avx2;
     using facebook::sysml::aot::avx2_plus;
     using facebook::sysml::aot::avx512;
+
+    // WOW this is actually pretty efficient!
+    // Playing with weird schedules
+    // Matrix-Matrix product
+    // C(r, c) = A(r, k) * B(k, c)
+    // if (0)
+    {
+        std::cout << "Benchmark: Depthwise" << std::endl;
+
+        // int ArCr = 16;
+        // int AcBr = 16;
+        // int BcCc = 16;
+
+        int OHW = 8;
+        int KHW = 3;
+        int IHW = OHW + KHW - 1;
+        int IOC = 32;
+
+        auto gen_loop_nest = [&]() {
+            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+                       // The first argument is the loop order in the form of
+                       // {dimension, stride}.  For now the outer dimension
+                       // has to divide the stride.  This is effectively the
+                       // same as Halide's split into outer and inner
+                       // variable, but can have arbitray number of splits.
+                       {{"IOC", 32},
+                        {"OH", 2},
+                        {"OW", 3},
+                        {"OH", 1},
+                        {"OW", 1},
+                        {"KH", 1},
+                        {"KW", 1},
+                        {"IOC", 1}},
+
+                       // The second argument is a map of the dimension sizes
+                       {{"OH", OHW},
+                        {"OW", OHW},
+                        {"KH", KHW},
+                        {"KW", KHW},
+                        {"IOC", IOC}},
+                       // Vars of C (other variables are reduction variables)
+                       {"OH", "OW", "IOC"},
+                       // Variables of A
+                       {"IH", "IW", "IOC"},
+                       // Variables of B
+                       {"KH", "KW", "IOC"},
+                       // C's strides for each variable.
+                       {{"OW", IOC}, {"OH", IOC * OHW}, {"IOC", 1}},
+                       // A's strides for each variable
+                       {{"OW", IOC},
+                        {"KW", IOC},
+                        {"OH", IOC * IHW},
+                        {"KH", IOC * IHW},
+                        {"IOC", 1}},
+                       // B's strides for each variable
+                       {{"KW", IOC}, {"KH", IOC * KHW}, {"IOC", 1}},
+                       facebook::sysml::aot::fma, 128)
+                .get_unique();
+        };
+
+        auto compile_secs = measureFastestWithWarmup(gen_loop_nest, 0, 1);
+        std::cout << "Compile: " << compile_secs << std::endl;
+
+        auto fn = gen_loop_nest();
+
+        fn.save_to_file("zi.asm");
+        // fn.register_perf("fn1");
+
+        auto A = getRandomVector<float>(IHW * IHW * IOC);
+        auto B = getRandomVector<float>(KHW * KHW * IOC);
+
+        auto CN = getRandomVector<float>(OHW * OHW * IOC);
+        auto CJ = CN;
+
+        baseline_CW_HWC(IOC, OHW, KHW, A.data(), B.data(), CN.data(), 0);
+
+        fn(CJ.data(), A.data(), B.data(), 0);
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiffVerbose(CJ.data(), CJ.data() + OHW * OHW * IOC,
+                                       CN.data(), 0.0001)
+                  << "\n";
+
+        auto secs = measureFastestWithWarmup(
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10, 100);
+
+        double gflops = 1.0 * OHW * OHW * KHW * KHW * IOC * 2 / 1000000000;
+
+        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
+    }
+
+    return 0;
 
     // WOW this is actually pretty efficient!
     // Playing with weird schedules
@@ -50,21 +144,21 @@ int main()
                        // has to divide the stride.  This is effectively the
                        // same as Halide's split into outer and inner
                        // variable, but can have arbitray number of splits.
-                       // {{"AcBr", 256},
-                       //  {"ArCr", 5},
-                       //  {"BcCc", 4 * 16},
-                       //  {"AcBr", 16},
-                       //  {"AcBr", 1},
-                       //  {"ArCr", 1},
-                       //  {"BcCc", 1}},
-
                        {{"AcBr", 256},
-                        {"ArCr", 4},
-                        {"BcCc", 3 * 16},
+                        {"ArCr", 6},
+                        {"BcCc", 2 * 8},
                         {"AcBr", 16},
                         {"AcBr", 1},
                         {"ArCr", 1},
                         {"BcCc", 1}},
+
+                       // {{"AcBr", 256},
+                       //  {"ArCr", 4},
+                       //  {"BcCc", 3 * 16},
+                       //  {"AcBr", 16},
+                       //  {"AcBr", 1},
+                       //  {"ArCr", 1},
+                       //  {"BcCc", 1}},
 
                        // The second argument is a map of the dimension sizes
                        {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
@@ -120,7 +214,7 @@ int main()
                   << "\n";
 
         auto secs = measureFastestWithWarmup(
-            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10, 1000);
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10, 100);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
 
@@ -151,12 +245,12 @@ int main()
         auto gen_loop_nest = [&]() {
             return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
                        {{"g_out", 1}, //
-                        {"o_h", 4},
-                        {"o_w", 4},
+                        {"o_h", 5},
+                        {"o_w", 5},
                         {"g_in", 1},
                         {"c_in", 1},
-                        {"k_h", 1},    //
-                        {"k_w", 1},    //
+                        {"k_h", 1}, //
+                        {"k_w", 1}, //
                         {"o_h", 1},
                         {"o_w", 1}, //
                         //{"o_w", 1},    //
@@ -198,7 +292,7 @@ int main()
                         {"k_h", COUT * KS},
                         {"k_w", COUT},
                         {"c_out", 1}},
-                       facebook::sysml::aot::fma)
+                       facebook::sysml::aot::fma, 1024)
                 .get_shared();
         };
 

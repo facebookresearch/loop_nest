@@ -1,6 +1,42 @@
 #pragma once
 #include <limits>
 
+inline void baseline_CW_HWC(unsigned IOC, unsigned OHW, unsigned KHW,
+                            float const* AData, float const* BData,
+                            float* CData, int alpha = 0)
+{
+    unsigned IHW = OHW + KHW - 1;
+
+    for (unsigned oh = 0; oh < OHW; ++oh)
+    {
+        for (unsigned ow = 0; ow < OHW; ++ow)
+        {
+            for (unsigned ioc = 0; ioc < IOC; ++ioc)
+            {
+                float& c = CData[ioc + ow * IOC + oh * OHW * IOC];
+
+                if (alpha == 0)
+                {
+                    c = 0.f;
+                }
+
+                for (unsigned kh = 0; kh < KHW; ++kh)
+                {
+                    unsigned ih = oh + kh;
+
+                    for (unsigned kw = 0; kw < KHW; ++kw)
+                    {
+                        unsigned iw = ow + kw;
+
+                        c += AData[ioc + iw * IOC + ih * IOC * IHW] *
+                             BData[ioc + kw * IOC + kh * IOC * KHW];
+                    }
+                }
+            }
+        }
+    }
+}
+
 inline void baseline_MM(unsigned ArCr, unsigned AcBr, unsigned BcCc, int LDA,
                         int LDB, int LDC, float const* AData,
                         float const* BData, float* CData, int alpha = 0)

@@ -946,6 +946,12 @@ private:
     void issue_C_loads(std::set<memory_argument> const& loads,
                        bool                             issue_first_alpha_logic)
     {
+
+        for (auto& CVmm : C_VMMs)
+        {
+            CVmm.second.reset();
+        }
+
         // TODO (relax)
         std::optional<int> tail_mask;
 
@@ -1304,7 +1310,9 @@ private:
 
     void issue_unrolled_fmas_scalar_vector()
     {
+
         auto instructions = std::move(instruction_IRs.front());
+        strong_assert(instruction_IRs.size());
         instruction_IRs.pop_front();
 
         for (auto const& insn : instructions)
@@ -1426,8 +1434,11 @@ private:
         std::optional<int>                                    tail_mask)
 
     {
+
         if ((A_traits.access == SCALAR && B_traits.access == VECTOR_PACKED) ||
-            (A_traits.access == VECTOR_PACKED && B_traits.access == SCALAR))
+            (A_traits.access == VECTOR_PACKED && B_traits.access == SCALAR) ||
+            (A_traits.access == VECTOR_PACKED &&
+             B_traits.access == VECTOR_PACKED && C_traits.access != SCALAR))
         {
             issue_unrolled_fmas_scalar_vector();
             return;
@@ -1746,7 +1757,9 @@ private:
 
     {
         if ((A_traits.access == SCALAR && B_traits.access == VECTOR_PACKED) ||
-            (A_traits.access == VECTOR_PACKED && B_traits.access == SCALAR))
+            (A_traits.access == VECTOR_PACKED && B_traits.access == SCALAR) ||
+            (A_traits.access == VECTOR_PACKED &&
+             B_traits.access == VECTOR_PACKED && C_traits.access != SCALAR))
         {
             issue_unrolled_fmas_scalar_vector();
             return;
@@ -3084,27 +3097,6 @@ private:
     void issue_unrolled_fmas_dry_run(std::vector<fma_operation> fmas,
                                      int                        num_iterations)
     {
-        if (fmas.size())
-        {
-            if (fmas[0].src1.traits->access == VECTOR_PACKED &&
-                fmas[0].src2.traits->access == SCALAR)
-            {
-                for (auto& f : fmas)
-                {
-                    std::swap(f.src1, f.src2);
-                }
-            }
-            else
-            {
-                strong_assert(fmas[0].src1.traits->access == SCALAR &&
-                              fmas[0].src2.traits->access == VECTOR_PACKED);
-            }
-        }
-        else
-        {
-            return;
-        }
-
         // List of usages
 
         int src1_reg = fmas[0].src1.traits->reg.getIdx();
@@ -3838,7 +3830,9 @@ public:
         }
 
         if ((A_traits.access == SCALAR && B_traits.access == VECTOR_PACKED) ||
-            (A_traits.access == VECTOR_PACKED && B_traits.access == SCALAR))
+            (A_traits.access == VECTOR_PACKED && B_traits.access == SCALAR) ||
+            (A_traits.access == VECTOR_PACKED &&
+             B_traits.access == VECTOR_PACKED && C_traits.access != SCALAR))
         {
             issue_loops_dry_run(unroll_stage);
         }
@@ -3850,13 +3844,15 @@ public:
 
         issue_loops(depth_for_register_blocked_C, unroll_stage, addressers);
 
-        for (auto const& lo : load_offsets)
-        {
-             LN_LOG(INFO) << lo.first << ":";
-            for (auto const& o : lo.second)
-                 LN_LOG(INFO) << " " << o;
-             LN_LOG(INFO) << "\n";
-        }
+        strong_assert(instruction_IRs.size() == 0);
+
+        // for (auto const& lo : load_offsets)
+        // {
+        //     //std::cout << lo.first << ":";
+        //     //for (auto const& o : lo.second)
+        //     //    std::cout << " " << o;
+        //     //std::cout << "\n";
+        // }
 
         pop({r15, r14, r13, r12, rbx});
 

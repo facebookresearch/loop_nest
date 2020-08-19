@@ -69,6 +69,27 @@ Float maxAbsDiffVerbose(Float const* LBegin, Float const* LEnd,
     return res;
 }
 
+
+template <class Float>
+Float maxAbsDiffVerbose(Float const* LBegin, Float const* LEnd,
+                        Float const* RBegin, float delta)
+{
+    int   off = 0;
+    Float res = 0;
+    for (; LBegin != LEnd; ++LBegin, ++RBegin)
+    {
+        if (std::abs(*LBegin - *RBegin) > delta)
+        {
+            std::cout << off << " : " << (*LBegin) << " " << (*RBegin) << " "
+                      << std::abs(*LBegin - *RBegin) << "\n";
+        }
+        res = std::max(res, std::abs(*LBegin - *RBegin));
+        off++;
+    }
+    return res;
+}
+
+
 template <class Float>
 aligned_vector<Float> getRandomVector(unsigned size,
                                       unsigned extra_elements = 16)
