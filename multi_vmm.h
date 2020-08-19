@@ -21,9 +21,11 @@ template <class Vmm>
 class multi_vmm
 {
 private:
-    int size_    = 0;
-    int first_   = 0;
-    int current_ = 0;
+    int size_          = 0;
+    int first_         = 0;
+    int current_       = 0;
+    int original_size_ = 0;
+    int max_touched_   = 0;
 
 public:
     multi_vmm() {}
@@ -32,8 +34,16 @@ public:
         : size_(s)
         , first_(f)
         , current_(0)
+        , original_size_(s)
+        , max_touched_(0)
     {
         assert(s > 0);
+    }
+
+    void reset()
+    {
+        size_    = original_size_;
+        current_ = 0;
     }
 
     multi_vmm(multi_vmm const&) = delete;
@@ -44,9 +54,11 @@ public:
     multi_vmm& operator=(multi_vmm&& o)
     {
         assert(o.size_ > 0);
-        size_    = o.size_;
-        first_   = o.first_;
-        current_ = o.current_;
+        size_          = o.size_;
+        first_         = o.first_;
+        current_       = o.current_;
+        original_size_ = o.original_size_;
+        max_touched_   = o.max_touched_;
         return *this;
     }
 
@@ -54,8 +66,9 @@ public:
 
     Vmm operator++(int)
     {
-        int c    = current_;
-        current_ = (current_ + 1) % size_;
+        int c        = current_;
+        current_     = (current_ + 1) % size_;
+        max_touched_ = std::max(max_touched_, current_);
         return Vmm(first_ + c);
     }
 
@@ -91,6 +104,7 @@ public:
     template <class Jitter>
     void reduce(Jitter& jitter, std::shared_ptr<operation_pair_base> op_pair)
     {
+        size_ = max_touched_ + 1;
         while (size_ > 1)
         {
             half(jitter, op_pair);
