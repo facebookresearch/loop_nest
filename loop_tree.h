@@ -5,6 +5,7 @@
 #include <functional>
 #include <map>
 #include <set>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -105,6 +106,83 @@ using elementwise_op_ptr = std::shared_ptr<elementwise_operation<ISA>>;
 template <class ISA>
 using loop_tree_node_ptr = std::shared_ptr<loop_tree_node<ISA>>;
 
+inline std::string dump_strides(strides_map_type const& strides,
+                                std::string const&      indent)
+{
+    std::ostringstream ss;
+    ss << indent << "Strides: " << std::endl;
+    for (auto const& tensor_strides : strides)
+    {
+        // tensor
+        ss << indent << " " << tensor_strides.first << ": ";
+        // strides
+        for (auto const& entry : tensor_strides.second)
+        {
+            ss << entry.first << ":" << entry.second << " ";
+        }
+        ss << std::endl;
+    }
+    return ss.str();
+}
+
+inline std::string dump_formula(formulas_map_type const& formulas,
+                                std::string const&       indent)
+{
+    std::ostringstream ss;
+    ss << indent << "Formulas: " << std::endl;
+    for (auto const& tensor_formula : formulas)
+    {
+        // tensor
+        ss << indent << " " << tensor_formula.first << ": ";
+        // formula
+        for (auto const& entry : tensor_formula.second)
+        {
+            ss << entry << " ";
+        }
+        ss << std::endl;
+    }
+    return ss.str();
+}
+
+inline std::string dump_tensors(std::vector<std::string> const& tensors,
+                                std::string const&              indent)
+{
+    std::ostringstream ss;
+    for (auto const& i : tensors)
+    {
+        ss << i << " ";
+    }
+    ss << std::endl;
+    return ss.str();
+}
+
+inline std::string
+dump_order(std::vector<std::pair<std::string, int>> const& order,
+           std::string const&                              indent)
+{
+    std::ostringstream ss;
+    ss << indent << "Order: ";
+    for (auto const& o : order)
+    {
+        ss << o.first << ":" << o.second << " ";
+    }
+    ss << std::endl;
+    return ss.str();
+}
+
+inline std::string dump_sizes(std::map<std::string, int> const& sizes,
+                              std::string const&                indent)
+{
+    std::ostringstream ss;
+    ss << indent << "Sizes: ";
+    for (auto const& s : sizes)
+    {
+        ss << s.first << ":" << s.second << " ";
+    }
+    ss << std::endl;
+    return ss.str();
+}
+
 template <class ISA>
 class loop_tree_node
 {
@@ -148,6 +226,10 @@ public:
     virtual std::set<std::string> get_output_tensors() const = 0;
 
     virtual strides_map_type const& get_tensor_strides() const = 0;
+
+    virtual std::string dump(formulas_map_type const&          formulas,
+                             std::map<std::string, int> const& sizes,
+                             std::string const& indent) const = 0;
 };
 
 template <class ISA>
@@ -170,6 +252,36 @@ private:
     elementwise_op_ptr<ISA>                  elementwise_postop;
     std::vector<std::string>                 elementwise_postop_tensors;
     std::optional<OptimizationConfiguration> optim_config;
+
+public:
+    std::string dump(formulas_map_type const&          formulas,
+                     std::map<std::string, int> const& sizes,
+                     std::string const&                indent) const
+    {
+        std::ostringstream ss;
+        ss << indent << "Interpreted Compute Node" << std::endl;
+
+        ss << indent << "Inputs: ";
+        ss << dump_tensors(inputs, indent);
+
+        ss << indent << "Output: " << output << std::endl;
+
+        if (elementwise_preop_tensors.size())
+        {
+            ss << indent << "Preop Tensors: ";
+            ss << dump_tensors(elementwise_preop_tensors, indent);
+        }
+
+        if (elementwise_postop_tensors.size())
+        {
+            ss << indent << "Postop Tensors: ";
+            ss << dump_tensors(elementwise_postop_tensors, indent);
+        }
+
+        ss << dump_strides(strides, indent);
+        ss << dump_formula(formulas, indent);
+        return ss.str();
+    }
 
 public:
     compute_node(
@@ -348,6 +460,19 @@ private:
     std::optional<int> unroll_limit;
 
 public:
+    std::string dump(formulas_map_type const&          formulas,
+                     std::map<std::string, int> const& sizes,
+                     std::string const&                indent) const
+    {
+        std::ostringstream ss;
+        ss << indent << "Interpreted transpose" << std::endl;
+        ss << indent << "Input: " << input << std::endl;
+        ss << indent << "Output: " << output << std::endl;
+        ss << dump_strides(strides, indent);
+        return ss.str();
+    }
+
+public:
     transpose_node(std::string const& input, std::string const& output,
                    strides_map_type const& strides,
                    std::optional<int>      unroll_limit = std::nullopt)
@@ -388,7 +513,7 @@ public:
                 C[0]     = A[0];
             };
     }
-};
+}; // namespace aot
 
 template <class ISA>
 loop_tree_node_ptr<ISA>
@@ -412,6 +537,17 @@ private:
     std::set<std::string> in_scope_tensor_names;
     std::set<std::string> in_scope_output_tensor_names;
     strides_map_type      in_scope_tensor_strides;
+
+public:
+    std::string dump(formulas_map_type const&          formulas,
+                     std::map<std::string, int> const& sizes,
+                     std::string const&                indent) const
+    {
+        std::ostringstream ss;
+        ss << indent << "Interpreted For Node" << std::endl;
+        ss << indent << "Var=" << var << ", delta=" << delta << std::endl;
+        return ss.str();
+    }
 
 private:
     void set_in_scope_tensor_info()
@@ -600,6 +736,39 @@ private:
     std::optional<OptimizationConfiguration> optim_config;
 
 public:
+    std::string dump(formulas_map_type const&          formulas,
+                     std::map<std::string, int> const& sizes,
+                     std::string const&                indent) const
+    {
+        std::ostringstream ss;
+        ss << indent << "JIT_loop_nest" << std::endl;
+        ss << dump_order(order, indent);
+
+        ss << dump_sizes(sizes, indent);
+
+        ss << indent << "Inputs: ";
+        ss << dump_tensors(inputs, indent);
+
+        ss << indent << "Output: " << output << std::endl;
+
+        if (elementwise_preop_tensors.size())
+        {
+            ss << indent << "Preop Tensors: ";
+            ss << dump_tensors(elementwise_preop_tensors, indent);
+        }
+
+        if (elementwise_postop_tensors.size())
+        {
+            ss << indent << "Postop Tensors: ";
+            ss << dump_tensors(elementwise_postop_tensors, indent);
+        }
+
+        ss << dump_strides(strides, indent);
+        ss << dump_formula(formulas, indent);
+        return ss.str();
+    }
+
+public:
     jitted_loop_nest_node(
         std::vector<std::string> const& inputs, std::string const& output,
         std::vector<std::pair<std::string, int>> const& order,
@@ -682,10 +851,11 @@ public:
 #ifdef SERIALIZE_LOOP_NEST
 #define serialize_xstr(s) serialize_str(s)
 #define serialize_str(s) #s
-        save_loop_nest_inputs(
-            serialize_xstr(SERIALIZE_LOOP_NEST), order, sizes, formulas.at(output),
-            formulas.at(inputs[0]), formulas.at(inputs[1]), strides.at(output),
-            strides.at(inputs[0]), strides.at(inputs[1]), unroll_limit);
+        save_loop_nest_inputs(serialize_xstr(SERIALIZE_LOOP_NEST), order, sizes,
+                              formulas.at(output), formulas.at(inputs[0]),
+                              formulas.at(inputs[1]), strides.at(output),
+                              strides.at(inputs[0]), strides.at(inputs[1]),
+                              unroll_limit);
 #undef serialize_str
 #undef serialize_xstr
 #endif
@@ -787,6 +957,21 @@ private:
     std::vector<std::pair<std::string, int>> order;
     strides_map_type                         strides;
     std::optional<int>                       unroll_limit;
+
+public:
+    std::string dump(formulas_map_type const&          formulas,
+                     std::map<std::string, int> const& sizes,
+                     std::string const&                indent) const
+    {
+        std::ostringstream ss;
+        ss << indent << "JIT_tranpose" << std::endl;
+        ss << dump_order(order, indent);
+        ss << dump_sizes(sizes, indent);
+        ss << indent << "Input: " << input << std::endl;
+        ss << indent << "Output: " << output << std::endl;
+        ss << dump_strides(strides, indent);
+        return ss.str();
+    }
 
 public:
     jitted_transpose_node(std::string const& input, std::string const& output,
@@ -958,6 +1143,26 @@ loop_tree_node_ptr<ISA> simplify_loop_nests(loop_tree_node_ptr<ISA> const& node,
     }
 }
 
+template <class ISA>
+inline std::string
+dump_recursively(loop_tree_node_ptr<ISA> const& node, formulas_map_type const& formulas,
+     std::map<std::string, int> const& sizes, std::string& indent)
+{
+    std::ostringstream ss;
+    ss << node->dump(formulas, sizes, indent);
+    ss << std::endl;
+    if (node->get_type() == node_kind::for_loop)
+    {
+        std::string next_indent = indent;
+        next_indent += "  ";
+        for (auto const& c : node->get_children())
+        {
+            ss << dump_recursively(c, formulas, sizes, next_indent);
+        }
+    }
+    return ss.str();
+}
+
 inline std::int64_t get_tensor_size(std::string const&                name,
                                     strides_map_type const&           strides,
                                     std::map<std::string, int> const& sizes,
@@ -1044,6 +1249,9 @@ public:
                                                       : 0)
     {
 
+        LN_LOG(DEBUG) << "Tree dump:\n";
+        LN_LOG(DEBUG) << dump();
+
         LN_LOG(DEBUG) << "Pass: Simplifying loop nests\n";
         std::vector<loop_tree_node_ptr<ISA>> new_nodes;
         for (auto c : nodes)
@@ -1052,6 +1260,9 @@ public:
                 simplify_loop_nests(c, 0, this->max_interpreted_depth));
         }
         this->nodes = new_nodes;
+
+        LN_LOG(DEBUG) << "Tree dump:\n";
+        LN_LOG(DEBUG) << dump();
 
         LN_LOG(DEBUG) << "Pass: Map tensor names to indices in vector\n";
         int idx = 0;
@@ -1071,6 +1282,17 @@ public:
     }
 
     std::vector<loop_tree_node_ptr<ISA>> const& get_children() { return nodes; }
+
+    std::string dump() const
+    {
+        std::ostringstream ss;
+        std::string indent = "";
+        for (auto const& c : nodes)
+        {
+            ss << dump_recursively(c, formulas, sizes, indent);
+        }
+        return ss.str();
+    }
 
     std::int64_t
     get_scratch_size(std::set<std::string> const& provided_tensors) const
