@@ -19,10 +19,11 @@ template <class VReg>
 class multi_vreg
 {
 private:
-    int size_    = 0;
-    int first_   = 0;
-    int current_ = 0;
-    int vlen_    = 4;
+    int size_          = 0;
+    int first_         = 0;
+    int current_       = 0;
+    int vlen_          = 4;
+    int original_size_ = 0;
 
 public:
     multi_vreg() {}
@@ -31,8 +32,15 @@ public:
         : size_(s)
         , first_(f)
         , current_(0)
+        , original_size_(s)
     {
         assert(s > 0);
+    }
+
+    void reset()
+    {
+        size_    = original_size_;
+        current_ = 0;
     }
 
     multi_vreg(multi_vreg const&) = delete;
@@ -43,9 +51,10 @@ public:
     multi_vreg& operator=(multi_vreg&& o)
     {
         assert(o.size_ > 0);
-        size_    = o.size_;
-        first_   = o.first_;
-        current_ = o.current_;
+        size_          = o.size_;
+        first_         = o.first_;
+        current_       = o.current_;
+        original_size_ = o.original_size_;
         return *this;
     }
 

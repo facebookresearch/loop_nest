@@ -890,6 +890,11 @@ private:
 
     void issue_C_loads(std::set<memory_argument> const& loads)
     {
+        for (auto& CVmm : C_VMMs)
+        {
+            CVmm.second.reset();
+        }
+
         std::vector<memory_argument> ordered_loads;
         for (auto const& c : loads)
         {
@@ -2239,7 +2244,7 @@ private:
 
         std::deque<int> free_regs;
 
-        free_regs.push_back(0);
+        // free_regs.push_back(0);
         free_regs.push_back(1);
         free_regs.push_back(2);
 
