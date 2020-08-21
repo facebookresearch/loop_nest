@@ -4,7 +4,6 @@
 #include <cstdlib>
 #include <iostream>
 #include <random>
-#include <stdexcept>
 #include <vector>
 
 #include "AlignedVec.h"
@@ -15,9 +14,22 @@
 #define strong_assert(condition)                                               \
     if (!(condition))                                                          \
     {                                                                          \
-        throw std::runtime_error(LOOP_NEST_STRINGIFY(condition));              \
+        throw std::runtime_error(LOOP_NEST_STRINGIFY(                          \
+            condition) " failed file: " __FILE__                               \
+                       " line: " LOOP_NEST_STRINGIFY((__LINE__)));             \
     }                                                                          \
     static_cast<void>(0)
+
+// #define strong_assert(condition)                                               \
+//     if (!(condition))                                                          \
+//     {                                                                          \
+//         std::cout << "Assertion " << LOOP_NEST_STRINGIFY(condition)            \
+//                   << " failed "                                                \
+//                   << "file: " << __FILE__ << " line: " << __LINE__             \
+//                   << std::endl;                                                \
+//         std::abort();                                                          \
+//     }                                                                          \
+//     static_cast<void>(0)
 
 // FROM: https://en.cppreference.com/w/cpp/utility/variant/visit
 
@@ -66,7 +78,6 @@ Float maxAbsDiffVerbose(Float const* LBegin, Float const* LEnd,
     return res;
 }
 
-
 template <class Float>
 Float maxAbsDiffVerbose(Float const* LBegin, Float const* LEnd,
                         Float const* RBegin, float delta)
@@ -85,7 +96,6 @@ Float maxAbsDiffVerbose(Float const* LBegin, Float const* LEnd,
     }
     return res;
 }
-
 
 template <class Float>
 aligned_vector<Float> getRandomVector(unsigned size,

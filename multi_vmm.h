@@ -104,7 +104,7 @@ public:
     template <class Jitter>
     void reduce(Jitter& jitter, std::shared_ptr<operation_pair_base> op_pair)
     {
-        size_ = max_touched_ + 1;
+        // size_ = max_touched_ + 1;
         while (size_ > 1)
         {
             half(jitter, op_pair);
