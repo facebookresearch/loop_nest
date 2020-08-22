@@ -1,3 +1,4 @@
+#include "arm_transposer.h"
 #include "baselines.h"
 #include "loop_nest.h"
 #include "loop_nest_baseline.h"
@@ -70,7 +71,7 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 256)
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, nullptr, 256)
                 .get_shared();
         };
 
@@ -154,7 +155,7 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 16)
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, nullptr, 16)
                 .get_shared();
         };
 
@@ -244,7 +245,7 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", 1}, {"AcBr", ArCr}},
                        // B's strides for each variable
-                       {{"AcBr", 1}, {"BcCc", AcBr}}, 2)
+                       {{"AcBr", 1}, {"BcCc", AcBr}}, nullptr, 2)
                 .get_shared();
         };
 
@@ -322,7 +323,7 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", 0}, {"AcBr", 0}},
                        // B's strides for each variable
-                       {{"AcBr", 1}, {"BcCc", AcBr}}, 512)
+                       {{"AcBr", 1}, {"BcCc", AcBr}}, nullptr, 512)
                 .get_shared();
         };
 
@@ -404,7 +405,7 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 128)
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, nullptr, 128)
                 .get_unique();
         };
 
@@ -511,7 +512,7 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 1024)
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, nullptr, 1024)
                 .get_unique();
         };
 
@@ -620,7 +621,8 @@ int main()
                         {"c_in", COUT * KS * KS},
                         {"k_h", COUT * KS},
                         {"k_w", COUT},
-                        {"c_out", 1}})
+                        {"c_out", 1}},
+                       nullptr)
                 .get_shared();
         };
 
@@ -698,7 +700,7 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", 0}, {"AcBr", 0}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 512)
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, nullptr, 512)
                 .get_shared();
         };
 
@@ -798,7 +800,7 @@ int main()
                        // A's strides for each variable
                        {{"r", k * 2}, {"k", 2}},
                        // B's strides for each variable
-                       {{"k", 2}}, 1024)
+                       {{"k", 2}}, nullptr, 1024)
                 .get_shared();
         };
 
@@ -884,7 +886,7 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, 2)
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, nullptr, 2)
                 .get_shared();
         };
 
@@ -951,7 +953,7 @@ int main()
                        // A's strides for each variable
                        {{"r", k}, {"k", 1}},
                        // B's strides for each variable
-                       {{"k", 1}})
+                       {{"k", 1}}, nullptr)
                 .get_shared();
         };
 
@@ -1032,7 +1034,7 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", 1}, {"BcCc", AcBr}}, 1024)
+                       {{"AcBr", 1}, {"BcCc", AcBr}}, nullptr, 1024)
                 .get_shared();
         };
 
@@ -1115,7 +1117,7 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}})
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, nullptr)
                 .get_shared();
         };
 
@@ -1199,7 +1201,7 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}})
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, nullptr)
                 .get_shared();
         };
 
@@ -1301,7 +1303,7 @@ int main()
                         {"KY", IZ},
                         {"KZ", 1}},
                        // B's strides for each variable
-                       {{"KX", KY * KZ}, {"KY", KZ}, {"KZ", 1}}, 1024)
+                       {{"KX", KY * KZ}, {"KY", KZ}, {"KZ", 1}}, nullptr, 1024)
                 .get_shared();
         };
 
@@ -1371,7 +1373,7 @@ int main()
                        // A's strides for each variable
                        {{"k", 1}},
                        // B's strides for each variable
-                       {{"k", c}, {"c", 1}})
+                       {{"k", c}, {"c", 1}}, nullptr)
                 .get_shared();
         };
 
@@ -1437,7 +1439,7 @@ int main()
                        // A's strides for each variable
                        {{"k", 1}},
                        // B's strides for each variable
-                       {{"k", c}, {"c", 1}})
+                       {{"k", c}, {"c", 1}}, nullptr)
                 .get_shared();
         };
 
@@ -1523,7 +1525,8 @@ int main()
                        {{"c_out", 1},
                         {"c_in", COUT},
                         {"k_w", COUT * CIN},
-                        {"k_h", COUT * CIN * KS}})
+                        {"k_h", COUT * CIN * KS}},
+                       nullptr)
                 .get_shared();
         };
 

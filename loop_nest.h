@@ -2659,7 +2659,7 @@ private:
             int per_register = 1;
 
             if (collected_load_store.size() < available_registers &&
-                inner_fma_operations > 100 &&
+                inner_fma_operations > 48 &&
                 optim_config.split_vector_registers())
             {
                 per_register =

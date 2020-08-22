@@ -2,6 +2,12 @@
 
 #pragma once
 
+#if defined(ARM_LOOP_NEST)
+
+#include "arm_arithmetic_operation.h"
+
+#else
+
 #define XBYAK_NO_OP_NAMES
 #include "xbyak/xbyak.h"
 
@@ -423,3 +429,5 @@ inline std::shared_ptr<operation_pair_base> const plus_max =
 } // namespace aot
 } // namespace sysml
 } // namespace facebook
+
+#endif

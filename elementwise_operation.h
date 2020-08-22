@@ -1,5 +1,13 @@
 #pragma once
 
+#pragma once
+
+#if defined(ARM_LOOP_NEST)
+
+#include "arm_elementwise_operation.h"
+
+#else
+
 #define XBYAK_NO_OP_NAMES
 #include "xbyak/xbyak.h"
 
@@ -91,7 +99,7 @@ private:
     using memory_argument            = memory_argument_type<vector_size>;
 
 public:
-    std::string name() { return "ReLu"; }
+    std::string name() override { return "ReLu"; }
 
     void initialize(std::vector<std::map<std::string, int>> const& = {},
                     std::vector<tensor_traits> const&              = {},
@@ -154,6 +162,7 @@ public:
         assert(auxiliary[0].getIdx() < 16);
         assert(mems_and_regs.size() == 1);
         cg.xorpd(auxiliary[0], auxiliary[0]);
+
         cg.maxps(mems_and_regs[0].second, auxiliary[0]);
     }
 
@@ -237,7 +246,7 @@ public:
     {
     }
 
-    std::string name() { return op_name; }
+    std::string name() override { return op_name; }
 
     void initialize(std::vector<std::map<std::string, int>> const& t_strides_,
                     std::vector<tensor_traits> const&              t_traits_,
@@ -609,7 +618,7 @@ public:
         op_name = oss.str();
     }
 
-    std::string name() { return op_name; }
+    std::string name() override { return op_name; }
 
     void initialize(std::vector<std::map<std::string, int>> const& map = {},
                     std::vector<tensor_traits> const& tensor_traits    = {},
@@ -689,3 +698,5 @@ compose(std::shared_ptr<elementwise_operation<ISA>> const& first,
 } // namespace aot
 } // namespace sysml
 } // namespace facebook
+
+#endif

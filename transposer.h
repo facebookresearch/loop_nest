@@ -1,5 +1,11 @@
 #pragma once
 
+#if defined(ARM_LOOP_NEST)
+
+#include "arm_transposer.h"
+
+#else
+
 #include "code_generator.h"
 #include "common.h"
 #include "isa.h"
@@ -835,3 +841,5 @@ public:
 } // namespace aot
 } // namespace sysml
 } // namespace facebook
+
+#endif

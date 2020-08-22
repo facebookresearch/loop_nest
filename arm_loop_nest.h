@@ -2,8 +2,11 @@
 
 #if defined(LOOP_NEST_ARM)
 
+#include "arm_arithmetic_operation.h"
+#include "arm_elementwise_operation.h"
 #include "code_generator.h"
 #include "common.h"
+#include "configuration.h"
 #include "isa.h"
 #include "log.h"
 #include "math.h"
@@ -2719,6 +2722,8 @@ private:
         total_memory_ = C_memory_ + A_memory_ + B_memory_;
     }
 
+    std::shared_ptr<elementwise_operation<aarch64>> postop;
+
 public:
     std::int64_t get_effective_flops() const { return effective_flops_; }
 
@@ -2736,7 +2741,20 @@ public:
         std::map<std::string, int> const&               C_strides,
         std::map<std::string, int> const&               A_strides,
         std::map<std::string, int> const&               B_strides,
-        std::optional<int> user_fma_unroll_limit = std::nullopt)
+        std::shared_ptr<operation_pair_base> /*op_pair */,
+        std::optional<int> user_fma_unroll_limit = std::nullopt,
+        std::shared_ptr<elementwise_operation<aarch64>> /* elementwise_preop */
+        = nullptr,
+        std::vector<std::map<std::string, int>> const&
+        /* elementwise_preop_strides */
+        = {},
+        std::shared_ptr<elementwise_operation<aarch64>> elementwise_postop =
+            nullptr,
+        std::vector<std::map<std::string, int>> const&
+        /* elementwise_postop_strides */
+        = {},
+        std::optional<OptimizationConfiguration> /* optim_config */ =
+            std::nullopt)
         : order(_order)
         , sizes(sizes)
         , C_formula(C_formula)
@@ -2751,6 +2769,7 @@ public:
         , is_C_vectorized(C_strides.count(order.back().first) == 1)
         , is_A_vectorized(A_strides.count(order.back().first) == 1)
         , is_B_vectorized(B_strides.count(order.back().first) == 1)
+        , postop(elementwise_postop)
     {
         LN_LOG(DEBUG) << "C is " << (is_C_vectorized ? "" : "NOT ")
                       << "vectorized\n"
