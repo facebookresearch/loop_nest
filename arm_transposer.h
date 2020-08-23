@@ -1,8 +1,8 @@
 #pragma once
 
-#if !defined(ARM_LOOP_NEST)
+#if defined(ARM_LOOP_NEST)
 
-#include "transposer.h"
+#include "arm_transposer.h"
 
 #else
 
@@ -507,6 +507,15 @@ private:
 
     void issue_unrolled_moves(std::vector<move_operation> const& moves)
     {
+        for (auto const& m : moves)
+        {
+            LN_LOG(INFO) << tabs.back() << "OUT[" << m.dest.offset
+                         << "] <- in[" << m.src.offset << "]\n";
+        }
+
+        LN_LOG(INFO) << tabs.back() << "ISSUING " << moves.size()
+                     << " UNROLLED MOVES\n";
+
         int first_reg     = is_vectorized ? 0 : 5;
         int num_regs      = is_vectorized ? 32 : 8;
         int cur_read_reg  = 0;
@@ -517,6 +526,10 @@ private:
 
         auto issue_read = [&](auto const& loc) {
             auto delta = loc.offset * 4 - src_loc;
+
+            LN_LOG(INFO) << tabs.back() << "READ REG[" << cur_read_reg << " : "
+                         << loc.mask << "] in[" << loc.offset
+                         << "] (delta: " << delta << ")\n";
 
             if (delta < -256 || delta > 255)
             {
@@ -567,7 +580,7 @@ private:
                 }
                 else
                 {
-                    ldr(WReg(first_reg + cur_read_reg), ptr(in_reg));
+                    ldr(WReg(first_reg + cur_read_reg), pre_ptr(in_reg, delta));
                 }
             }
 
@@ -577,6 +590,10 @@ private:
 
         auto issue_write = [&](auto const& loc) {
             auto delta = loc.offset * 4 - dst_loc;
+
+            LN_LOG(INFO) << tabs.back() << "WRITE REG[" << cur_write_reg
+                         << " : " << loc.mask << "] out[" << loc.offset
+                         << "]\n";
 
             if (delta < -256 || delta > 255)
             {
@@ -600,7 +617,7 @@ private:
                 }
                 else
                 {
-                    ldr(WReg(first_reg + cur_write_reg), ptr(out_reg));
+                    str(WReg(first_reg + cur_write_reg), ptr(out_reg));
                 }
             }
             else
@@ -610,15 +627,15 @@ private:
                     switch (loc.mask)
                     {
                     case 1:
-                        ldr(SReg(first_reg + cur_write_reg),
+                        str(SReg(first_reg + cur_write_reg),
                             pre_ptr(out_reg, delta));
                         break;
                     case 2:
-                        ldr(DReg(first_reg + cur_write_reg),
+                        str(DReg(first_reg + cur_write_reg),
                             pre_ptr(out_reg, delta));
                         break;
                     case 4:
-                        ldr(QReg(first_reg + cur_write_reg),
+                        str(QReg(first_reg + cur_write_reg),
                             pre_ptr(out_reg, delta));
                         break;
                     default:
@@ -627,7 +644,8 @@ private:
                 }
                 else
                 {
-                    ldr(WReg(first_reg + cur_write_reg), ptr(out_reg));
+                    str(WReg(first_reg + cur_write_reg),
+                        pre_ptr(out_reg, delta));
                 }
             }
 
@@ -656,14 +674,15 @@ private:
             }
         }
 
-        sadd_imm(in_reg, src_loc);
-        sadd_imm(out_reg, dst_loc);
+        sadd_imm(in_reg, -src_loc);
+        sadd_imm(out_reg, -dst_loc);
     }
 
     void issue_loop_helper(int depth, bool save_loop, bool save_ptrs,
                            int unroll_stage)
     {
-        LN_LOG(INFO) << tabs.back() << "// DEPTH: " << depth << "\n";
+        LN_LOG(INFO) << tabs.back() << "// DEPTH: " << depth
+                     << " US: " << unroll_stage << "\n";
 
         if (depth == unroll_stage)
         {
