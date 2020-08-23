@@ -800,14 +800,13 @@ public:
 
         set_tensor_traits();
 
+        set_in_register_tensor_pointers();
+        auto first_unrolled_loop = possibly_inject_a_loop();
+
         if (!is_vectorized)
         {
             vectorized_var = "";
         }
-
-        set_in_register_tensor_pointers();
-
-        auto first_unrolled_loop = possibly_inject_a_loop();
 
         LN_LOG(INFO) << "First unrolled loop: " << first_unrolled_loop << "\n";
 
