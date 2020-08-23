@@ -10,6 +10,7 @@ int main()
     using facebook::sysml::aot::avx2;
     using facebook::sysml::aot::avx2_plus;
     using facebook::sysml::aot::avx512;
+    using facebook::sysml::aot::aarch64;
 
     int R = 1024;
     int C = 1024;
