@@ -697,6 +697,13 @@ private:
             assert(halide_target.has_feature(Halide::Target::Feature::AVX2));
             assert(!halide_target.has_feature(Halide::Target::Feature::AVX512));
         }
+        else if(std::is_same_v<ISA, aarch64>) {
+            halide_target.set_feature(Halide::Target::Feature::AVX2, false);
+            halide_target.set_feature(Halide::Target::Feature::AVX512, false);
+
+            assert(!halide_target.has_feature(Halide::Target::Feature::AVX2));
+            assert(!halide_target.has_feature(Halide::Target::Feature::AVX512));
+        }
         else
         {
             assert("Unhandled ISA" && false);
