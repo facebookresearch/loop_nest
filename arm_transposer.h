@@ -819,7 +819,7 @@ public:
 
         prepare_stack();
 
-        // issue_loops(first_unrolled_loop);
+        issue_loops(first_unrolled_loop);
 
         restore_stack();
 
