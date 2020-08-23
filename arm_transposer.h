@@ -632,7 +632,7 @@ private:
             }
 
             cur_write_reg = (cur_write_reg + 1) % num_regs;
-            src_loc       = loc.offset * 4;
+            dst_loc       = loc.offset * 4;
         };
 
         for (int i = 0; i < moves.size(); ++i)
@@ -655,6 +655,9 @@ private:
                 issue_write(moves[i].dst);
             }
         }
+
+        sadd_imm(in_reg, src_loc);
+        sadd_imm(out_reg, dst_loc);
     }
 
     void issue_loop_helper(int depth, bool save_loop, bool save_ptrs,
