@@ -645,14 +645,14 @@ private:
                 }
                 for (int j = 0; j < 5; ++j)
                 {
-                    issue_write(moves[i + j].dst);
+                    issue_write(moves[i + j].dest);
                 }
                 i += 4;
             }
             else
             {
                 issue_read(moves[i].src);
-                issue_write(moves[i].dst);
+                issue_write(moves[i].dest);
             }
         }
 
