@@ -1,8 +1,8 @@
 #pragma once
 
-#if !defined(ARM_LOOP_NEST)
+#if defined(ARM_LOOP_NEST)
 
-#include "transposer.h"
+#include "arm_transposer.h"
 
 #else
 
