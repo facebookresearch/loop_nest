@@ -22,6 +22,7 @@
 int main()
 {
     using facebook::sysml::aot::avx2;
+    using facebook::sysml::aot::aarch64;
     using facebook::sysml::aot::avx2_plus;
     using facebook::sysml::aot::avx512;
 

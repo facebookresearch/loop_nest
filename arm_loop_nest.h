@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(LOOP_NEST_ARM)
+#if defined(LOOP_NEST_ARM) || defined(ARM_LOOP_NEST)
 
 #include "arm_arithmetic_operation.h"
 #include "arm_elementwise_operation.h"

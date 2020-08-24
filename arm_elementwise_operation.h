@@ -32,14 +32,17 @@ public:
     }
 };
 
+template<class T>
 inline auto elementwise_relu =
-    std::make_shared<elementwise_operation<aarch64>>(true);
+    std::make_shared<elementwise_operation<T>>(true);
 
+template<class T>
 inline auto elementwise_bias =
-    std::make_shared<elementwise_operation<aarch64>>(false);
+    std::make_shared<elementwise_operation<T>>(false);
 
+template<class T>
 inline auto elementwise_multiply =
-    std::make_shared<elementwise_operation<aarch64>>(false);
+    std::make_shared<elementwise_operation<T>>(false);
 
 } // namespace aot
 } // namespace sysml

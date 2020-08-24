@@ -11,7 +11,7 @@
 
 #pragma once
 
-#if defined(LOOP_NEST_ARM)
+#if defined(LOOP_NEST_ARM) || defined(ARM_LOOP_NEST)
 #include "arm_loop_nest.h"
 #else
 
