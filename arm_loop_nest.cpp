@@ -34,9 +34,9 @@ int main()
     {
         std::cout << "Benchmark: 7" << std::endl;
 
-        int ArCr = 128;
-        int AcBr = 128;
-        int BcCc = 128;
+        int ArCr = 4;
+        int AcBr = 4;
+        int BcCc = 4;
 
         auto gen_loop_nest = [&]() {
             return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
@@ -71,7 +71,8 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, nullptr, 256)
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, nullptr, 256, nullptr, {},
+                       facebook::sysml::aot::elementwise_relu)
                 .get_shared();
         };
 
@@ -92,7 +93,7 @@ int main()
                     CN.data(), 1);
 
         fn(CJ.data(), A.data(), B.data(), 1);
-        // apply_relu(CN.data(), CN.data() + CN.size());
+        apply_relu(CN.data(), CN.data() + CN.size());
 
         std::cout << "MAXABSDIFF: "
                   << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())

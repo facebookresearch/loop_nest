@@ -12,8 +12,8 @@ int main()
     using facebook::sysml::aot::avx2_plus;
     using facebook::sysml::aot::avx512;
 
-    int R = 2;
-    int C = 2;
+    int R = 123;
+    int C = 123;
 
     auto A  = getRandomVector<float>(R * C);
     auto B  = getRandomVector<float>(R * C);
@@ -25,19 +25,18 @@ int main()
         // Sizes
         {{"R", R}, {"C", C}},
         // Out Strides
-        {{"R", 1}, {"C", R}},
+        {{"R", C}, {"C", 1}},
         // In Strides
         {{"R", C}, {"C", 1}});
 
     auto transpose_jit =
-        facebook::sysml::aot::transposer_jitter<CT_ISA>(
-            {{"R", 1}, {"C", 1}},
-            // Sizes
-            {{"R", R}, {"C", C}},
-            // Out Strides
-            {{"R", 1}, {"C", R}},
-            // In Strides
-            {{"R", C}, {"C", 1}}, 4)
+        facebook::sysml::aot::transposer_jitter<CT_ISA>({{"R", 1}, {"C", 1}},
+                                                        // Sizes
+                                                        {{"R", R}, {"C", C}},
+                                                        // Out Strides
+                                                        {{"R", C}, {"C", 1}},
+                                                        // In Strides
+                                                        {{"R", C}, {"C", 1}}, 4)
             .get_shared();
 
     transpose(B.data(), A.data());
@@ -48,6 +47,7 @@ int main()
 
     std::cout << "MAXABSDIFF: "
               << maxAbsDiff(BJ.data(), BJ.data() + R * C, B.data()) << "\n";
+
 
     // for (int r = 0; r < R; ++r)
     // {

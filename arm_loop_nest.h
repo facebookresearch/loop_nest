@@ -560,6 +560,19 @@ private:
         }
     }
 
+    void meta_cmp(XReg const& xreg, int imm)
+    {
+        if (imm >= -256 || imm < 256)
+        {
+            cmp(xreg, imm);
+        }
+        else
+        {
+            mov_imm(xtmp1, imm);
+            cmp(xreg, xtmp1);
+        }
+    }
+
     // Collects all (unrolled) FMAs below a certain loop in the nest.
     // Assumes that the limits are correctly set for the current loop
     // in the execution tree of the loop nest.  This is to correctly
@@ -1007,16 +1020,20 @@ private:
                         bool issue_max_alpha_logic)
     {
         std::vector<memory_argument> ordered_stores;
+
         for (auto const& c : stores)
         {
             ordered_stores.emplace_back(c);
         }
+
         std::sort(ordered_stores.begin(), ordered_stores.end(),
                   [](const memory_argument& a, const memory_argument& b) {
                       return a.offset < b.offset;
                   });
+
         std::vector<int> incrs;
         int              prev_off = -1;
+
         for (auto const& c : ordered_stores)
         {
             if (prev_off != -1)
@@ -1025,37 +1042,122 @@ private:
             }
             prev_off = c.offset;
         }
+
         mov(tmpCReg_, CReg_);
         assert(ordered_stores.size());
         add_imm(tmpCReg_, ordered_stores.front().offset * 4);
-        for (auto const& c : ordered_stores)
-        {
-            LN_LOG(INFO) << tabs.back() << "STORE " << c.readable() << "\n";
 
-            auto incr = 0;
-            if (incrs.size())
+        if (postop && postop->is_relu())
+        {
+            for (auto const& c : ordered_stores)
             {
-                incr = incrs.front() * 4;
-                incrs.erase(incrs.begin());
+                LN_LOG(INFO) << tabs.back() << "STORE " << c.readable() << "\n";
+                C_VMMs[c].reduce(*this);
+            }
+            for (auto const& c : ordered_stores)
+            {
+                if (C_traits.access == SCALAR)
+                {
+                    C_VMMs[c].full_reduce(*this, c.mask);
+                }
             }
 
-            C_VMMs[c].reduce(*this);
+            auto donePostOpLabel = make_label();
 
-            switch (C_traits.access)
+            std::cout << "MALPHA ----> " << max_alpha << "\n";
+
+            meta_cmp(AlphaReg_, max_alpha - 1);
+            b(Xbyak::LT, *donePostOpLabel);
+
+            for (auto const& c : ordered_stores)
             {
-            case SCALAR:
-                C_VMMs[c].full_reduce(*this, c.mask);
-                store_scalar(C_VMMs[c][0], tmpCReg_, 0, incr);
-                break;
+                if (C_traits.access == SCALAR)
+                {
+                    fmax(SReg(C_VMMs[c][0].getIdx()),
+                         SReg(C_VMMs[c][0].getIdx()),
+                         SReg(ZeroVector_.getIdx()));
+                }
+                else
+                {
+                    switch (c.mask)
+                    {
+                    case 1:
+                        fmax(SReg(C_VMMs[c][0].getIdx()),
+                             SReg(C_VMMs[c][0].getIdx()),
+                             SReg(ZeroVector_.getIdx()));
+                        break;
+                    case 2:
+                        smax(C_VMMs[c][0].s2, C_VMMs[c][0].s2, ZeroVector_.s2);
+                        break;
+                    case 3: // fall through
+                    case 4:
+                        smax(C_VMMs[c][0].s4, C_VMMs[c][0].s4, ZeroVector_.s4);
+                        break;
+                    default:
+                        strong_assert(false && "bad c.mask");
+                    }
+                }
+            }
 
-            case VECTOR_PACKED:
-                store_vector(C_VMMs[c][0], tmpCReg_, 0, c.mask, incr);
-                break;
+            L_aarch64(*donePostOpLabel);
 
-            case VECTOR_STRIDED:
-                scatter_vector(C_VMMs[c][0], tmpCReg_, 0, c.mask,
-                               C_traits.innermost_stride * 4, incr);
-                break;
+            for (auto const& c : ordered_stores)
+            {
+                auto incr = 0;
+                if (incrs.size())
+                {
+                    incr = incrs.front() * 4;
+                    incrs.erase(incrs.begin());
+                }
+
+                switch (C_traits.access)
+                {
+                case SCALAR:
+                    store_scalar(C_VMMs[c][0], tmpCReg_, 0, incr);
+                    break;
+
+                case VECTOR_PACKED:
+                    store_vector(C_VMMs[c][0], tmpCReg_, 0, c.mask, incr);
+                    break;
+
+                case VECTOR_STRIDED:
+                    scatter_vector(C_VMMs[c][0], tmpCReg_, 0, c.mask,
+                                   C_traits.innermost_stride * 4, incr);
+                    break;
+                }
+            }
+        }
+        else
+        {
+            for (auto const& c : ordered_stores)
+            {
+                LN_LOG(INFO) << tabs.back() << "STORE " << c.readable() << "\n";
+
+                auto incr = 0;
+                if (incrs.size())
+                {
+                    incr = incrs.front() * 4;
+                    incrs.erase(incrs.begin());
+                }
+
+                C_VMMs[c].reduce(*this);
+
+                switch (C_traits.access)
+                {
+                case SCALAR:
+                    C_VMMs[c].full_reduce(*this, c.mask);
+                    store_scalar(C_VMMs[c][0], tmpCReg_, 0, incr);
+                    break;
+
+                case VECTOR_PACKED:
+                    store_vector(C_VMMs[c][0], tmpCReg_, 0, c.mask, incr);
+                    break;
+
+                case VECTOR_STRIDED:
+                    scatter_vector(C_VMMs[c][0], tmpCReg_, 0, c.mask,
+                                   C_traits.innermost_stride * 4, incr);
+                    break;
+                }
             }
         }
     }

@@ -1,8 +1,8 @@
 #pragma once
 
-#if defined(ARM_LOOP_NEST)
+#if !defined(ARM_LOOP_NEST)
 
-#include "arm_transposer.h"
+#include "transposer.h"
 
 #else
 
@@ -815,7 +815,6 @@ public:
         vectorized_var = order.back().first;
 
         check_representation();
-        ret();
 
         set_tensor_traits();
 

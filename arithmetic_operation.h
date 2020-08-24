@@ -2,7 +2,7 @@
 
 #pragma once
 
-#if defined(ARM_LOOP_NEST)
+#if defined(LOOP_NEST_ARM)
 
 #include "arm_arithmetic_operation.h"
 
