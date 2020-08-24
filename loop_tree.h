@@ -58,6 +58,7 @@ get_operation_pair(arithmetic_op_kind plus_op, arithmetic_op_kind multiplies_op)
 
     std::map<std::pair<arithmetic_op_kind, arithmetic_op_kind>,
              std::shared_ptr<operation_pair_base>>
+#ifndef LOOP_NEST_ARM
         op_map = {
             {{arithmetic_op_kind::plus, arithmetic_op_kind::multiplies},
              std::make_shared<operation_pair<basic_plus, basic_multiplies>>()},
@@ -67,6 +68,11 @@ get_operation_pair(arithmetic_op_kind plus_op, arithmetic_op_kind multiplies_op)
              std::make_shared<operation_pair<min, basic_multiplies>>()},
             {{arithmetic_op_kind::max, arithmetic_op_kind::plus},
              std::make_shared<operation_pair<max, basic_plus>>()}};
+#else
+        op_map = {
+            {{arithmetic_op_kind::plus, arithmetic_op_kind::multiplies},
+              std::make_shared<operation_pair_base>()}};
+#endif
 
     return op_map.at({plus_op, multiplies_op});
 }
