@@ -20,15 +20,17 @@
 
 int main()
 {
+    using facebook::sysml::aot::aarch64;
     using facebook::sysml::aot::avx2;
     using facebook::sysml::aot::avx2_plus;
     using facebook::sysml::aot::avx512;
-    using facebook::sysml::aot::aarch64;
+
+    srand(0);
 
     for (int rounds = 0; rounds < 1000000; ++rounds)
     {
-        int ArCr         = (1 << rand() % 10) + rand() % 16;
-        int AcBr         = (1 << rand() % 10) + rand() % 16;
+        int ArCr         = (1 << rand() % 2) + rand() % 16;
+        int AcBr         = (1 << rand() % 2) + rand() % 16;
         int max_unrolled = 1 << (rand() % 8);
 
         std::vector<std::pair<std::string, int>> order = {{"AcBr", 1},
@@ -88,6 +90,8 @@ int main()
                           {{"ArCr", 1}, {"AcBr", ArCr}}, max_unrolled)
                           .get_shared();
 
+            fn.save_to_file("zi.asm");
+
             auto A  = getRandomVector<float>(AcBr * ArCr);
             auto CN = getRandomVector<float>(ArCr * AcBr);
             auto CJ = CN;
@@ -98,9 +102,22 @@ int main()
             auto madiff =
                 maxAbsDiff(CJ.data(), CJ.data() + ArCr * AcBr, CN.data());
 
+            std::cout << "ArCr=" << ArCr << " ";
+            std::cout << "AcBr=" << AcBr << " ";
+
+            std::cout << "ORDER: ";
+
+            for (auto const& o : full_order)
+            {
+                std::cout << o.first << ',' << o.second << " :: ";
+            }
+
+            std::cout << "\n";
+
+            std::cout << "MU=" << max_unrolled << std::endl;
             std::cout << "MAXABSDIFF: " << madiff << std::endl;
 
-            assert(madiff < 0.000001);
+            // assert(madiff < 0.000001);
         }
     }
 }

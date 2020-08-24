@@ -93,7 +93,7 @@ aligned_vector<Float> getRandomVector(unsigned size,
     aligned_vector<Float> res(size + extra_elements);
 
     std::random_device rd;
-    std::mt19937       gen(rd());
+    std::mt19937       gen(0); //rd());
 
     std::uniform_real_distribution<double> dis(-1.0, 1.0);
 

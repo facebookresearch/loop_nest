@@ -12,89 +12,97 @@ int main()
     using facebook::sysml::aot::avx2_plus;
     using facebook::sysml::aot::avx512;
 
-    int R = 123;
-    int C = 123;
+    for (int i = 0; i < 10;)
+    {
 
-    auto A  = getRandomVector<float>(R * C);
-    auto B  = getRandomVector<float>(R * C);
-    auto BJ = getRandomVector<float>(R * C);
+        int R = 11;
+        int C = 13;
 
-    auto transpose = facebook::sysml::aot::transposer_baseline(
-        // Order
-        {{"R", 1}, {"C", 1}},
-        // Sizes
-        {{"R", R}, {"C", C}},
-        // Out Strides
-        {{"R", C}, {"C", 1}},
-        // In Strides
-        {{"R", C}, {"C", 1}});
+        auto A  = getRandomVector<float>(R * C);
+        auto B  = getRandomVector<float>(R * C);
+        auto BJ = getRandomVector<float>(R * C);
 
-    auto transpose_jit =
-        facebook::sysml::aot::transposer_jitter<CT_ISA>({{"R", 1}, {"C", 1}},
-                                                        // Sizes
-                                                        {{"R", R}, {"C", C}},
-                                                        // Out Strides
-                                                        {{"R", C}, {"C", 1}},
-                                                        // In Strides
-                                                        {{"R", C}, {"C", 1}}, 4)
-            .get_shared();
+        // ArCr=12 AcBr=6 ORDER: ArCr,12 :: AcBr,5 :: AcBr,4 :: ArCr,4 :: AcBr,1
+        // :: ArCr,1 :: MU=32
 
-    transpose(B.data(), A.data());
+        auto transpose = facebook::sysml::aot::transposer_baseline(
+            // Order
+            {{"C", 13}, {"R", 12}, {"C", 9}, {"R", 4}, {"C", 1}, {"R", 1}},
+            // Sizes
+            {{"R", R}, {"C", C}},
+            // Out Strides
+            {{"R", C}, {"C", 1}},
+            // In Strides
+            {{"R", 1}, {"C", R}});
 
-    transpose_jit.save_to_file("zi.asm");
+        auto transpose_jit =
+            facebook::sysml::aot::transposer_jitter<CT_ISA>(
+                {{"C", 13}, {"R", 12}, {"C", 9}, {"R", 4}, {"C", 1}, {"R", 1}},
+                // Sizes
+                {{"R", R}, {"C", C}},
+                // Out Strides
+                {{"R", C}, {"C", 1}},
+                // In Strides
+                {{"R", 1}, {"C", R}}, 32)
+                .get_shared();
 
-    transpose_jit(BJ.data(), A.data());
+        transpose(B.data(), A.data());
 
-    std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(BJ.data(), BJ.data() + R * C, B.data()) << "\n";
+        transpose_jit.save_to_file("zi.asm");
 
+        transpose_jit(BJ.data(), A.data());
 
-    // for (int r = 0; r < R; ++r)
-    // {
-    //     for (int c = 0; c < C; ++c)
-    //     {
-    //         std::cout << A[r * C + c] << "; ";
-    //     }
-    //     std::cout << "\n";
-    // }
-    // std::cout << "\n";
-    // std::cout << "\n";
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(BJ.data(), BJ.data() + R * C, B.data()) << "\n";
 
-    // for (int r = 0; r < R; ++r)
-    // {
-    //     for (int c = 0; c < C; ++c)
-    //     {
-    //         std::cout << B[r * C + c] << "; ";
-    //     }
-    //     std::cout << "\n";
-    // }
-    // std::cout << "\n";
-    // std::cout << "\n";
+        // for (int r = 0; r < R; ++r)
+        // {
+        //     for (int c = 0; c < C; ++c)
+        //     {
+        //         std::cout << A[r * C + c] << "; ";
+        //     }
+        //     std::cout << "\n";
+        // }
+        // std::cout << "\n";
+        // std::cout << "\n";
 
-    // for (int r = 0; r < R; ++r)
-    // {
-    //     for (int c = 0; c < C; ++c)
-    //     {
-    //         std::cout << BJ[r * C + c] << "; ";
-    //     }
-    //     std::cout << "\n";
-    // }
+        // for (int r = 0; r < R; ++r)
+        // {
+        //     for (int c = 0; c < C; ++c)
+        //     {
+        //         std::cout << B[r * C + c] << "; ";
+        //     }
+        //     std::cout << "\n";
+        // }
+        // std::cout << "\n";
+        // std::cout << "\n";
 
-    // for (int r = 0; r < R; ++r)
-    // {
-    //     for (int c = 0; c < C; ++c)
-    //     {
-    //         std::cout << BJ[r * C + c] << " :: " << B[r * C + c] << " = "
-    //                   << (BJ[r * C + c] - B[r * C + c]) << "; ";
-    //     }
-    //     std::cout << "\n";
-    // }
+        // for (int r = 0; r < R; ++r)
+        // {
+        //     for (int c = 0; c < C; ++c)
+        //     {
+        //         std::cout << BJ[r * C + c] << "; ";
+        //     }
+        //     std::cout << "\n";
+        // }
 
-    // facebook::sysml::aot::transposer_bench<CT_ISA>(
-    //     {{"C", 128}, {"R", 128}, {"C", 1}, {"R", 1}}, {{"R", R}, {"C", C}},
-    //     {{"R", 1}, {"C", R}}, {{"R", 1}, {"C", C}}, 32, 1, 0);
+        // for (int r = 0; r < R; ++r)
+        // {
+        //     for (int c = 0; c < C; ++c)
+        //     {
+        //         std::cout << BJ[r * C + c] << " :: " << B[r * C + c] << " = "
+        //                   << (BJ[r * C + c] - B[r * C + c]) << "; ";
+        //     }
+        //     std::cout << "\n";
+        // }
 
-    // facebook::sysml::aot::transposer_bench<CT_ISA>(
-    //     {{"R", 16}, {"R", 1}, {"C", 1}}, {{"R", R}, {"C", C}},
-    //     {{"R", C}, {"C", 1}}, {{"R", 1}, {"C", R}}, 16, 1, 0);
+        // facebook::sysml::aot::transposer_bench<CT_ISA>(
+        //     {{"C", 128}, {"R", 128}, {"C", 1}, {"R", 1}}, {{"R", R}, {"C",
+        //     C}},
+        //     {{"R", 1}, {"C", R}}, {{"R", 1}, {"C", C}}, 32, 1, 0);
+
+        // facebook::sysml::aot::transposer_bench<CT_ISA>(
+        //     {{"R", 16}, {"R", 1}, {"C", 1}}, {{"R", R}, {"C", C}},
+        //     {{"R", C}, {"C", 1}}, {{"R", 1}, {"C", R}}, 16, 1, 0);
+    }
 }

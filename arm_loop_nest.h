@@ -104,11 +104,19 @@ private:
         // stack_offset = 0;
         sub(sp, sp, 1024);
         sub(sp, sp, 1024);
-        mov(stackReg_, sp);
+        mov(stack_reg, sp);
+        stp(q8, q9, post_ptr(stack_reg, 64));
+        stp(q10, q11, post_ptr(stack_reg, 64));
+        stp(q12, q13, post_ptr(stack_reg, 64));
+        stp(q14, q15, post_ptr(stack_reg, 64));
     }
 
     void restore_stack()
     {
+        ldp(q14, q15, pre_ptr(stack_reg, 64));
+        ldp(q12, q13, pre_ptr(stack_reg, 64));
+        ldp(q10, q11, pre_ptr(stack_reg, 64));
+        ldp(q8, q9, pre_ptr(stack_reg, 64));
         add(sp, sp, 1024);
         add(sp, sp, 1024);
     }

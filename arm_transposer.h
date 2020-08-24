@@ -117,10 +117,18 @@ private:
         sub(sp, sp, 1024);
         sub(sp, sp, 1024);
         mov(stack_reg, sp);
+        stp(q8, q9, post_ptr(stack_reg, 64));
+        stp(q10, q11, post_ptr(stack_reg, 64));
+        stp(q12, q13, post_ptr(stack_reg, 64));
+        stp(q14, q15, post_ptr(stack_reg, 64));
     }
 
     void restore_stack()
     {
+        ldp(q14, q15, pre_ptr(stack_reg, 64));
+        ldp(q12, q13, pre_ptr(stack_reg, 64));
+        ldp(q10, q11, pre_ptr(stack_reg, 64));
+        ldp(q8, q9, pre_ptr(stack_reg, 64));
         add(sp, sp, 1024);
         add(sp, sp, 1024);
     }
@@ -509,15 +517,15 @@ private:
     {
         for (auto const& m : moves)
         {
-            LN_LOG(INFO) << tabs.back() << "OUT[" << m.dest.offset
-                         << "] <- in[" << m.src.offset << "]\n";
+            LN_LOG(INFO) << tabs.back() << "OUT[" << m.dest.offset << "] <- in["
+                         << m.src.offset << "]\n";
         }
 
         LN_LOG(INFO) << tabs.back() << "ISSUING " << moves.size()
                      << " UNROLLED MOVES\n";
 
-        int first_reg     = is_vectorized ? 0 : 5;
-        int num_regs      = is_vectorized ? 32 : 8;
+        int first_reg     = 0; //is_vectorized ? 0 : 5;
+        int num_regs      = 7; //is_vectorized ? 32 : 8;
         int cur_read_reg  = 0;
         int cur_write_reg = 0;
 
@@ -531,7 +539,7 @@ private:
                          << loc.mask << "] in[" << loc.offset
                          << "] (delta: " << delta << ")\n";
 
-            if (delta < -256 || delta > 255)
+            if (true || delta < -256 || delta > 255)
             {
                 sadd_imm(in_reg, delta);
                 if (is_vectorized)
@@ -553,7 +561,7 @@ private:
                 }
                 else
                 {
-                    ldr(WReg(first_reg + cur_read_reg), ptr(in_reg));
+                    ldr(SReg(first_reg + cur_read_reg), ptr(in_reg));
                 }
             }
             else
@@ -580,7 +588,7 @@ private:
                 }
                 else
                 {
-                    ldr(WReg(first_reg + cur_read_reg), pre_ptr(in_reg, delta));
+                    ldr(SReg(first_reg + cur_read_reg), pre_ptr(in_reg, delta));
                 }
             }
 
@@ -595,7 +603,7 @@ private:
                          << " : " << loc.mask << "] out[" << loc.offset
                          << "]\n";
 
-            if (delta < -256 || delta > 255)
+            if (true || delta < -256 || delta > 255)
             {
                 sadd_imm(out_reg, delta);
                 if (is_vectorized)
@@ -617,7 +625,7 @@ private:
                 }
                 else
                 {
-                    str(WReg(first_reg + cur_write_reg), ptr(out_reg));
+                    str(SReg(first_reg + cur_write_reg), ptr(out_reg));
                 }
             }
             else
@@ -644,7 +652,7 @@ private:
                 }
                 else
                 {
-                    str(WReg(first_reg + cur_write_reg),
+                    str(SReg(first_reg + cur_write_reg),
                         pre_ptr(out_reg, delta));
                 }
             }
