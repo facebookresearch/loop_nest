@@ -79,9 +79,9 @@ private:
         return ret;
     }
 
-    void meta_push(XReg const& op) { str(op, post_ptr(stackReg_, 8)); }
+    void meta_push(XReg const& op) { str(op, post_ptr(stack_reg, 8)); }
 
-    void meta_pop(XReg const& op) { ldr(op, pre_ptr(stackReg_, -8)); }
+    void meta_pop(XReg const& op) { ldr(op, pre_ptr(stack_reg, -8)); }
 
     void meta_push(std::vector<XReg> const& regs)
     {
@@ -222,7 +222,7 @@ private:
     Reg64 xtmp1     = x5;
     Reg64 xtmp2     = x6;
     Reg64 loopReg_  = x7;
-    Reg64 stackReg_ = x9;
+    Reg64 stack_reg = x9;
     Reg64 tmpCReg_  = x10;
     Reg64 tmpAReg_  = x11;
     Reg64 tmpBReg_  = x12;
