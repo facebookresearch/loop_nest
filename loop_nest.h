@@ -3289,10 +3289,40 @@ private:
             }
         };
 
+        bool needs_a_reg = [&](tensor_location_t const& mem_location) {
+            if (auto it = tensor_location_index.find(mem_location);
+                it == tensor_location_index.end())
+            {
+                if (!(folding_allowed &&
+                      remaining_usages[mem_location].size() == 1))
+                {
+                    return true;
+                }
+            }
+            return false;
+        };
+
         for (int i = 0; i < fmas.size(); ++i)
         {
             tensor_location_t left_loc  = {src1_reg, fmas[i].src1.offset * 4};
             tensor_location_t right_loc = {src2_reg, fmas[i].src2.offset * 4};
+
+            int needs_free_regs = 0;
+
+            if (needs_a_reg(left_loc))
+            {
+                ++needs_free_regs;
+            }
+
+            if (needs_a_reg(right_loc))
+            {
+                ++needs_free_regs;
+            }
+
+            while (needs_free_regs < free_regs.size())
+            {
+                free_regs.push_back(free_a_register());
+            }
 
             if (auto it = tensor_location_index.find(left_loc);
                 it == tensor_location_index.end() &&

@@ -2485,14 +2485,27 @@ private:
             tensor_location_t scalar_loc = {src1_reg, fmas[i].src1.offset * 4};
             tensor_location_t vector_loc = {src2_reg, fmas[i].src2.offset * 4};
 
+            int needs_free_regs = 0;
             if (auto it = tensor_location_index.find(scalar_loc);
                 it == tensor_location_index.end())
             {
-                if (free_regs.size() == 0)
-                {
-                    free_regs.push_back(free_a_register());
-                }
+                ++needs_free_regs;
+            }
 
+            if (auto it = tensor_location_index.find(vector_loc);
+                it == tensor_location_index.end())
+            {
+                ++needs_free_regs;
+            }
+
+            while (needs_free_regs < free_regs.size())
+            {
+                free_regs.push_back(free_a_register());
+            }
+
+            if (auto it = tensor_location_index.find(scalar_loc);
+                it == tensor_location_index.end())
+            {
                 load_scalar(free_regs.front(), src1_reg,
                             fmas[i].src1.offset * 4);
                 free_regs.pop_front();
@@ -2504,11 +2517,6 @@ private:
             if (auto it = tensor_location_index.find(vector_loc);
                 it == tensor_location_index.end())
             {
-                if (free_regs.size() == 0)
-                {
-                    free_regs.push_back(free_a_register());
-                }
-
                 load_vector(free_regs.front(), src2_reg,
                             fmas[i].src2.offset * 4);
                 free_regs.pop_front();
