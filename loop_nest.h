@@ -3531,7 +3531,7 @@ private:
         //     }
         // }
 
-        constexpr int max_load_moves = 16;
+        constexpr int max_load_moves = 8;
 
         // Move loads
         for (int i = 1; i < instructions.size(); ++i)
