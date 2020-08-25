@@ -1308,7 +1308,8 @@ private:
         issue_C_stores(stores, tail_mask, max_alpha, issue_max_alpha_logic);
     }
 
-    void issue_unrolled_fmas_scalar_vector()
+    void issue_unrolled_fmas_scalar_vector(
+        std::map<int, std::shared_ptr<address_packer>> const& addressers)
     {
 
         auto instructions = std::move(instruction_IRs.front());
@@ -1322,15 +1323,17 @@ private:
                     [&](load_instruction const& i) {
                         if (i.does_broadcast)
                         {
-                            vbroadcastss(Vmm(i.vmm_idx),
-                                         ptr[Reg64(i.tensor_loc.idx) +
-                                             i.tensor_loc.offset]);
+                            vbroadcastss(
+                                Vmm(i.vmm_idx),
+                                ptr[addressers.at(i.tensor_loc.idx)
+                                        ->get_address(i.tensor_loc.offset)]);
                         }
                         else
                         {
-                            vmovups(Vmm(i.vmm_idx),
-                                    ptr[Reg64(i.tensor_loc.idx) +
-                                        i.tensor_loc.offset]);
+                            vmovups(
+                                Vmm(i.vmm_idx),
+                                ptr[addressers.at(i.tensor_loc.idx)
+                                        ->get_address(i.tensor_loc.offset)]);
                         }
                     },
                     [&](fmla_instruction const& fml) {
@@ -1361,13 +1364,15 @@ private:
                                 {
                                     op_pair->fuse(
                                         *this, Vmm(fml.dst), Vmm(fml.left_src),
-                                        ptr_b[Reg64(loc.idx) + loc.offset]);
+                                        ptr_b[addressers.at(loc.idx)
+                                                  ->get_address(loc.offset)]);
                                 }
                                 else
                                 {
                                     op_pair->multiplies(
                                         *this, Vmm(0), Vmm(fml.left_src),
-                                        ptr_b[Reg64(loc.idx) + loc.offset]);
+                                        ptr_b[addressers.at(loc.idx)
+                                                  ->get_address(loc.offset)]);
                                     op_pair->plus(*this, Vmm(fml.dst),
                                                   Vmm(fml.dst), Vmm(0));
                                 }
@@ -1378,13 +1383,15 @@ private:
                                 {
                                     op_pair->fuse(
                                         *this, Vmm(fml.dst), Vmm(fml.left_src),
-                                        ptr[Reg64(loc.idx) + loc.offset]);
+                                        ptr[addressers.at(loc.idx)->get_address(
+                                            loc.offset)]);
                                 }
                                 else
                                 {
                                     op_pair->multiplies(
                                         *this, Vmm(0), Vmm(fml.left_src),
-                                        ptr[Reg64(loc.idx) + loc.offset]);
+                                        ptr[addressers.at(loc.idx)->get_address(
+                                            loc.offset)]);
                                     op_pair->plus(*this, Vmm(fml.dst),
                                                   Vmm(fml.dst), Vmm(0));
                                 }
@@ -1393,37 +1400,6 @@ private:
                     }},
                 insn);
         }
-
-        // for (auto const& insn : instructions)
-        // {
-        //     std::visit(
-        //         overloaded{[&](load_instruction const& i) {
-        //                        int ptr_reg_idx =
-        //                        i.tensor_location.tensor_idx; int ptr_offset =
-        //                        i.tensor_location.tensor_offset;
-
-        //                        LN_LOG(INFO)
-        //                            << tabs.back() << "::LOAD Vreg(" << i.vreg
-        //                            << ")[" << i.num_lanes << "], X_"
-        //                            << ptr_reg_idx << "[" << ptr_offset <<
-        //                            "]\n";
-        //                    },
-        //                    [&](fmla_instruction const& fml) {
-        //                        LN_LOG(INFO) << tabs.back() << "::FMLA Vreg("
-        //                                     << fml.dst.number << "), Vreg("
-        //                                     << fml.left_src.number << "),
-        //                                     Vreg("
-        //                                     << fml.right_src.number << ") ["
-        //                                     << fml.right_src.lane << "]\n";
-        //                    },
-        //                    [](std::monostate) {}},
-        //         insn);
-        // }
-
-        // for (auto const& offs : tensor_offsets)
-        // {
-        //     sadd_imm(XReg(offs.first), -offs.second);
-        // }
     }
 
     template <class R = ISA>
@@ -1440,7 +1416,7 @@ private:
             (A_traits.access == VECTOR_PACKED &&
              B_traits.access == VECTOR_PACKED && C_traits.access != SCALAR))
         {
-            issue_unrolled_fmas_scalar_vector();
+            issue_unrolled_fmas_scalar_vector(addressers);
             return;
         }
 
@@ -2893,6 +2869,76 @@ private:
         return addressers;
     }
 
+    std::map<int, std::shared_ptr<address_packer>>
+    create_better_addressers(std::vector<fma_operation> unrolled_fmas)
+    {
+        if (!optim_config.use_address_packer())
+        {
+            return create_null_addressers();
+        }
+
+        std::map<int, std::shared_ptr<address_packer>> addressers;
+
+        std::map<int, int> ranges;
+
+        for (auto const& fma : unrolled_fmas)
+        {
+            ranges[fma.src1.traits->reg.getIdx()] = std::max(
+                ranges[fma.src1.traits->reg.getIdx()], fma.src1.offset * 4);
+            ranges[fma.src2.traits->reg.getIdx()] = std::max(
+                ranges[fma.src2.traits->reg.getIdx()], fma.src2.offset * 4);
+        }
+
+        int  r1           = unrolled_fmas[0].src1.traits->reg.getIdx();
+        bool is_r1_scalar = unrolled_fmas[0].src1.traits->access == SCALAR;
+
+        int r1_delta = is_r1_scalar ? 0x400 : 0x4000;
+
+        int  r2           = unrolled_fmas[0].src2.traits->reg.getIdx();
+        bool is_r2_scalar = unrolled_fmas[0].src2.traits->access == SCALAR;
+
+        addressers[r1] = std::make_shared<null_address_packer>(this, Reg64(r1));
+        addressers[r2] = std::make_shared<null_address_packer>(this, Reg64(r2));
+
+        int r2_delta = is_r2_scalar ? 0x400 : 0x4000;
+
+        std::vector<Reg64> a1_regs{r8, r9, r10, r11};
+        std::vector<Reg64> a2_regs{r13, r14, r15, rbx};
+
+        int r1_n = ((ranges[r1] - r1_delta / 2) / r1_delta);
+        int r2_n = ((ranges[r2] - r2_delta / 2) / r2_delta);
+
+        if (r1_n * 2 < r2_n)
+        {
+            a2_regs.push_back(a1_regs.back());
+            a1_regs.pop_back();
+        }
+        else if (r2_n * 2 < r1_n)
+        {
+            a1_regs.push_back(a2_regs.back());
+            a2_regs.pop_back();
+        }
+
+        std::cout << "ADDR 1: " << r1 << ' ' << r1_delta << " :: " << r1_n
+                  << "\n";
+        std::cout << "ADDR 2: " << r2 << ' ' << r2_delta << " :: " << r2_n
+                  << "\n";
+
+        if (r1_n)
+        {
+            addressers[r1] = std::make_shared<simple_SIB_address_packer>(
+                this, Reg64(r1), r1_n, r1_delta, a1_regs);
+        }
+
+        if (r2_n)
+        {
+            addressers[r2] = std::make_shared<simple_SIB_address_packer>(
+                this, Reg64(r2), r2_n, r2_delta, a2_regs);
+        }
+
+        return addressers;
+    }
+
     void issue_loop_helper(
         int depth, bool save_loop, bool save_ptrs,
         int depth_for_register_blocked_C, int unroll_stage,
@@ -3812,7 +3858,19 @@ public:
 
         strong_assert(unrolled_fmas.size() == total_required_fma_operations);
 
-        auto addressers = create_addressers(std::move(unrolled_fmas));
+        std::map<int, std::shared_ptr<address_packer>> addressers;
+
+        if ((A_traits.access == SCALAR && B_traits.access == VECTOR_PACKED) ||
+            (A_traits.access == VECTOR_PACKED && B_traits.access == SCALAR) ||
+            (A_traits.access == VECTOR_PACKED &&
+             B_traits.access == VECTOR_PACKED && C_traits.access != SCALAR))
+        {
+            addressers = create_better_addressers(std::move(unrolled_fmas));
+        }
+        else
+        {
+            addressers = create_addressers(std::move(unrolled_fmas));
+        }
 
         // Regs to be saved: RBX and R12-R15 (we don't use RBP)
         push({r15, r14, r13, r12, rbx});

@@ -35,6 +35,112 @@ int main()
     // C(r, c) = A(r, k) * B(k, c)
     // if (0)
     {
+        std::cout << "Benchmark: 1" << std::endl;
+
+        // int ArCr = 16;
+        // int AcBr = 16;
+        // int BcCc = 16;
+
+        int ArCr = 32;
+        int AcBr = 512;
+        int BcCc = 512;
+
+        auto gen_loop_nest = [&]() {
+            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+                       // The first argument is the loop order in the form of
+                       // {dimension, stride}.  For now the outer dimension
+                       // has to divide the stride.  This is effectively the
+                       // same as Halide's split into outer and inner
+                       // variable, but can have arbitray number of splits.
+                       {{"AcBr", 64},
+                        {"ArCr", 4},
+                        {"BcCc", 4 * 16},
+                        {"AcBr", 16},
+                        {"AcBr", 1},
+                        {"ArCr", 1},
+                        {"BcCc", 1}},
+
+                       // {{"AcBr", 256},
+                       //  {"ArCr", 4},
+                       //  {"BcCc", 3 * 16},
+                       //  {"AcBr", 16},
+                       //  {"AcBr", 1},
+                       //  {"ArCr", 1},
+                       //  {"BcCc", 1}},
+
+                       // The second argument is a map of the dimension sizes
+                       {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
+                       // Vars of C (other variables are reduction variables)
+                       {"ArCr", "BcCc"},
+                       // Variables of A
+                       {"ArCr", "AcBr"},
+                       // Variables of B
+                       {"AcBr", "BcCc"},
+                       // C's strides for each variable.  Note that the
+                       // strides data is a superset of the previous argument
+                       // (variables of C).  I'm still deciding on the final
+                       // design, possibly allowing for null strides that
+                       // will just deduce them from the sizes, or some
+                       // special structs indicating the layout (ie
+                       // row-major, col-major).  In this case the vars have
+                       // to be ordered though... Many decisions to make...
+                       {{"ArCr", BcCc}, {"BcCc", 1}},
+                       // A's strides for each variable
+                       {{"ArCr", AcBr}, {"AcBr", 1}},
+                       // B's strides for each variable
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
+                       1024)
+                .get_unique();
+        };
+
+        auto compile_secs = measureFastestWithWarmup(gen_loop_nest, 0, 1);
+        std::cout << "Compile: " << compile_secs << std::endl;
+
+        auto fnx = gen_loop_nest();
+        auto fny = aot_fn_cast<void(int)>(std::move(fnx));
+        auto fn  = aot_fn_cast<void(float*, float const*, float const*, int)>(
+            std::move(fny));
+
+        fn.save_to_file("zi.asm");
+        // fn.register_perf("fn1");
+
+        auto A = getRandomVector<float>(AcBr * ArCr);
+        auto B = getRandomVector<float>(AcBr * BcCc);
+
+        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto CJ = CN;
+
+        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
+                    B.data(), CN.data(), 0);
+
+        // apply_relu(CN.data(), CN.data() + CN.size());
+
+        fn(CJ.data(), A.data(), B.data(), 0);
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << "\n";
+
+        auto secs = measureFastestWithWarmup(
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10, 100);
+
+        double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
+
+        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
+
+        bench_implementation_fmas_per_cycle(
+            fn, AcBr * ArCr, AcBr * BcCc, ArCr * BcCc,
+            1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
+    }
+
+    return 0;
+
+    // WOW this is actually pretty efficient!
+    // Playing with weird schedules
+    // Matrix-Matrix product
+    // C(r, c) = A(r, k) * B(k, c)
+    // if (0)
+    {
         std::cout << "Benchmark: Depthwise" << std::endl;
 
         // int ArCr = 16;
