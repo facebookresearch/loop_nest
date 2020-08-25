@@ -69,9 +69,8 @@ get_operation_pair(arithmetic_op_kind plus_op, arithmetic_op_kind multiplies_op)
             {{arithmetic_op_kind::max, arithmetic_op_kind::plus},
              std::make_shared<operation_pair<max, basic_plus>>()}};
 #else
-        op_map = {
-            {{arithmetic_op_kind::plus, arithmetic_op_kind::multiplies},
-              std::make_shared<operation_pair_base>()}};
+        op_map = {{{arithmetic_op_kind::plus, arithmetic_op_kind::multiplies},
+                   std::make_shared<operation_pair_base>()}};
 #endif
 
     return op_map.at({plus_op, multiplies_op});
@@ -1021,10 +1020,12 @@ public:
                              std::map<std::string, int> const& sizes,
                              formulas_map_type const&          formulas) const
     {
-        auto jit_fn = facebook::sysml::aot::transposer_jitter<ISA>(
-                          order, sizes, strides.at(output), strides.at(input),
-                          unroll_limit)
-                          .get_shared();
+        auto jit_fn =
+            facebook::sysml::aot::transposer_jitter<std::conditional_t<
+                std::is_same_v<ISA, avx512>, avx2_plus, ISA>>(
+                order, sizes, strides.at(output), strides.at(input),
+                64/* unroll_limit */)
+                .get_shared();
 
         return
             [jit_fn, output_idx = tensors_idx.at(output),
@@ -1150,9 +1151,10 @@ loop_tree_node_ptr<ISA> simplify_loop_nests(loop_tree_node_ptr<ISA> const& node,
 }
 
 template <class ISA>
-inline std::string
-dump_recursively(loop_tree_node_ptr<ISA> const& node, formulas_map_type const& formulas,
-     std::map<std::string, int> const& sizes, std::string& indent)
+inline std::string dump_recursively(loop_tree_node_ptr<ISA> const&    node,
+                                    formulas_map_type const&          formulas,
+                                    std::map<std::string, int> const& sizes,
+                                    std::string&                      indent)
 {
     std::ostringstream ss;
     ss << node->dump(formulas, sizes, indent);
@@ -1292,7 +1294,7 @@ public:
     std::string dump() const
     {
         std::ostringstream ss;
-        std::string indent = "";
+        std::string        indent = "";
         for (auto const& c : nodes)
         {
             ss << dump_recursively(c, formulas, sizes, indent);
