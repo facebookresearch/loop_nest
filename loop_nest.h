@@ -3289,15 +3289,17 @@ private:
             }
         };
 
-        bool needs_a_reg = [&](tensor_location_t const& mem_location) {
+        bool needs_a_reg = [&](tensor_location_t const& mem_location,
+                               bool                     folding_allowed) {
             if (auto it = tensor_location_index.find(mem_location);
                 it == tensor_location_index.end())
             {
-                if (!(folding_allowed &&
-                      remaining_usages[mem_location].size() == 1))
+                if (folding_allowed &&
+                    remaining_usages[mem_location].size() == 1)
                 {
-                    return true;
+                    return false;
                 }
+                return true;
             }
             return false;
         };
@@ -3309,21 +3311,6 @@ private:
 
             int needs_free_regs = 0;
 
-            if (needs_a_reg(left_loc))
-            {
-                ++needs_free_regs;
-            }
-
-            if (needs_a_reg(right_loc))
-            {
-                ++needs_free_regs;
-            }
-
-            while (needs_free_regs < free_regs.size())
-            {
-                free_regs.push_back(free_a_register());
-            }
-
             if (auto it = tensor_location_index.find(left_loc);
                 it == tensor_location_index.end() &&
                 remaining_usages[left_loc].size() == 1)
@@ -3334,6 +3321,22 @@ private:
                     std::swap(left_loc, right_loc);
                     std::swap(fmas[i].src1, fmas[i].src2);
                 }
+            }
+
+            if (needs_a_reg(left_loc, false))
+            {
+                ++needs_free_regs;
+            }
+
+            if (needs_a_reg(right_loc, fmas[i].src2.traits->access != SCALAR ||
+                                           !std::is_same_v<ISA, avx2>))
+            {
+                ++needs_free_regs;
+            }
+
+            while (needs_free_regs < free_regs.size())
+            {
+                free_regs.push_back(free_a_register());
             }
 
             maybe_issue_load(left_loc, fmas[i].src1.traits->access == SCALAR,
