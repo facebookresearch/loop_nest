@@ -2498,7 +2498,7 @@ private:
                 ++needs_free_regs;
             }
 
-            while (needs_free_regs < free_regs.size())
+            while (needs_free_regs > free_regs.size())
             {
                 free_regs.push_back(free_a_register());
             }

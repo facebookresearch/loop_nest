@@ -3289,7 +3289,7 @@ private:
             }
         };
 
-        bool needs_a_reg = [&](tensor_location_t const& mem_location,
+        auto needs_a_reg = [&](tensor_location_t const& mem_location,
                                bool                     folding_allowed) {
             if (auto it = tensor_location_index.find(mem_location);
                 it == tensor_location_index.end())
@@ -3334,7 +3334,7 @@ private:
                 ++needs_free_regs;
             }
 
-            while (needs_free_regs < free_regs.size())
+            while (needs_free_regs > free_regs.size())
             {
                 free_regs.push_back(free_a_register());
             }
