@@ -1737,7 +1737,7 @@ private:
             (A_traits.access == VECTOR_PACKED &&
              B_traits.access == VECTOR_PACKED && C_traits.access != SCALAR))
         {
-            issue_unrolled_fmas_scalar_vector();
+            issue_unrolled_fmas_scalar_vector(addressers);
             return;
         }
 
