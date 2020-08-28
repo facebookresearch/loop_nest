@@ -27,6 +27,229 @@ int main()
     using facebook::sysml::aot::aot_fn_cast;
     using facebook::sysml::aot::avx2;
 
+    // WOW this is actually pretty efficient!
+    // Playing with weird schedules
+    // Matrix-Matrix product
+    // C(r, c) = A(r, k) * B(k, c)
+    // if (0)
+    {
+        std::cout << "Benchmark: 5" << std::endl;
+
+        int ArCr = 1;
+        int AcBr = 4;
+        int BcCc = 4;
+
+        // int ArCr = 333;
+        // int AcBr = 333;
+        // int BcCc = 333;
+
+        auto gen_loop_nest = [&]() {
+            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+                       // The first argument is the loop order in the form of
+                       // {dimension, stride}.  For now the outer dimension
+                       // has to divide the stride.  This is effectively the
+                       // same as Halide's split into outer and inner
+                       // variable, but can have arbitray number of splits.
+                       {{"AcBr", 128},
+                        {"ArCr", std::is_same_v<CT_ISA, avx2> ? 12 : 28},
+                        {"BcCc", std::is_same_v<CT_ISA, avx2> ? 8 : 16},
+                        {"AcBr", 1},
+                        {"ArCr", 1},
+                        {"BcCc", 1}},
+                       // The second argument is a map of the dimension sizes
+                       {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
+                       // Vars of C (other variables are reduction variables)
+                       {"ArCr", "BcCc"},
+                       // Variables of A
+                       {"ArCr", "AcBr"},
+                       // Variables of B
+                       {"AcBr", "BcCc"},
+                       // C's strides for each variable.  Note that the
+                       // strides data is a superset of the previous argument
+                       // (variables of C).  I'm still deciding on the final
+                       // design, possibly allowing for null strides that
+                       // will just deduce them from the sizes, or some
+                       // special structs indicating the layout (ie
+                       // row-major, col-major).  In this case the vars have
+                       // to be ordered though... Many decisions to make...
+                       {{"ArCr", 1}, {"BcCc", ArCr}},
+                       // A's strides for each variable
+                       {{"ArCr", 1}, {"AcBr", ArCr}},
+                       // B's strides for each variable
+                       {{"AcBr", 1}, {"BcCc", AcBr}}, nullptr, 1)
+                .get_shared();
+        };
+
+        auto compile_secs = measureFastestWithWarmup(gen_loop_nest, 0, 1);
+        std::cout << "Compile: " << compile_secs << std::endl;
+
+        auto fn = gen_loop_nest();
+        fn.save_to_file("zi.asm");
+        // fn.register_perf("fn1");
+
+        auto A = getRandomVector<float>(AcBr * ArCr);
+        auto B = getRandomVector<float>(AcBr * BcCc);
+
+        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto CJ = CN;
+
+        baseline_MM(ArCr, AcBr, BcCc, 1, ArCr, 1, AcBr, 1, ArCr, A.data(),
+                    B.data(), CN.data(), 1);
+
+        fn(CJ.data(), A.data(), B.data(), 1);
+        // apply_relu(CN.data(), CN.data() + CN.size());
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << "\n";
+
+        auto secs = measureFastestWithWarmup(
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10, 10);
+
+        double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
+
+        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
+
+        bench_implementation_fmas_per_cycle(
+            fn, AcBr * ArCr, AcBr * BcCc, ArCr * BcCc,
+            1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
+    }
+
+    return 0;
+
+
+    // ALL SCALARS!!!!
+    {
+        std::cout << "Benchmark: 6" << std::endl;
+
+        int ArCr = 5;
+        int AcBr = 6;
+        int BcCc = 1;
+
+        int k = AcBr;
+        int r = ArCr;
+
+        auto gen_loop_nest = [&]() {
+            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+                       {{"r", 16}, //
+                        {"r", 1},  //
+                        {"k", 64},
+                        {"k", 1}}, //
+                       {{"k", k}, {"r", r}},
+                       // Vars of C (other variables are reduction variables)
+                       {"r"},
+                       // Variables of A
+                       {"r", "k"},
+                       // Variables of B
+                       {"k"},
+                       // C's strides for each variable
+                       {{"r", 1}},
+                       // A's strides for each variable
+                       {{"r", k * 2}, {"k", 2}},
+                       // B's strides for each variable
+                       {{"k", 2}}, nullptr, 1024)
+                .get_shared();
+        };
+
+        auto compile_secs = measureFastestWithWarmup(gen_loop_nest, 0, 1);
+        std::cout << "Compile: " << compile_secs << std::endl;
+
+        auto fn = gen_loop_nest();
+        fn.save_to_file("zi.asm");
+        // fn.register_perf("fn3");
+
+        auto A = getRandomVector<float>(AcBr * ArCr * 2);
+        auto B = getRandomVector<float>(AcBr * BcCc * 2);
+
+        auto CN = std::vector<float>(ArCr * BcCc);
+        auto CJ = std::vector<float>(ArCr * BcCc);
+
+        baseline_MM(ArCr, AcBr, BcCc, k * 2, 2, 2, 2, 1, 1, A.data(), B.data(),
+                    CN.data(), 1);
+
+        fn(CJ.data(), A.data(), B.data(), 0);
+        // apply_relu(CN.data(), CN.data() + CN.size());
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << "\n";
+
+        auto secs = measureFastestWithWarmup(
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10, 10);
+
+        double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
+
+        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
+    }
+
+    // return 0;
+    // (row-major)Matrix-(column)Vector product (requires horizontal
+    // sum) C(r) = A(r, k) * B(k) if (0)
+    {
+        std::cout << "Benchmark: 9" << std::endl;
+
+        int ArCr = 256 + 3;
+        int AcBr = 256 + 3;
+        int BcCc = 1;
+
+        int k = AcBr;
+        int r = ArCr;
+
+        auto gen_loop_nest = [&]() {
+            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+                       {{"r", 16}, //
+                        {"r", 1},  //
+                        {"k", 64},
+                        {"k", 1}}, //
+                       {{"k", k}, {"r", r}},
+                       // Vars of C (other variables are reduction variables)
+                       {"r"},
+                       // Variables of A
+                       {"r", "k"},
+                       // Variables of B
+                       {"k"},
+                       // C's strides for each variable
+                       {{"r", 1}},
+                       // A's strides for each variable
+                       {{"r", k}, {"k", 1}},
+                       // B's strides for each variable
+                       {{"k", 1}}, nullptr)
+                .get_shared();
+        };
+
+        auto compile_secs = measureFastestWithWarmup(gen_loop_nest, 0, 1);
+        std::cout << "Compile: " << compile_secs << std::endl;
+
+        auto fn = gen_loop_nest();
+        fn.save_to_file("zi.asm");
+        // fn.register_perf("fn3");
+
+        auto A = getRandomVector<float>(AcBr * ArCr);
+        auto B = getRandomVector<float>(AcBr * BcCc);
+
+        auto CN = std::vector<float>(ArCr * BcCc);
+        auto CJ = std::vector<float>(ArCr * BcCc);
+
+        baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, A.data(), B.data(),
+                    CN.data());
+
+        fn(CJ.data(), A.data(), B.data(), 0);
+        // apply_relu(CN.data(), CN.data() + CN.size());
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << "\n";
+
+        auto secs = measureFastestWithWarmup(
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10, 100);
+
+        double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
+
+        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
+    }
+
+    // return 0;
+
     // Playing with weird schedules
     // Matrix-Matrix product
     // C(r, c) = A(r, k) * B(k, c)
@@ -111,7 +334,7 @@ int main()
             1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
     }
 
-    return 0;
+    // return 0;
 
     // Playing with weird schedules
     // Matrix-Matrix product
@@ -175,96 +398,6 @@ int main()
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, A.data(), B.data(),
                     CN.data(), 1);
-
-        fn(CJ.data(), A.data(), B.data(), 1);
-        // apply_relu(CN.data(), CN.data() + CN.size());
-
-        std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
-                  << "\n";
-
-        auto secs = measureFastestWithWarmup(
-            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10, 10);
-
-        double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
-
-        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
-
-        bench_implementation_fmas_per_cycle(
-            fn, AcBr * ArCr, AcBr * BcCc, ArCr * BcCc,
-            1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
-    }
-
-    return 0;
-
-    // WOW this is actually pretty efficient!
-    // Playing with weird schedules
-    // Matrix-Matrix product
-    // C(r, c) = A(r, k) * B(k, c)
-    // if (0)
-    {
-        std::cout << "Benchmark: 5" << std::endl;
-
-        int ArCr = 1;
-        int AcBr = 333;
-        int BcCc = 333;
-
-        // int ArCr = 333;
-        // int AcBr = 333;
-        // int BcCc = 333;
-
-        auto gen_loop_nest = [&]() {
-            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
-                       // The first argument is the loop order in the form of
-                       // {dimension, stride}.  For now the outer dimension
-                       // has to divide the stride.  This is effectively the
-                       // same as Halide's split into outer and inner
-                       // variable, but can have arbitray number of splits.
-                       {{"AcBr", 128},
-                        {"ArCr", std::is_same_v<CT_ISA, avx2> ? 12 : 28},
-                        {"BcCc", std::is_same_v<CT_ISA, avx2> ? 8 : 16},
-                        {"AcBr", 1},
-                        {"ArCr", 1},
-                        {"BcCc", 1}},
-                       // The second argument is a map of the dimension sizes
-                       {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
-                       // Vars of C (other variables are reduction variables)
-                       {"ArCr", "BcCc"},
-                       // Variables of A
-                       {"ArCr", "AcBr"},
-                       // Variables of B
-                       {"AcBr", "BcCc"},
-                       // C's strides for each variable.  Note that the
-                       // strides data is a superset of the previous argument
-                       // (variables of C).  I'm still deciding on the final
-                       // design, possibly allowing for null strides that
-                       // will just deduce them from the sizes, or some
-                       // special structs indicating the layout (ie
-                       // row-major, col-major).  In this case the vars have
-                       // to be ordered though... Many decisions to make...
-                       {{"ArCr", 1}, {"BcCc", ArCr}},
-                       // A's strides for each variable
-                       {{"ArCr", 1}, {"AcBr", ArCr}},
-                       // B's strides for each variable
-                       {{"AcBr", 1}, {"BcCc", AcBr}}, nullptr, 2)
-                .get_shared();
-        };
-
-        auto compile_secs = measureFastestWithWarmup(gen_loop_nest, 0, 1);
-        std::cout << "Compile: " << compile_secs << std::endl;
-
-        auto fn = gen_loop_nest();
-        fn.save_to_file("zi.asm");
-        // fn.register_perf("fn1");
-
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
-
-        auto CN = getRandomVector<float>(ArCr * BcCc);
-        auto CJ = CN;
-
-        baseline_MM(ArCr, AcBr, BcCc, 1, ArCr, 1, AcBr, 1, ArCr, A.data(),
-                    B.data(), CN.data(), 1);
 
         fn(CJ.data(), A.data(), B.data(), 1);
         // apply_relu(CN.data(), CN.data() + CN.size());
@@ -771,73 +904,6 @@ int main()
 
     // return 0;
 
-    // (row-major)Matrix-(column)Vector product (requires horizontal
-    // sum) C(r) = A(r, k) * B(k) if (0)
-    {
-        std::cout << "Benchmark: 6" << std::endl;
-
-        int ArCr = 333;
-        int AcBr = 222;
-        int BcCc = 1;
-
-        int k = AcBr;
-        int r = ArCr;
-
-        auto gen_loop_nest = [&]() {
-            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
-                       {{"r", 16}, //
-                        {"r", 1},  //
-                        {"k", 64},
-                        {"k", 1}}, //
-                       {{"k", k}, {"r", r}},
-                       // Vars of C (other variables are reduction variables)
-                       {"r"},
-                       // Variables of A
-                       {"r", "k"},
-                       // Variables of B
-                       {"k"},
-                       // C's strides for each variable
-                       {{"r", 1}},
-                       // A's strides for each variable
-                       {{"r", k * 2}, {"k", 2}},
-                       // B's strides for each variable
-                       {{"k", 2}}, nullptr, 1024)
-                .get_shared();
-        };
-
-        auto compile_secs = measureFastestWithWarmup(gen_loop_nest, 0, 1);
-        std::cout << "Compile: " << compile_secs << std::endl;
-
-        auto fn = gen_loop_nest();
-        fn.save_to_file("zi.asm");
-        // fn.register_perf("fn3");
-
-        auto A = getRandomVector<float>(AcBr * ArCr * 2);
-        auto B = getRandomVector<float>(AcBr * BcCc * 2);
-
-        auto CN = std::vector<float>(ArCr * BcCc);
-        auto CJ = std::vector<float>(ArCr * BcCc);
-
-        baseline_MM(ArCr, AcBr, BcCc, k * 2, 2, 2, 2, 1, 1, A.data(), B.data(),
-                    CN.data(), 1);
-
-        fn(CJ.data(), A.data(), B.data(), 0);
-        // apply_relu(CN.data(), CN.data() + CN.size());
-
-        std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
-                  << "\n";
-
-        auto secs = measureFastestWithWarmup(
-            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10, 10);
-
-        double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
-
-        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
-    }
-
-    // return 0;
-
     // Matrix-Matrix product
     // C(r, c) = A(r, k) * B(k, c)
     // if (0)
@@ -916,73 +982,6 @@ int main()
 
         auto secs = measureFastestWithWarmup(
             [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10, 10);
-
-        double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
-
-        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
-    }
-
-    // return 0;
-
-    // (row-major)Matrix-(column)Vector product (requires horizontal
-    // sum) C(r) = A(r, k) * B(k) if (0)
-    {
-        std::cout << "Benchmark: 9" << std::endl;
-
-        int ArCr = 256 + 3;
-        int AcBr = 256 + 3;
-        int BcCc = 1;
-
-        int k = AcBr;
-        int r = ArCr;
-
-        auto gen_loop_nest = [&]() {
-            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
-                       {{"r", 16}, //
-                        {"r", 1},  //
-                        {"k", 64},
-                        {"k", 1}}, //
-                       {{"k", k}, {"r", r}},
-                       // Vars of C (other variables are reduction variables)
-                       {"r"},
-                       // Variables of A
-                       {"r", "k"},
-                       // Variables of B
-                       {"k"},
-                       // C's strides for each variable
-                       {{"r", 1}},
-                       // A's strides for each variable
-                       {{"r", k}, {"k", 1}},
-                       // B's strides for each variable
-                       {{"k", 1}}, nullptr)
-                .get_shared();
-        };
-
-        auto compile_secs = measureFastestWithWarmup(gen_loop_nest, 0, 1);
-        std::cout << "Compile: " << compile_secs << std::endl;
-
-        auto fn = gen_loop_nest();
-        fn.save_to_file("zi.asm");
-        // fn.register_perf("fn3");
-
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
-
-        auto CN = std::vector<float>(ArCr * BcCc);
-        auto CJ = std::vector<float>(ArCr * BcCc);
-
-        baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, A.data(), B.data(),
-                    CN.data());
-
-        fn(CJ.data(), A.data(), B.data(), 0);
-        // apply_relu(CN.data(), CN.data() + CN.size());
-
-        std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
-                  << "\n";
-
-        auto secs = measureFastestWithWarmup(
-            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10, 100);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
 
@@ -1559,4 +1558,92 @@ int main()
 
         std::cout << "GFLOPS: " << (gflops / secs) << "\n";
     }
+
+    {
+        std::cout << "Benchmark: Depthwise" << std::endl;
+
+        // int ArCr = 16;
+        // int AcBr = 16;
+        // int BcCc = 16;
+
+        int OHW = 8;
+        int KHW = 3;
+        int IHW = OHW + KHW - 1;
+        int IOC = 32;
+
+        auto gen_loop_nest = [&]() {
+            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+                       // The first argument is the loop order in the form of
+                       // {dimension, stride}.  For now the outer dimension
+                       // has to divide the stride.  This is effectively the
+                       // same as Halide's split into outer and inner
+                       // variable, but can have arbitray number of splits.
+                       {{"IOC", 32},
+                        {"OH", 2},
+                        {"OW", 3},
+                        {"OH", 1},
+                        {"OW", 1},
+                        {"KH", 1},
+                        {"KW", 1},
+                        {"IOC", 1}},
+
+                       // The second argument is a map of the dimension sizes
+                       {{"OH", OHW},
+                        {"OW", OHW},
+                        {"KH", KHW},
+                        {"KW", KHW},
+                        {"IOC", IOC}},
+                       // Vars of C (other variables are reduction variables)
+                       {"OH", "OW", "IOC"},
+                       // Variables of A
+                       {"IH", "IW", "IOC"},
+                       // Variables of B
+                       {"KH", "KW", "IOC"},
+                       // C's strides for each variable.
+                       {{"OW", IOC}, {"OH", IOC * OHW}, {"IOC", 1}},
+                       // A's strides for each variable
+                       {{"OW", IOC},
+                        {"KW", IOC},
+                        {"OH", IOC * IHW},
+                        {"KH", IOC * IHW},
+                        {"IOC", 1}},
+                       // B's strides for each variable
+                       {{"KW", IOC}, {"KH", IOC * KHW}, {"IOC", 1}},
+                       facebook::sysml::aot::fma, 128)
+                .get_unique();
+        };
+
+        auto compile_secs = measureFastestWithWarmup(gen_loop_nest, 0, 1);
+        std::cout << "Compile: " << compile_secs << std::endl;
+
+        auto fn = gen_loop_nest();
+
+        fn.save_to_file("zi.asm");
+        // fn.register_perf("fn1");
+
+        auto A = getRandomVector<float>(IHW * IHW * IOC);
+        auto B = getRandomVector<float>(KHW * KHW * IOC);
+
+        auto CN = getRandomVector<float>(OHW * OHW * IOC);
+        auto CJ = CN;
+
+        baseline_CW_HWC(IOC, OHW, KHW, A.data(), B.data(), CN.data(), 0);
+
+        fn(CJ.data(), A.data(), B.data(), 0);
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiffVerbose(CJ.data(), CJ.data() + OHW * OHW * IOC,
+                                       CN.data(), 0.0001)
+                  << "\n";
+
+        auto secs = measureFastestWithWarmup(
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10, 100);
+
+        double gflops = 1.0 * OHW * OHW * KHW * KHW * IOC * 2 / 1000000000;
+
+        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
+    }
+
+    return 0;
+
 }
