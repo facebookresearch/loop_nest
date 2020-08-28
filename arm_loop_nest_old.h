@@ -1,11 +1,5 @@
 #pragma once
 
-#if defined(ARM_LOOP_NEST_OLD)
-
-#include "arm_loop_nest_old.h"
-
-#else
-
 #if defined(LOOP_NEST_ARM) || defined(ARM_LOOP_NEST)
 
 #include "arm_arithmetic_operation.h"
@@ -3024,6 +3018,4 @@ public:
 
 #else
 #include "loop_nest.h"
-#endif
-
 #endif

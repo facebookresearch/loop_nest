@@ -36,8 +36,8 @@ int main()
         std::cout << "Benchmark: 5" << std::endl;
 
         int ArCr = 1;
-        int AcBr = 4;
-        int BcCc = 4;
+        int AcBr = 2;
+        int BcCc = 2;
 
         // int ArCr = 333;
         // int AcBr = 333;
@@ -76,7 +76,7 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", 1}, {"AcBr", ArCr}},
                        // B's strides for each variable
-                       {{"AcBr", 1}, {"BcCc", AcBr}}, nullptr, 1)
+                       {{"AcBr", 1}, {"BcCc", AcBr}}, nullptr, 2)
                 .get_shared();
         };
 
@@ -115,7 +115,7 @@ int main()
             1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
     }
 
-    return 0;
+    // return 0;
 
 
     // ALL SCALARS!!!!

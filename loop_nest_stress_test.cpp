@@ -31,7 +31,7 @@ int main()
         int ArCr              = (1 << rand() % 10) + rand() % 16;
         int AcBr              = (1 << rand() % 10) + rand() % 16;
         int BcCc              = (1 << rand() % 10) + rand() % 16;
-        int max_fmas_unrolled = 1 << (rand() % 16);
+        int max_fmas_unrolled = 1 << (rand() % 10);
 
         std::vector<std::pair<std::string, int>> order = {
             {"AcBr", 1}, {"BcCc", 1}, {"ArCr", 1}};

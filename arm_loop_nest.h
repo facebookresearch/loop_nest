@@ -1,5 +1,11 @@
 #pragma once
 
+#if defined(ARM_LOOP_NEST_OLD)
+
+#include "arm_loop_nest_old.h"
+
+#else
+
 #if defined(LOOP_NEST_ARM) || defined(ARM_LOOP_NEST)
 
 #include "arm_arithmetic_operation.h"
@@ -380,15 +386,17 @@ private:
         {
             if (C_formula.count(loop.var))
             {
-                auto fullIterations = limits[loop.var].back() / vector_size;
-                auto rest           = limits[loop.var].back() % vector_size;
+                auto vek_size = vectorized_var == "NONE" ? 1 : vector_size;
+
+                auto fullIterations = limits[loop.var].back() / vek_size;
+                auto rest           = limits[loop.var].back() % vek_size;
 
                 for (int i = 0; i < fullIterations; ++i)
                 {
                     ret.insert(memory_argument{get_cursor_offset(C_strides),
-                                               &C_traits, vector_size,
+                                               &C_traits, vek_size,
                                                current_coordinate_cursor});
-                    current_coordinate_cursor[loop.var] += vector_size;
+                    current_coordinate_cursor[loop.var] += vek_size;
                 }
 
                 if (rest)
@@ -926,12 +934,15 @@ private:
         {
             ordered_loads.emplace_back(c);
         }
+
         std::sort(ordered_loads.begin(), ordered_loads.end(),
                   [](const memory_argument& a, const memory_argument& b) {
                       return a.offset < b.offset;
                   });
+
         std::vector<int> incrs;
         int              prev_off = -1;
+
         for (auto const& c : ordered_loads)
         {
             if (prev_off != -1)
@@ -940,9 +951,11 @@ private:
             }
             prev_off = c.offset;
         }
+
         mov(tmpCReg_, CReg_);
         strong_assert(ordered_loads.size());
         add_imm(tmpCReg_, ordered_loads.front().offset * 4);
+
         for (auto const& c : ordered_loads)
         {
             LN_LOG(INFO) << tabs.back() << "LOAD " << c.readable() << "\n";
@@ -1074,7 +1087,7 @@ private:
 
             auto donePostOpLabel = make_label();
 
-            std::cout << "MALPHA ----> " << max_alpha << "\n";
+            // std::cout << "MALPHA ----> " << max_alpha << "\n";
 
             meta_cmp(AlphaReg_, max_alpha - 1);
             b(Xbyak::LT, *donePostOpLabel);
@@ -2050,10 +2063,11 @@ private:
     // the first loop to be unrolled.
     std::tuple<int, int, int> possibly_inject_a_loop()
     {
+        auto vek_size = vectorized_var == "NONE" ? 1 : vector_size;
 
         auto padded_sizes = sizes;
-        padded_sizes[vectorized_var] =
-            round_up(padded_sizes[vectorized_var], vector_size);
+        padded_sizes[order.back().first] =
+            round_up(padded_sizes[order.back().first], vek_size);
 
         std::map<std::string, std::vector<int>> ranges;
         for (auto const& p : padded_sizes)
@@ -2081,7 +2095,7 @@ private:
                                            ? v * s.second
                                            : v;
                             }) /
-            (vectorized_var != "NONE" ? vector_size : 1);
+            vek_size;
 
         LN_LOG(DEBUG) << "REGS REQUIRED: " << registers_required
                       << " FMAS: " << total_required_fma_operations << "\n";
@@ -2096,8 +2110,6 @@ private:
 
         auto it_end = --(order.end());
         auto it     = order.begin();
-
-        auto vek_size = vectorized_var == "NONE" ? 1 : vector_size;
 
         for (; registers_required > available_registers && it != it_end; ++it)
         {
@@ -2781,10 +2793,12 @@ private:
             strong_assert(v_it != tensor_location_index.end());
 
             // issue FMA
-            instructions.push_back(fmla_instruction{
+            fmla_instruction to_push{
                 {(int)((C_VMMs[fmas[i].dest]++).getIdx()), vector_size},
                 {v_it->vreg_idx, v_it->vreg_lane},
-                {s_it->vreg_idx, s_it->vreg_lane}}); // update datastructures
+                {s_it->vreg_idx, s_it->vreg_lane}}; // update datastructures
+
+            instructions.push_back(to_push);
 
             strong_assert(remaining_usages.count(scalar_loc) &&
                           remaining_usages[scalar_loc].size() &&
@@ -3112,10 +3126,15 @@ private:
             int mask = fmas[i].src1.mask;
 
             // issue FMA
-            instructions.push_back(fmla_instruction{
+            fmla_instruction to_push{
                 {(int)((C_VMMs[fmas[i].dest]++).getIdx()), vector_size},
                 {first_it->vreg_idx, mask},
-                {second_it->vreg_idx, mask}}); // update datastructures
+                {second_it->vreg_idx, mask}}; // update datastructures
+
+            // std::cout << "---------------> " << fmas[i].dest.readable()
+            //           << " :: " << to_push.dst.number << "\n";
+
+            instructions.push_back(to_push);
 
             strong_assert(remaining_usages.count(first_loc) &&
                           remaining_usages[first_loc].size() &&
@@ -3503,8 +3522,8 @@ public:
         std::vector<fma_operation> unrolled_fmas =
             collect_default_unrolled_FMAs_at(unroll_stage);
 
-        std::cout << "UFMAS: " << unrolled_fmas.size()
-                  << " BUT: " << total_required_fma_operations << "\n\n";
+        // std::cout << "UFMAS: " << unrolled_fmas.size()
+        //           << " BUT: " << total_required_fma_operations << "\n\n";
         strong_assert(unrolled_fmas.size() == total_required_fma_operations);
 
         // Regs to be saved: RBX and R12-R15 (we don't use RBP)
@@ -3570,4 +3589,6 @@ public:
 
 #else
 #include "loop_nest.h"
+#endif
+
 #endif
