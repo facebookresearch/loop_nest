@@ -439,24 +439,12 @@ private:
                             if (next_load.tensor_location.idx ==
                                 load.tensor_location.idx)
                             {
-                                std::cout << "MAYBE MAYBE MAYBE MAYBE MAYBE "
-                                             "MAYBE MAYBE MAYBE MAYBE MAYBE "
-                                             "MAYBE MAYBE MAYBE MAYBE MAYBE "
-                                             "MAYBE MAYBE MAYBE MAYBE MAYBE "
-                                             "MAYBE MAYBE MAYBE MAYBE \n";
-
                                 if (next_load.num_lanes == load.num_lanes &&
                                     next_load.vreg != load.vreg &&
                                     next_load.tensor_location.offset ==
                                         load.tensor_location.offset +
                                             load.num_lanes * 4)
                                 {
-                                    std::cout << "PAIR PAIR PAIR PAIR PAIR "
-                                                 "PAIR PAIR PAIR PAIR PAIR "
-                                                 "PAIR PAIR PAIR PAIR PAIR "
-                                                 "PAIR PAIR PAIR PAIR PAIR "
-                                                 "PAIR PAIR PAIR PAIR \n";
-
                                     instructions[i] = load_pair_instruction{
                                         load.vreg, next_load.vreg,
                                         load.num_lanes, load.tensor_location};
