@@ -35,9 +35,9 @@ int main()
     {
         std::cout << "Benchmark: 5" << std::endl;
 
-        int ArCr = 1;
-        int AcBr = 2;
-        int BcCc = 2;
+        int ArCr = 4;
+        int AcBr = 8;
+        int BcCc = 16;
 
         // int ArCr = 333;
         // int AcBr = 333;
@@ -50,12 +50,7 @@ int main()
                        // has to divide the stride.  This is effectively the
                        // same as Halide's split into outer and inner
                        // variable, but can have arbitray number of splits.
-                       {{"AcBr", 128},
-                        {"ArCr", std::is_same_v<CT_ISA, avx2> ? 12 : 28},
-                        {"BcCc", std::is_same_v<CT_ISA, avx2> ? 8 : 16},
-                        {"AcBr", 1},
-                        {"ArCr", 1},
-                        {"BcCc", 1}},
+                       {{"AcBr", 128}, {"AcBr", 1}, {"ArCr", 1}, {"BcCc", 1}},
                        // The second argument is a map of the dimension sizes
                        {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
                        // Vars of C (other variables are reduction variables)
@@ -72,11 +67,11 @@ int main()
                        // special structs indicating the layout (ie
                        // row-major, col-major).  In this case the vars have
                        // to be ordered though... Many decisions to make...
-                       {{"ArCr", 1}, {"BcCc", ArCr}},
+                       {{"ArCr", BcCc}, {"BcCc", 1}},
                        // A's strides for each variable
-                       {{"ArCr", 1}, {"AcBr", ArCr}},
+                       {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", 1}, {"BcCc", AcBr}}, nullptr, 2)
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, nullptr, 256)
                 .get_shared();
         };
 
@@ -93,7 +88,7 @@ int main()
         auto CN = getRandomVector<float>(ArCr * BcCc);
         auto CJ = CN;
 
-        baseline_MM(ArCr, AcBr, BcCc, 1, ArCr, 1, AcBr, 1, ArCr, A.data(),
+        baseline_MM(ArCr, AcBr, BcCc, ArCr, 1, BcCc, 1, BcCc, 1, A.data(),
                     B.data(), CN.data(), 1);
 
         fn(CJ.data(), A.data(), B.data(), 1);
@@ -104,7 +99,7 @@ int main()
                   << "\n";
 
         auto secs = measureFastestWithWarmup(
-            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10, 10);
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10, 10000);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
 
@@ -115,8 +110,7 @@ int main()
             1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
     }
 
-    // return 0;
-
+    return 0;
 
     // ALL SCALARS!!!!
     {
@@ -1645,5 +1639,4 @@ int main()
     }
 
     return 0;
-
 }
