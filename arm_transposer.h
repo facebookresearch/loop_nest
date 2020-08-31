@@ -82,15 +82,6 @@ private:
     }
 
 private:
-    std::vector<std::any> raii;
-
-    std::shared_ptr<Label> make_label()
-    {
-        auto ret = std::make_shared<Label>();
-        raii.push_back(ret);
-        return ret;
-    }
-
     void meta_push(XReg const& op) { str(op, post_ptr(stack_reg, 8)); }
 
     void meta_pop(XReg const& op) { ldr(op, pre_ptr(stack_reg, -8)); }
@@ -524,9 +515,9 @@ private:
         LN_LOG(INFO) << tabs.back() << "ISSUING " << moves.size()
                      << " UNROLLED MOVES\n";
 
-        int first_reg     = 0; //is_vectorized ? 0 : 5;
-        int num_regs      = 7; //is_vectorized ? 32 : 8;
-        int cur_read_reg  = 0;
+        int first_reg    = 0; // is_vectorized ? 0 : 5;
+        int num_regs     = 7; // is_vectorized ? 32 : 8;
+        int cur_read_reg = 0;
         int cur_write_reg = 0;
 
         int src_loc = 0;

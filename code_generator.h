@@ -4,6 +4,7 @@
 #include "memory_resource.h"
 #include "xbyak.h"
 
+#include <any>
 #include <cassert>
 #include <cstdint>
 #include <set>
@@ -98,6 +99,21 @@ private:
             const_cast<xbyak_buffer_type*>(getCode()));
         return T(ptr, size, get_deleter());
     }
+
+#if defined(ARM_LOOP_NEST) || defined(LOOP_NEST_ARM)
+
+protected:
+    std::vector<std::any> raii;
+
+public:
+    std::shared_ptr<Xbyak::Label> make_label()
+    {
+        auto ret = std::make_shared<Xbyak::Label>();
+        raii.push_back(ret);
+        return ret;
+    }
+
+#endif
 
 public:
 #if !defined(LOOP_NEST_ARM)
