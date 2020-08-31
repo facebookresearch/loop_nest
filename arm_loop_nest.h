@@ -77,19 +77,40 @@ private:
 
     void meta_pop(XReg const& op) { ldr(op, pre_ptr(stack_reg, -8)); }
 
+    void meta_push_pair(XReg const& op1, XReg const& op2)
+    {
+        stp(op1, op2, post_ptr(stack_reg, 16));
+    }
+
+    void meta_pop_pair(XReg const& op1, XReg const& op2)
+    {
+        ldp(op1, op2, pre_ptr(stack_reg, -16));
+    }
+
     void meta_push(std::vector<XReg> const& regs)
     {
-        for (auto const& r : regs)
+        for (int i = 1; i < regs.size(); i += 2)
         {
-            meta_push(r);
+            meta_push_pair(regs[i - 1], regs[i]);
+        }
+
+        if (regs.size() % 2)
+        {
+            meta_push(regs.back());
         }
     }
 
     void meta_pop(std::vector<XReg> const& regs)
     {
-        for (auto it = regs.crbegin(); it != regs.crend(); ++it)
+        if (regs.size() % 2)
         {
-            meta_pop(*it);
+            meta_pop(regs.back());
+        }
+
+        for (int i = static_cast<int>(regs.size() - (regs.size() % 2) - 2);
+             i >= 0; i -= 2)
+        {
+            meta_pop_pair(regs[i], regs[i + 1]);
         }
     }
 
@@ -238,6 +259,11 @@ private:
     Reg64 tmpCReg_  = x10;
     Reg64 tmpAReg_  = x11;
     Reg64 tmpBReg_  = x12;
+
+    std::vector<int> possible_loop_registers = {13, 14, 15, 19, 20, 21, 22,
+                                                23, 24, 25, 26, 27, 28, 29};
+
+    std::vector<int> loop_registers;
 
     std::map<int, Reg64> const_regs;
 
@@ -799,30 +825,40 @@ private:
     // that have strides along the dimension dim.
     void push_pointers(std::string const& dim)
     {
+        std::vector<Reg64> to_push;
+
         for (auto const& ptr : in_register_tensor_pointers)
         {
             if (ptr.strides.count(dim) && ptr.strides.at(dim) != 0)
             {
                 LN_LOG(INFO) << tabs.back() << "PUSH " << ptr.name << "(X"
                              << ptr.reg.getIdx() << ")\n";
-                meta_push(ptr.reg);
+                to_push.push_back(ptr.reg);
             }
         }
+
+        meta_push(to_push);
     }
 
     // Similarly pops the pointers
     void pop_pointers(std::string const& dim)
     {
-        for (auto it = in_register_tensor_pointers.rbegin();
-             it != in_register_tensor_pointers.rend(); ++it)
+        std::vector<Reg64> to_pop;
+
+        for (auto const& ptr : in_register_tensor_pointers)
         {
-            auto const& ptr = *it;
             if (ptr.strides.count(dim) && ptr.strides.at(dim) != 0)
             {
-                LN_LOG(INFO) << tabs.back() << "POP " << ptr.name << "(X"
-                             << ptr.reg.getIdx() << ")\n";
-                meta_pop(ptr.reg);
+                to_pop.push_back(ptr.reg);
             }
+        }
+
+        meta_pop(to_pop);
+
+        for (auto it = to_pop.rbegin(); it != to_pop.rend(); ++it)
+        {
+            LN_LOG(INFO) << tabs.back() << "POP "
+                         << "(X" << it->getIdx() << ")\n";
         }
     };
 
@@ -2353,7 +2389,10 @@ private:
 
             if (full_iterations > 1 && save_loop)
             {
-                meta_push(loopReg_);
+                if (loop_registers[depth] == -1 && depth > 0)
+                {
+                    meta_push(loopReg_);
+                }
             }
 
             if (full_iterations > 0)
@@ -2376,7 +2415,11 @@ private:
 
             if (full_iterations > 1)
             {
-                mov_imm(loopReg_, full_iterations);
+                Reg64 loop_reg = loop_registers[depth] == -1
+                                     ? loopReg_
+                                     : Reg64(loop_registers[depth]);
+
+                mov_imm(loop_reg, full_iterations);
                 auto loopLabel = make_label();
                 L_aarch64(*loopLabel);
 
@@ -2409,8 +2452,8 @@ private:
 
                 Label doneLabel;
 
-                sub_imm(loopReg_, 1);
-                cbnz(loopReg_, *loopLabel);
+                sub_imm(loop_reg, 1);
+                cbnz(loop_reg, *loopLabel);
             }
             else if (full_iterations == 1)
             {
@@ -2489,7 +2532,10 @@ private:
 
             if (full_iterations > 1 && save_loop)
             {
-                meta_pop(loopReg_);
+                if (loop_registers[depth] == -1 && depth > 0)
+                {
+                    meta_pop(loopReg_);
+                }
             }
 
             if (multiple_iterations && save_ptrs)
@@ -3167,6 +3213,26 @@ private:
 
     std::shared_ptr<elementwise_operation<aarch64>> postop;
 
+    std::vector<Reg64> prepare_loop_registers(int unroll_stage)
+    {
+        loop_registers     = std::vector<int>(unroll_stage, -1);
+        int first_loop_reg = std::min(
+            0, unroll_stage - static_cast<int>(possible_loop_registers.size()));
+
+        std::vector<Reg64> to_save;
+
+        for (int i = first_loop_reg; i < loop_registers.size(); ++i)
+        {
+            loop_registers[i] = possible_loop_registers[i - first_loop_reg];
+            if (loop_registers[i] >= 19)
+            {
+                to_save.push_back(Reg64(loop_registers[i]));
+            }
+        }
+
+        return to_save;
+    }
+
 public:
     std::int64_t get_effective_flops() const { return effective_flops_; }
 
@@ -3300,7 +3366,12 @@ public:
             rev_freq.pop_back();
         }
 
+        auto x_regs_to_save = prepare_loop_registers(unroll_stage);
+        meta_push(x_regs_to_save);
+
         issue_loops(depth_for_register_blocked_C, unroll_stage);
+
+        meta_pop(x_regs_to_save);
 
         restore_stack();
         ret();
