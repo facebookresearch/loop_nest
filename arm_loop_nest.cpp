@@ -88,7 +88,7 @@ int main()
         auto CN = getRandomVector<float>(ArCr * BcCc);
         auto CJ = CN;
 
-        baseline_MM(ArCr, AcBr, BcCc, ArCr, 1, BcCc, 1, BcCc, 1, A.data(),
+        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
                     B.data(), CN.data(), 1);
 
         fn(CJ.data(), A.data(), B.data(), 1);
@@ -110,7 +110,7 @@ int main()
             1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
     }
 
-    return 0;
+    // return 0;
 
     // ALL SCALARS!!!!
     {

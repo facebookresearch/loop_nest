@@ -20,8 +20,6 @@
 #include "multi_vreg.h"
 #include "utils.h"
 
-// #include "address_packer.h"
-// #include "elementwise_operation.h"
 #include <boost/multi_index/composite_key.hpp>
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/ordered_index.hpp>
@@ -106,7 +104,6 @@ private:
 
     void prepare_stack()
     {
-        // stack_offset = 0;
         sub(sp, sp, 1024);
         sub(sp, sp, 1024);
         mov(stack_reg, sp);
@@ -250,7 +247,7 @@ private:
     Reg64 tmpCReg_  = x10;
     Reg64 tmpAReg_  = x11;
     Reg64 tmpBReg_  = x12;
-    // std::vector<Reg64> elementwiseReg_;
+
     std::map<int, Reg64> const_regs;
 
     VReg ZeroVector_ = v0;
@@ -283,9 +280,6 @@ private:
     std::vector<std::pair<std::string, int>> order;
     std::map<std::string, int> const&        sizes;
 
-    // std::shared_ptr<elementwise_operation<aarch64>> elementwise_preop;
-    // std::shared_ptr<elementwise_operation<aarch64>> elementwise_postop;
-
     std::set<std::string> const& C_formula;
     std::set<std::string> const& A_formula;
     std::set<std::string> const& B_formula;
@@ -293,10 +287,6 @@ private:
     std::map<std::string, int> C_strides;
     std::map<std::string, int> A_strides;
     std::map<std::string, int> B_strides;
-    // std::vector<std::map<std::string, int>> elementwise_preop_strides;
-    // std::vector<std::map<std::string, int>> elementwise_postop_strides;
-    // concatenation of preop followed by postop strides
-    // std::vector<std::map<std::string, int>> elementwise_strides;
 
     int nest_depth;
 
@@ -309,12 +299,6 @@ private:
     bool is_A_vectorized;
     bool is_B_vectorized;
 
-    // How do we compute the lements of C.  It's either vectorized,
-    // computing vector_size elements at once, or one scalar value at
-    // the time, in which case we still use vector instructions, but
-    // perform a horizontal sum at the end.
-    /* int C_access_len; depricated for C_traits.access_len */
-
     // Labels holding strides along LSD of vectorized tensors that are
     // not packed.
     Label C_access_strides_label;
@@ -326,7 +310,6 @@ private:
     tensor_traits C_traits;
     tensor_traits A_traits;
     tensor_traits B_traits;
-    // std::vector<tensor_traits> elementwise_traits;
 
     // The name of the variable in the innermost loop (along which the
     // vectorization is performed)
@@ -398,6 +381,36 @@ private:
                     }
                 }
             }
+        }
+    }
+
+    void interleave_loads(std::vector<instruction_t>& instructions)
+    {
+
+        std::map<int, int> pairity;
+        std::map<int, int> temp_pair = {{BReg_.getIdx(), tmpBReg_.getIdx()},
+                                        {AReg_.getIdx(), tmpAReg_.getIdx()}};
+
+        for (auto& insn : instructions)
+        {
+            std::visit(
+                overloaded{[&](load_pair_instruction& load_pair) {
+                               auto ridx = load_pair.tensor_location.idx;
+                               if ((pairity[ridx]++) % 2)
+                               {
+                                   load_pair.tensor_location.idx =
+                                       temp_pair[ridx];
+                               }
+                           },
+                           [&](load_instruction& load) {
+                               auto ridx = load.tensor_location.idx;
+                               if ((pairity[ridx]++) % 2)
+                               {
+                                   load.tensor_location.idx = temp_pair[ridx];
+                               }
+                           },
+                           [](fmla_instruction&) {}, [](std::monostate) {}},
+                insn);
         }
     }
 
@@ -511,12 +524,6 @@ private:
             }
         }
     }
-
-    void allocate_elementwise_addressing_registers() {}
-
-    void allocate_elementwise_labels() {}
-
-    void initialize_elementwise_ops() {}
 
     bool
     is_inside_current_limits(std::map<std::string, int> const& coordinate) const
@@ -1251,8 +1258,6 @@ private:
 
             auto donePostOpLabel = make_label();
 
-            // std::cout << "MALPHA ----> " << max_alpha << "\n";
-
             meta_cmp(AlphaReg_, max_alpha - 1);
             b(Xbyak::LT, *donePostOpLabel);
 
@@ -1702,6 +1707,9 @@ private:
 
         std::map<int, int> tensor_offsets;
 
+        mov(tmpBReg_, BReg_);
+        mov(tmpAReg_, AReg_);
+
         for (auto const& insn : instructions)
         {
             std::visit(
@@ -1715,9 +1723,10 @@ private:
                         tensor_offsets[ptr_reg_idx] += delta;
 
                         if (delta && delta <= (i.num_lanes * 252) &&
-                            delta >= (-256 * i.num_lanes))
+                            delta >= (-256 * i.num_lanes) &&
+                            (delta % (4 * i.num_lanes) == 0))
                         {
-                            strong_assert(delta % (4 * i.num_lanes) == 0);
+                            // strong_assert(delta % (4 * i.num_lanes) == 0);
 
                             switch (i.num_lanes)
                             {
@@ -1782,12 +1791,6 @@ private:
                                 ldr(SReg(i.vreg),
                                     post_ptr(XReg(ptr_reg_idx), delta));
                             }
-                            // else if (delta_xreg_map.count(delta))
-                            // {
-                            //     ldr(SReg(i.vreg),
-                            //         post_ptr(XReg(ptr_reg_idx),
-                            //                  XReg(delta_xreg_map[delta])));
-                            // }
                             else
                             {
                                 ldr(SReg(i.vreg), ptr(XReg(ptr_reg_idx)));
@@ -1801,12 +1804,6 @@ private:
                                 ldr(DReg(i.vreg),
                                     post_ptr(XReg(ptr_reg_idx), delta));
                             }
-                            // else if (delta_xreg_map.count(delta))
-                            // {
-                            //     ldr(DReg(i.vreg),
-                            //         post_ptr(XReg(ptr_reg_idx),
-                            //                  XReg(delta_xreg_map[delta])));
-                            // }
                             else
                             {
                                 ldr(DReg(i.vreg), ptr(XReg(ptr_reg_idx)));
@@ -1820,12 +1817,6 @@ private:
                                 ldr(QReg(i.vreg),
                                     post_ptr(XReg(ptr_reg_idx), delta));
                             }
-                            // else if (delta_xreg_map.count(delta))
-                            // {
-                            //     ldr(QReg(i.vreg),
-                            //         post_ptr(XReg(ptr_reg_idx),
-                            //                  XReg(delta_xreg_map[delta])));
-                            // }
                             else
                             {
                                 ldr(QReg(i.vreg), ptr(XReg(ptr_reg_idx)));
@@ -1889,7 +1880,10 @@ private:
 
         for (auto const& offs : tensor_offsets)
         {
-            sadd_imm(XReg(offs.first), -offs.second);
+            if (offs.first == BReg_.getIdx() || offs.first == AReg_.getIdx())
+            {
+                sadd_imm(XReg(offs.first), -offs.second);
+            }
         }
     }
 
@@ -1925,387 +1919,11 @@ private:
                 return;
             }
         }
-
-        most_frequent_queue<memory_argument> queue;
-
-        // coalesce broadcasting loads
-        auto normalize_broadcast = [](memory_argument m) {
-            if (m.traits->access == SCALAR)
-            {
-                auto new_off = vector_size * (m.offset / vector_size);
-                return memory_argument{new_off, m.traits, vector_size,
-                                       m.coordinates};
-            }
-            return m;
-        };
-
-        std::set<memory_argument> can_implicit_broadcast;
-        for (auto const& inst : fmas)
+        else
         {
-            strong_assert(is_inside_current_limits(inst.coordinates));
-            queue.inc(inst.src1);
-            auto src2 = normalize_broadcast(inst.src2);
-            queue.inc(src2);
-            can_implicit_broadcast.insert(src2);
+            strong_assert(false && "Possibly some dimensions are 0");
         }
-
-        auto num_regs = isa_traits<aarch64>::total_vector_registers -
-                        first_unused_vmm_register;
-
-        std::set<int> free_regs;
-        for (auto i = 0; i < num_regs; ++i)
-        {
-            free_regs.insert(first_unused_vmm_register + i);
-        }
-
-        std::map<memory_argument, int> vmm_map;
-
-        while (queue.size())
-        {
-
-            std::vector<memory_argument> loads;
-            for (; free_regs.size() && queue.size();)
-            {
-                auto addr = queue.top();
-                if (!vmm_map.count(addr))
-                {
-                    vmm_map[addr] = *free_regs.begin();
-                    free_regs.erase(vmm_map.at(addr));
-                    loads.emplace_back(addr);
-                }
-                queue.pop();
-            }
-
-            // reduce loads for uncoalesced broadcasts
-            std::map<memory_argument, int> load_mask;
-            for (auto const& fma : fmas)
-            {
-                // keep track of needed loads for broadcasting
-                if (fma.src2.traits->access == SCALAR)
-                {
-                    auto idx  = fma.src2.offset % vector_size;
-                    auto src2 = normalize_broadcast(fma.src2);
-                    load_mask[normalize_broadcast(fma.src2)] =
-                        std::max(load_mask[src2], idx);
-                }
-            }
-
-            std::vector<fma_operation> in_vmm_fmas;
-            for (auto it = fmas.begin(); it != fmas.end();)
-            {
-                auto src1 = it->src1;
-                auto src2 = normalize_broadcast(it->src2);
-                if (vmm_map.count(src1) && vmm_map.count(src2))
-                {
-                    in_vmm_fmas.emplace_back(*it);
-                    it = fmas.erase(it);
-                }
-                else
-                {
-                    ++it;
-                }
-            }
-
-            if (!in_vmm_fmas.size())
-            {
-                issue_unrolled_fmas_(fmas);
-                return;
-            }
-
-            std::sort(loads.begin(), loads.end(),
-                      [](const memory_argument& a, const memory_argument& b) {
-                          return a.offset < b.offset;
-                      });
-
-            std::map<int, std::pair<int, int>> tmp_addresser;
-            std::map<int, int>                 tmp_addresser_base;
-            std::map<int, std::vector<int>>    load_incrs;
-            for (auto const& addr : loads)
-            {
-                auto base_reg = addr.traits->reg.getIdx();
-                if (!tmp_addresser.count(base_reg))
-                {
-                    int tmp = base_reg == BReg_.getIdx() ? tmpBReg_.getIdx()
-                                                         : tmpAReg_.getIdx();
-                    tmp_addresser[base_reg] = std::make_pair(tmp, addr.offset);
-                    tmp_addresser_base[tmp] = addr.offset;
-                    load_incrs[base_reg];
-                }
-                else
-                {
-                    auto prev_off = tmp_addresser[base_reg].second;
-                    load_incrs[base_reg].emplace_back(addr.offset - prev_off);
-                    tmp_addresser[base_reg].second = addr.offset;
-                }
-            }
-            std::map<memory_argument, int> post_ptr_map;
-            for (auto const& addr : loads)
-            {
-                auto base_reg = addr.traits->reg.getIdx();
-                if (load_incrs.at(base_reg).size())
-                {
-                    post_ptr_map[addr] = load_incrs.at(base_reg).front();
-                    load_incrs.at(base_reg).erase(
-                        load_incrs.at(base_reg).begin());
-                }
-            }
-
-            for (auto const& kv : tmp_addresser)
-            {
-                auto orig_reg  = kv.first;
-                auto tmp_reg   = kv.second.first;
-                auto orig_base = tmp_addresser_base.at(tmp_reg);
-                mov(Reg64(tmp_reg), Reg64(orig_reg));
-                add_imm(Reg64(tmp_reg), orig_base * 4);
-            }
-
-            for (auto const& addr : loads)
-            {
-
-                auto reg = Vmm(vmm_map.at(addr));
-                auto addr_reg =
-                    Reg64(tmp_addresser.at(addr.traits->reg.getIdx()).first);
-                auto inc = 0;
-                if (post_ptr_map.count(addr))
-                {
-                    inc = post_ptr_map.at(addr) * 4;
-                }
-                switch (addr.traits->access)
-                {
-                case SCALAR:
-                    if (can_implicit_broadcast.count(addr))
-                    {
-                        load_vector(reg, addr_reg, 0,
-                                    load_mask.count(addr)
-                                        ? load_mask.at(addr) + 1
-                                        : vector_size,
-                                    inc);
-                    }
-                    else
-                    {
-                        broadcast_scalar(reg, addr_reg, 0, addr.mask, inc);
-                    }
-                    break;
-                case VECTOR_PACKED:
-                    load_vector(reg, addr_reg, 0, vector_size, inc);
-                    break;
-
-                case VECTOR_STRIDED:
-                    gather_vector(reg, addr_reg, 0, addr.mask,
-                                  addr.traits->innermost_stride * 4, inc);
-                    break;
-                }
-            }
-
-            // emit fmas
-            for (auto const& fma : in_vmm_fmas)
-            {
-                auto arg1_reg = Vmm(vmm_map.at(fma.src1));
-                auto arg2_reg = Vmm(vmm_map.at(normalize_broadcast(fma.src2)));
-                if (fma.src2.traits->access == SCALAR)
-                {
-                    auto idx = fma.src2.offset % vector_size;
-                    fmla((C_VMMs[fma.dest]++).s4, arg1_reg.s4,
-                         arg2_reg.s4[idx]);
-                }
-                else
-                {
-                    fmla((C_VMMs[fma.dest]++).s4, arg1_reg.s4, arg2_reg.s4);
-                }
-            }
-
-            queue = most_frequent_queue<memory_argument>();
-            std::set<memory_argument> keep;
-            for (auto const& inst : fmas)
-            {
-                auto src2 = normalize_broadcast(inst.src2);
-                queue.inc(inst.src1);
-                if (vmm_map.count(src2))
-                {
-                    if (src2.traits->access == SCALAR)
-                    {
-                        keep.insert(src2);
-                    }
-                    else
-                    {
-                        queue.inc(normalize_broadcast(inst.src2));
-                    }
-                }
-                else
-                {
-                    queue.inc(normalize_broadcast(inst.src2));
-                }
-            }
-            std::vector<memory_argument> to_free;
-            for (auto const& kv : vmm_map)
-            {
-                if (keep.count(kv.first))
-                {
-                    continue;
-                }
-                to_free.emplace_back(kv.first);
-                free_regs.insert(kv.second);
-            }
-            for (auto const& m : to_free)
-            {
-                vmm_map.erase(m);
-            }
-
-        } // while queue.size()
     }
-
-    void issue_unrolled_fmas_(std::vector<fma_operation> fmas)
-    {
-        most_frequent_queue<memory_argument> queue;
-
-        for (auto const& inst : fmas)
-        {
-            // Ensures no instructions are added to the unrolled
-            // loop tails
-            strong_assert(is_inside_current_limits(inst.coordinates));
-            queue.inc(inst.src1);
-            queue.inc(inst.src2);
-        }
-
-        Vmm arg1_register = Vmm(1);
-        Vmm arg2_register = Vmm(2);
-
-        std::vector<Vmm> arg1_registers;
-        arg1_registers.push_back(arg1_register);
-        for (int i = first_unused_vmm_register;
-             i < isa_traits<aarch64>::total_vector_registers; ++i)
-        {
-            arg1_registers.push_back(Vmm(i));
-        }
-
-        // TODO(zi) replace this eyeballed value
-        while (arg1_registers.size() > 5)
-        {
-            arg1_registers.pop_back();
-            // arg1_registers.resize(5);
-        }
-
-        int cycle   = arg1_registers.size();
-        int current = 0;
-
-        std::vector<std::function<void()>> issue_delayed_ops(cycle, []() {});
-
-        for (; queue.size() > 0; ++current)
-        {
-            issue_delayed_ops[current % cycle]();
-
-            auto arg1_reg = arg1_registers[current % cycle];
-
-            auto addr = queue.top();
-            queue.pop();
-
-            LN_LOG(INFO) << tabs.back() << "LOAD " << addr.readable() << " ["
-                         << addr.mask << "]\n";
-
-            switch (addr.traits->access)
-            {
-            case SCALAR:
-                broadcast_scalar(arg1_reg, addr.traits->reg, addr.offset * 4,
-                                 vector_size);
-                break;
-
-            case VECTOR_PACKED:
-                load_vector(arg1_reg, addr.traits->reg, addr.offset * 4,
-                            C_traits.access == SCALAR ? addr.mask
-                                                      : vector_size);
-                break;
-
-            case VECTOR_STRIDED:
-                gather_vector(arg1_reg, addr.traits->reg, addr.offset * 4,
-                              addr.mask, addr.traits->innermost_stride * 4);
-                break;
-            }
-
-            std::vector<fma_operation> delayed_fma_operations;
-
-            for (auto it = fmas.begin(); it != fmas.end();)
-            {
-                if (it->src1 == addr || it->src2 == addr)
-                {
-                    auto src1 = it->src1;
-                    auto src2 = it->src2;
-                    if (addr == it->src2)
-                    {
-                        std::swap(src1, src2);
-                    }
-
-                    queue.dec(src2);
-
-                    delayed_fma_operations.push_back(*it);
-
-                    LN_LOG(INFO) << tabs.back() << it->dest.readable()
-                                 << " += " << it->src1.readable() << " * "
-                                 << it->src2.readable() << "\n";
-                    it = fmas.erase(it);
-                }
-                else
-                {
-                    ++it;
-                }
-            }
-
-            issue_delayed_ops[current % cycle] = [arg1_reg, addr,
-                                                  delayed_fma_operations, this,
-                                                  arg2_register]() {
-                for (auto const& op : delayed_fma_operations)
-                {
-                    auto src1 = op.src1;
-                    auto src2 = op.src2;
-
-                    if (addr == src2)
-                    {
-                        std::swap(src1, src2);
-                    }
-
-                    switch (src2.traits->access)
-                    {
-                    case SCALAR:
-                        load_scalar(arg2_register, src2.traits->reg,
-                                    src2.offset * 4);
-                        break;
-
-                    case VECTOR_PACKED:
-                        load_vector(arg2_register, src2.traits->reg,
-                                    src2.offset * 4, vector_size);
-                        break;
-
-                    case VECTOR_STRIDED:
-                        gather_vector(arg2_register, src2.traits->reg,
-                                      src2.offset * 4, src2.mask,
-                                      src2.traits->innermost_stride * 4);
-                        break;
-                    }
-                    if (src2.traits->access == SCALAR)
-                    {
-                        fmla((C_VMMs[op.dest]++).s4, arg1_reg.s4,
-                             arg2_register.s4[0]);
-                    }
-                    else
-                    {
-                        fmla((C_VMMs[op.dest]++).s4, arg1_reg.s4,
-                             arg2_register.s4);
-                    }
-                }
-            };
-        }
-
-        for (int off = 0; off < cycle; ++off, ++current)
-        {
-            issue_delayed_ops[current % cycle]();
-        }
-
-        // for (auto const& p : addressers)
-        // {
-        //     p.second->restore();
-        // }
-    }
-
-    void issue_embedded_constants() {}
 
     void set_tensor_traits()
     {
@@ -2353,7 +1971,6 @@ private:
 
         if (A_access_kind == VECTOR_STRIDED || B_access_kind == VECTOR_STRIDED)
         {
-            // std::cout << "DIFF::HEHEHEHEHEHHEHEHEHEHEH\n";
             C_access_kind = A_access_kind = B_access_kind = SCALAR;
             is_C_vectorized = is_A_vectorized = is_B_vectorized = false;
             is_A_vectorized = is_B_vectorized = is_C_vectorized = false;
@@ -2389,8 +2006,6 @@ private:
         LN_LOG(DEBUG) << "C_access_len is: " << C_traits.access_len << "\n";
     }
 
-    void set_elementwise_tensor_traits() {}
-
     void set_available_vector_registers()
     {
         auxiliary_registers = 3;
@@ -2407,8 +2022,6 @@ private:
         in_register_tensor_pointers.push_back({"B_Tensor", BReg_, B_strides});
         in_register_tensor_pointers.push_back({"C_Tensor", CReg_, C_strides});
     }
-
-    void set_in_register_elementwise_tensor_pointers() {}
 
     // Returns the first loop that can hold C in register file, and
     // the first loop to be unrolled.
@@ -2438,8 +2051,6 @@ private:
             std::accumulate(padded_sizes.begin(), padded_sizes.end(),
                             (std::int64_t)1,
                             [&](std::int64_t v, auto const& s) {
-                                // std::cout << v << " :: " << s.second <<
-                                // "\n";
                                 return (B_strides.count(s.first) ||
                                         A_strides.count(s.first) ||
                                         C_strides.count(s.first))
@@ -2456,8 +2067,6 @@ private:
         LN_LOG(DEBUG) << "Registers originally required: " << registers_required
                       << "\n";
         LN_LOG(DEBUG) << "C_access_len: " << C_traits.access_len << "\n";
-
-        // auto sizes_copy = padded_sizes;
 
         auto it_end = --(order.end());
         auto it     = order.begin();
@@ -2524,8 +2133,6 @@ private:
                 --it;
                 --first_loop_that_can_hold_C;
             }
-
-            // strong_assert(it_end != order.begin());
 
             auto pair = *it;
 
@@ -2685,8 +2292,6 @@ private:
                 }
                 else
                 {
-                    // std::cout << loops[i].var << " :: " << loops[i].end
-                    //          << std::endl;
                     strong_assert((loops[i].end % vector_size) == 0);
                 }
             }
@@ -2815,10 +2420,6 @@ private:
 
                 sub_imm(loopReg_, 1);
                 cbnz(loopReg_, *loopLabel);
-
-                // adr(x15, loopLabel);
-                // br(x15);
-                // L_aarch64(doneLabel);
             }
             else if (full_iterations == 1)
             {
@@ -2922,11 +2523,6 @@ private:
     void issue_unrolled_fmas_dry_run(std::vector<fma_operation> fmas,
                                      int                        num_iterations)
     {
-        // if (fmas[0].src1.traits->access == VECTOR_PACKED &&
-        //     fmas[0].src2.traits->access == VECTOR_PACKED)
-        // {
-        //     return;
-        // }
 
         if (fmas.size())
         {
@@ -2951,7 +2547,6 @@ private:
                 return;
             }
         }
-        // List of usages
 
         int src1_reg = fmas[0].src1.traits->reg.getIdx();
         int src2_reg = fmas[0].src2.traits->reg.getIdx();
@@ -2969,7 +2564,6 @@ private:
 
         std::deque<int> free_regs;
 
-        // free_regs.push_back(0);
         free_regs.push_back(1);
         free_regs.push_back(2);
 
@@ -3202,8 +2796,10 @@ private:
             }
         }
 
-        move_loads(instructions);
         pair_loads(instructions);
+
+        move_loads(instructions);
+
         offsets_to_post_increment(instructions, num_iterations);
 
         instruction_IRs.push_back(std::move(instructions));
@@ -3228,7 +2824,6 @@ private:
 
         std::deque<int> free_regs;
 
-        // free_regs.push_back(0);
         free_regs.push_back(1);
         free_regs.push_back(2);
 
@@ -3395,9 +2990,6 @@ private:
                 {first_it->vreg_idx, mask},
                 {second_it->vreg_idx, mask}}; // update datastructures
 
-            // std::cout << "---------------> " << fmas[i].dest.readable()
-            //           << " :: " << to_push.dst.number << "\n";
-
             instructions.push_back(to_push);
 
             strong_assert(remaining_usages.count(first_loc) &&
@@ -3414,8 +3006,8 @@ private:
             update_vector(second_it);
         }
 
-        move_loads(instructions);
         pair_loads(instructions);
+        move_loads(instructions);
         offsets_to_post_increment(instructions, num_iterations);
 
         instruction_IRs.push_back(std::move(instructions));
@@ -3652,25 +3244,11 @@ public:
         compute_masked_out_flops();
         compute_memory();
 
-        // elementwise_strides.insert(elementwise_strides.end(),
-        //                            elementwise_preop_strides.begin(),
-        //                            elementwise_preop_strides.end());
-        // elementwise_strides.insert(elementwise_strides.end(),
-        //                            elementwise_postop_strides.begin(),
-        //                            elementwise_postop_strides.end());
-
-        // allocate_elementwise_addressing_registers();
-        // allocate_elementwise_labels();
-
         set_tensor_traits();
-        // set_elementwise_tensor_traits();
 
         set_available_vector_registers();
 
         set_in_register_tensor_pointers();
-        // set_in_register_elementwise_tensor_pointers();
-
-        // initialize_elementwise_ops();
 
         int first_loop_that_can_hold_C, unroll_stage,
             total_required_fma_operations;
@@ -3699,66 +3277,44 @@ public:
         std::vector<fma_operation> unrolled_fmas =
             collect_default_unrolled_FMAs_at(unroll_stage);
 
-        // std::cout << "UFMAS: " << unrolled_fmas.size()
-        //           << " BUT: " << total_required_fma_operations << "\n\n";
         strong_assert(unrolled_fmas.size() == total_required_fma_operations);
-
-        // Regs to be saved: RBX and R12-R15 (we don't use RBP)
-        // push({r15, r14, r13, r12, rbx});
 
         prepare_stack();
         eor(ZeroReg_, ZeroReg_, ZeroReg_);
         ins(ZeroVector_.d[0], ZeroReg_);
         ins(ZeroVector_.d[1], ZeroReg_);
 
-        // if ((A_traits.access == SCALAR && B_traits.access ==
-        // VECTOR_PACKED) ||
-        //     (A_traits.access == VECTOR_PACKED && B_traits.access ==
-        //     SCALAR) || (A_traits.access == VECTOR_PACKED &&
-        //      B_traits.access == VECTOR_PACKED))
+        issue_loops_dry_run(unroll_stage);
+
+        std::vector<int> available = {11, 12, 13, 14, 15};
+        std::vector<std::pair<std::int64_t, int>> rev_freq;
+
+        for (auto const& f : sadd_freq)
         {
-            issue_loops_dry_run(unroll_stage);
-
-            std::vector<int> available = {11, 12, 13, 14, 15};
-            std::vector<std::pair<std::int64_t, int>> rev_freq;
-
-            for (auto const& f : sadd_freq)
+            if (f.first < -256 || f.first >= 256)
             {
-                if (f.first < -256 || f.first >= 256)
-                {
-                    rev_freq.push_back({f.second, f.first});
-                }
-                LN_LOG(INFO)
-                    << "SADD OF " << f.first << " :: " << f.second << "\n";
+                rev_freq.push_back({f.second, f.first});
             }
+            LN_LOG(INFO) << "SADD OF " << f.first << " :: " << f.second << "\n";
+        }
 
-            std::sort(rev_freq.begin(), rev_freq.end());
+        std::sort(rev_freq.begin(), rev_freq.end());
 
-            while (rev_freq.size() && available.size())
-            {
-                mov_imm(XReg(available.back()), 0);
-                sadd_imm(XReg(available.back()), rev_freq.back().second);
-                delta_xreg_map[rev_freq.back().second] = available.back();
-                available.pop_back();
-                rev_freq.pop_back();
-            }
+        while (rev_freq.size() && available.size())
+        {
+            mov_imm(XReg(available.back()), 0);
+            sadd_imm(XReg(available.back()), rev_freq.back().second);
+            delta_xreg_map[rev_freq.back().second] = available.back();
+            available.pop_back();
+            rev_freq.pop_back();
         }
 
         issue_loops(depth_for_register_blocked_C, unroll_stage);
 
         restore_stack();
-
-        // pop({r15, r14, r13, r12, rbx});
-
-        // This is apparently very important as it can slow down
-        // legacy SSE code upon return.
-        // software.intel.com/en-us/forums/intel-isa-extensions/topic/704023
-        // vzeroupper();
         ret();
-
-        // issue_embedded_constants();
     }
-}; // namespace aot
+};
 
 } // namespace aot
 } // namespace sysml
