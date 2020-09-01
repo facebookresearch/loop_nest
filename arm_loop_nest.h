@@ -222,6 +222,62 @@ private:
         }
     };
 
+    struct load_xreg_instruction
+    {
+        int reg;
+
+        tensor_location_t tensor_location;
+
+        friend bool operator<(load_xreg_instruction const& lhs,
+                              load_xreg_instruction const& rhs)
+        {
+            return std::tie(lhs.reg, lhs.tensor_location) <
+                   std::tie(rhs.reg, rhs.tensor_location);
+        }
+    };
+
+    struct load_wreg_instruction
+    {
+        int reg;
+
+        tensor_location_t tensor_location;
+
+        friend bool operator<(load_wreg_instruction const& lhs,
+                              load_wreg_instruction const& rhs)
+        {
+            return std::tie(lhs.reg, lhs.tensor_location) <
+                   std::tie(rhs.reg, rhs.tensor_location);
+        }
+    };
+
+    struct ins_xreg_instruction
+    {
+        int reg;
+        int vreg;
+        int lane;
+
+        friend bool operator<(ins_xreg_instruction const& lhs,
+                              ins_xreg_instruction const& rhs)
+        {
+            return std::tie(lhs.reg, lhs.vreg, lhs.lane) <
+                   std::tie(rhs.reg, rhs.vreg, rhs.lane);
+        }
+    };
+
+    struct ins_wreg_instruction
+    {
+        int reg;
+        int vreg;
+        int lane;
+
+        friend bool operator<(ins_wreg_instruction const& lhs,
+                              ins_wreg_instruction const& rhs)
+        {
+            return std::tie(lhs.reg, lhs.vreg, lhs.lane) <
+                   std::tie(rhs.reg, rhs.vreg, rhs.lane);
+        }
+    };
+
     struct load_pair_instruction
     {
         int vreg1;
@@ -241,8 +297,11 @@ private:
         }
     };
 
-    using instruction_t = std::variant<std::monostate, load_instruction,
-                                       load_pair_instruction, fmla_instruction>;
+    using instruction_t =
+        std::variant<std::monostate, load_instruction, load_pair_instruction,
+                     fmla_instruction, load_wreg_instruction,
+                     load_xreg_instruction, ins_wreg_instruction,
+                     ins_xreg_instruction>;
 
     std::deque<std::vector<instruction_t>> instruction_IRs;
 
@@ -371,6 +430,11 @@ private:
     {
         for (int i = 1; i < instructions.size(); ++i)
         {
+            auto& insn = instructions[i];
+            strong_assert(std::holds_alternative<load_instruction>(insn) ||
+                          std::holds_alternative<fmla_instruction>(insn) ||
+                          std::holds_alternative<std::monostate>(insn));
+
             if (std::holds_alternative<load_instruction>(instructions[i]))
             {
                 auto load = std::get<load_instruction>(instructions[i]);
@@ -426,6 +490,22 @@ private:
                                    load.tensor_location.idx = temp_pair[ridx];
                                }
                            },
+                           [&](load_wreg_instruction& load) {
+                               auto ridx = load.tensor_location.idx;
+                               if ((pairity[ridx]++) % 2)
+                               {
+                                   load.tensor_location.idx = temp_pair[ridx];
+                               }
+                           },
+                           [&](load_xreg_instruction& load) {
+                               auto ridx = load.tensor_location.idx;
+                               if ((pairity[ridx]++) % 2)
+                               {
+                                   load.tensor_location.idx = temp_pair[ridx];
+                               }
+                           },
+                           [](ins_wreg_instruction const&) {},
+                           [](ins_xreg_instruction const&) {},
                            [](fmla_instruction&) {}, [](std::monostate) {}},
                 insn);
         }
@@ -498,8 +578,54 @@ private:
                         mappings.erase(fml.right_src.number);
                         mappings.erase(fml.dst.number);
                     },
+                    [](load_wreg_instruction const&) { strong_assert(false); },
+                    [](load_xreg_instruction const&) { strong_assert(false); },
+                    [](ins_wreg_instruction const&) { strong_assert(false); },
+                    [](ins_xreg_instruction const&) { strong_assert(false); },
                     [](std::monostate) {}},
                 instructions[i]);
+        }
+    }
+
+    void
+    print_instructions(std::vector<instruction_t> const& instructions) const
+    {
+        for (auto const& insn : instructions)
+        {
+            std::visit(
+                overloaded{
+                    [&](load_pair_instruction const& i) {
+                        int ptr_reg_idx = i.tensor_location.idx;
+                        int ptr_offset  = i.tensor_location.offset;
+
+                        LN_LOG(INFO) << tabs.back() << "::LOAD PAIR Vreg("
+                                     << i.vreg1 << " and " << i.vreg2 << ")["
+                                     << i.num_lanes << "], X_" << ptr_reg_idx
+                                     << "[" << ptr_offset << "]\n";
+                    },
+                    [&](load_instruction const& i) {
+                        int ptr_reg_idx = i.tensor_location.idx;
+                        int ptr_offset  = i.tensor_location.offset;
+
+                        LN_LOG(INFO)
+                            << tabs.back() << "::LOAD Vreg(" << i.vreg << ")["
+                            << i.num_lanes << "], X_" << ptr_reg_idx << "["
+                            << ptr_offset << "]\n";
+                    },
+                    [&](fmla_instruction const& fml) {
+                        LN_LOG(INFO)
+                            << tabs.back() << "::FMLA Vreg(" << fml.dst.number
+                            << "), Vreg(" << fml.left_src.number << "), Vreg("
+                            << fml.right_src.number << ") ["
+                            << fml.right_src.lane << "]\n";
+                    },
+                    [](load_wreg_instruction const&) { strong_assert(false); },
+                    [](load_xreg_instruction const&) { strong_assert(false); },
+                    [](ins_wreg_instruction const&) { strong_assert(false); },
+                    [](ins_xreg_instruction const&) { strong_assert(false); },
+
+                    [](std::monostate) {}},
+                insn);
         }
     }
 
@@ -538,6 +664,14 @@ private:
             if (std::holds_alternative<load_pair_instruction>(insn))
             {
                 process(std::get<load_pair_instruction>(insn));
+            }
+            if (std::holds_alternative<load_xreg_instruction>(insn))
+            {
+                process(std::get<load_xreg_instruction>(insn));
+            }
+            if (std::holds_alternative<load_wreg_instruction>(insn))
+            {
+                process(std::get<load_wreg_instruction>(insn));
             }
         }
     }
@@ -1585,44 +1719,15 @@ private:
                             strong_assert(false && "Unknown number of lanes");
                         }
                     },
+                    [](load_wreg_instruction const&) { strong_assert(false); },
+                    [](load_xreg_instruction const&) { strong_assert(false); },
+                    [](ins_wreg_instruction const&) { strong_assert(false); },
+                    [](ins_xreg_instruction const&) { strong_assert(false); },
                     [](std::monostate) {}},
                 insn);
         }
 
-        for (auto const& insn : instructions)
-        {
-            std::visit(overloaded{[&](load_pair_instruction const& i) {
-                                      int ptr_reg_idx = i.tensor_location.idx;
-                                      int ptr_offset = i.tensor_location.offset;
-
-                                      LN_LOG(INFO)
-                                          << tabs.back() << "::LOAD PAIR Vreg("
-                                          << i.vreg1 << " and " << i.vreg2
-                                          << ")[" << i.num_lanes << "], X_"
-                                          << ptr_reg_idx << "[" << ptr_offset
-                                          << "]\n";
-                                  },
-                                  [&](load_instruction const& i) {
-                                      int ptr_reg_idx = i.tensor_location.idx;
-                                      int ptr_offset = i.tensor_location.offset;
-
-                                      LN_LOG(INFO)
-                                          << tabs.back() << "::LOAD Vreg("
-                                          << i.vreg << ")[" << i.num_lanes
-                                          << "], X_" << ptr_reg_idx << "["
-                                          << ptr_offset << "]\n";
-                                  },
-                                  [&](fmla_instruction const& fml) {
-                                      LN_LOG(INFO)
-                                          << tabs.back() << "::FMLA Vreg("
-                                          << fml.dst.number << "), Vreg("
-                                          << fml.left_src.number << "), Vreg("
-                                          << fml.right_src.number << ") ["
-                                          << fml.right_src.lane << "]\n";
-                                  },
-                                  [](std::monostate) {}},
-                       insn);
-        }
+        print_instructions(instructions);
 
         for (auto const& offs : tensor_offsets)
         {
@@ -1640,86 +1745,59 @@ private:
         for (auto const& insn : instructions)
         {
             std::visit(
-                overloaded{[&](load_pair_instruction const& i) {
-                               int ptr_reg_idx = i.tensor_location.idx;
-                               int delta       = i.tensor_location.offset;
+                overloaded{
+                    [&](load_pair_instruction const& i) {
+                        int ptr_reg_idx = i.tensor_location.idx;
+                        int delta       = i.tensor_location.offset;
 
-                               tensor_offsets[ptr_reg_idx] += delta;
-                               strong_assert(i.num_lanes == 1);
+                        tensor_offsets[ptr_reg_idx] += delta;
+                        strong_assert(i.num_lanes == 1);
 
-                               if (delta && delta <= 252 && delta >= -256)
-                               {
-                                   ldp(SReg(i.vreg1), SReg(i.vreg2),
-                                       post_ptr(XReg(ptr_reg_idx), delta));
-                               }
-                               else
-                               {
-                                   ldp(SReg(i.vreg1), SReg(i.vreg2),
-                                       ptr(XReg(ptr_reg_idx)));
-                                   sadd_imm(XReg(ptr_reg_idx), delta);
-                               }
-                           },
-                           [&](load_instruction const& i) {
-                               int ptr_reg_idx = i.tensor_location.idx;
-                               int delta       = i.tensor_location.offset;
+                        if (delta && delta <= 252 && delta >= -256)
+                        {
+                            ldp(SReg(i.vreg1), SReg(i.vreg2),
+                                post_ptr(XReg(ptr_reg_idx), delta));
+                        }
+                        else
+                        {
+                            ldp(SReg(i.vreg1), SReg(i.vreg2),
+                                ptr(XReg(ptr_reg_idx)));
+                            sadd_imm(XReg(ptr_reg_idx), delta);
+                        }
+                    },
+                    [&](load_instruction const& i) {
+                        int ptr_reg_idx = i.tensor_location.idx;
+                        int delta       = i.tensor_location.offset;
 
-                               tensor_offsets[ptr_reg_idx] += delta;
-                               strong_assert(i.num_lanes == 1);
+                        tensor_offsets[ptr_reg_idx] += delta;
+                        strong_assert(i.num_lanes == 1);
 
-                               if (delta && delta < 256 && delta >= -256)
-                               {
-                                   ldr(SReg(i.vreg),
-                                       post_ptr(XReg(ptr_reg_idx), delta));
-                               }
-                               else
-                               {
-                                   ldr(SReg(i.vreg), ptr(XReg(ptr_reg_idx)));
-                                   sadd_imm(XReg(ptr_reg_idx), delta);
-                               }
-                           },
-                           [&](fmla_instruction const& fml) {
-                               fmla(VReg(fml.dst.number).s2,
-                                    VReg(fml.left_src.number).s2,
-                                    VReg(fml.right_src.number).s2);
-                           },
-                           [](std::monostate) {}},
+                        if (delta && delta < 256 && delta >= -256)
+                        {
+                            ldr(SReg(i.vreg),
+                                post_ptr(XReg(ptr_reg_idx), delta));
+                        }
+                        else
+                        {
+                            ldr(SReg(i.vreg), ptr(XReg(ptr_reg_idx)));
+                            sadd_imm(XReg(ptr_reg_idx), delta);
+                        }
+                    },
+                    [&](fmla_instruction const& fml) {
+                        fmla(VReg(fml.dst.number).s2,
+                             VReg(fml.left_src.number).s2,
+                             VReg(fml.right_src.number).s2);
+                    },
+                    [](load_wreg_instruction const&) { strong_assert(false); },
+                    [](load_xreg_instruction const&) { strong_assert(false); },
+                    [](ins_wreg_instruction const&) { strong_assert(false); },
+                    [](ins_xreg_instruction const&) { strong_assert(false); },
+
+                    [](std::monostate) {}},
                 insn);
         }
 
-        for (auto const& insn : instructions)
-        {
-            std::visit(overloaded{[&](load_pair_instruction const& i) {
-                                      int ptr_reg_idx = i.tensor_location.idx;
-                                      int ptr_offset = i.tensor_location.offset;
-
-                                      LN_LOG(INFO)
-                                          << tabs.back() << "::LOAD PAIR Vreg("
-                                          << i.vreg1 << " and " << i.vreg2
-                                          << ")[" << i.num_lanes << "], X_"
-                                          << ptr_reg_idx << "[" << ptr_offset
-                                          << "]\n";
-                                  },
-                                  [&](load_instruction const& i) {
-                                      int ptr_reg_idx = i.tensor_location.idx;
-                                      int ptr_offset = i.tensor_location.offset;
-
-                                      LN_LOG(INFO)
-                                          << tabs.back() << "::LOAD Vreg("
-                                          << i.vreg << ")[" << i.num_lanes
-                                          << "], X_" << ptr_reg_idx << "["
-                                          << ptr_offset << "]\n";
-                                  },
-                                  [&](fmla_instruction const& fml) {
-                                      LN_LOG(INFO)
-                                          << tabs.back() << "::FMLA Vreg("
-                                          << fml.dst.number << "), Vreg("
-                                          << fml.left_src.number << "), Vreg("
-                                          << fml.right_src.number << ") ["
-                                          << fml.right_src.lane << "]\n";
-                                  },
-                                  [](std::monostate) {}},
-                       insn);
-        }
+        print_instructions(instructions);
 
         for (auto const& offs : tensor_offsets)
         {
@@ -1866,44 +1944,16 @@ private:
                                  VReg(fml.right_src.number).s4);
                         }
                     },
+                    [](load_wreg_instruction const&) { strong_assert(false); },
+                    [](load_xreg_instruction const&) { strong_assert(false); },
+                    [](ins_wreg_instruction const&) { strong_assert(false); },
+                    [](ins_xreg_instruction const&) { strong_assert(false); },
+
                     [](std::monostate) {}},
                 insn);
         }
 
-        for (auto const& insn : instructions)
-        {
-            std::visit(overloaded{[&](load_pair_instruction const& i) {
-                                      int ptr_reg_idx = i.tensor_location.idx;
-                                      int ptr_offset = i.tensor_location.offset;
-
-                                      LN_LOG(INFO)
-                                          << tabs.back() << "::LOAD PAIR Vreg("
-                                          << i.vreg1 << " and " << i.vreg2
-                                          << ")[" << i.num_lanes << "], X_"
-                                          << ptr_reg_idx << "[" << ptr_offset
-                                          << "]\n";
-                                  },
-                                  [&](load_instruction const& i) {
-                                      int ptr_reg_idx = i.tensor_location.idx;
-                                      int ptr_offset = i.tensor_location.offset;
-
-                                      LN_LOG(INFO)
-                                          << tabs.back() << "::LOAD Vreg("
-                                          << i.vreg << ")[" << i.num_lanes
-                                          << "], X_" << ptr_reg_idx << "["
-                                          << ptr_offset << "]\n";
-                                  },
-                                  [&](fmla_instruction const& fml) {
-                                      LN_LOG(INFO)
-                                          << tabs.back() << "::FMLA Vreg("
-                                          << fml.dst.number << "), Vreg("
-                                          << fml.left_src.number << "), Vreg("
-                                          << fml.right_src.number << ") ["
-                                          << fml.right_src.lane << "]\n";
-                                  },
-                                  [](std::monostate) {}},
-                       insn);
-        }
+        print_instructions(instructions);
 
         for (auto const& offs : tensor_offsets)
         {
@@ -2833,10 +2883,8 @@ private:
             }
         }
 
-        pair_loads(instructions);
-
         move_loads(instructions);
-
+        pair_loads(instructions);
         offsets_to_post_increment(instructions, num_iterations);
 
         instruction_IRs.push_back(std::move(instructions));
@@ -3043,8 +3091,8 @@ private:
             update_vector(second_it);
         }
 
-        pair_loads(instructions);
         move_loads(instructions);
+        pair_loads(instructions);
         offsets_to_post_increment(instructions, num_iterations);
 
         instruction_IRs.push_back(std::move(instructions));
@@ -3357,14 +3405,14 @@ public:
 
         std::sort(rev_freq.begin(), rev_freq.end());
 
-        while (rev_freq.size() && available.size())
-        {
-            mov_imm(XReg(available.back()), 0);
-            sadd_imm(XReg(available.back()), rev_freq.back().second);
-            delta_xreg_map[rev_freq.back().second] = available.back();
-            available.pop_back();
-            rev_freq.pop_back();
-        }
+        // while (rev_freq.size() && available.size())
+        // {
+        //     mov_imm(XReg(available.back()), 0);
+        //     sadd_imm(XReg(available.back()), rev_freq.back().second);
+        //     delta_xreg_map[rev_freq.back().second] = available.back();
+        //     available.pop_back();
+        //     rev_freq.pop_back();
+        // }
 
         auto x_regs_to_save = prepare_loop_registers(unroll_stage);
         meta_push(x_regs_to_save);
