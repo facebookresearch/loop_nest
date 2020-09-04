@@ -656,7 +656,7 @@ private:
             {
                 if (--num_prev_uses[r] == 0)
                 {
-                    auto const& insn = instructions[r];
+                    auto const& insn = instructions[i];
                     if (std::holds_alternative<load_instruction>(insn) ||
                         std::holds_alternative<load_pair_instruction>(insn) ||
                         std::holds_alternative<load_xreg_instruction>(insn) ||
