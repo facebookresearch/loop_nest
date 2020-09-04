@@ -471,11 +471,11 @@ private:
     std::vector<instruction_t>
     cortex_a5X_optimized(std::vector<instruction_t> instructions_in)
     {
-        pair_loads(instructions_in, 4);
+        pair_loads(instructions_in);
 
         std::vector<instruction_t> instructions;
 
-        int to_skip_loads = 10;
+        int to_skip_loads = 10000000;
 
         for (auto& insn : instructions_in)
         {
