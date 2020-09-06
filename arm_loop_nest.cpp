@@ -110,7 +110,7 @@ int main()
             1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
     }
 
-    // return 0;
+    return 0;
 
     // ALL SCALARS!!!!
     {

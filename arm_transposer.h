@@ -108,18 +108,18 @@ private:
         sub(sp, sp, 1024);
         sub(sp, sp, 1024);
         mov(stack_reg, sp);
-        stp(q8, q9, post_ptr(stack_reg, 64));
-        stp(q10, q11, post_ptr(stack_reg, 64));
-        stp(q12, q13, post_ptr(stack_reg, 64));
-        stp(q14, q15, post_ptr(stack_reg, 64));
+        // stp(q8, q9, post_ptr(stack_reg, 64));
+        // stp(q10, q11, post_ptr(stack_reg, 64));
+        // stp(q12, q13, post_ptr(stack_reg, 64));
+        // stp(q14, q15, post_ptr(stack_reg, 64));
     }
 
     void restore_stack()
     {
-        ldp(q14, q15, pre_ptr(stack_reg, 64));
-        ldp(q12, q13, pre_ptr(stack_reg, 64));
-        ldp(q10, q11, pre_ptr(stack_reg, 64));
-        ldp(q8, q9, pre_ptr(stack_reg, 64));
+        // ldp(q14, q15, pre_ptr(stack_reg, 64));
+        // ldp(q12, q13, pre_ptr(stack_reg, 64));
+        // ldp(q10, q11, pre_ptr(stack_reg, 64));
+        // ldp(q8, q9, pre_ptr(stack_reg, 64));
         add(sp, sp, 1024);
         add(sp, sp, 1024);
     }
@@ -132,6 +132,9 @@ private:
     Reg64 loop_reg  = x2;
     Reg64 stack_reg = x3;
     Reg64 xtmp1     = x4;
+
+    Reg64 movReg1 = x5;
+    Reg64 movReg2 = x6;
 
     std::vector<std::pair<std::string, int>> order;
     std::map<std::string, int>               sizes;
@@ -504,7 +507,33 @@ private:
         return ret;
     }
 
-    void issue_unrolled_moves(std::vector<move_operation> const& moves)
+    void offsets_to_post_increment(std::vector<move_operation>& moves)
+    {
+        std::map<int, int> reg_to_location;
+
+        auto process = [&](int reg_id, auto& loc) {
+            if (reg_to_location.count(reg_id))
+            {
+                auto delta = reg_to_location[reg_id] - loc.offset;
+
+                reg_to_location[reg_id] = loc.offset;
+                loc.offset              = delta * 4;
+            }
+            else
+            {
+                reg_to_location[reg_id] = loc.offset;
+                loc.offset              = 0;
+            }
+        };
+
+        for (auto it = moves.rbegin(); it != moves.rend(); ++it)
+        {
+            process(in_reg.getIdx(), it->src);
+            process(out_reg.getIdx(), it->dest);
+        }
+    }
+
+    void issue_unrolled_moves(std::vector<move_operation> moves)
     {
         for (auto const& m : moves)
         {
@@ -515,166 +544,151 @@ private:
         LN_LOG(INFO) << tabs.back() << "ISSUING " << moves.size()
                      << " UNROLLED MOVES\n";
 
-        int first_reg    = 0; // is_vectorized ? 0 : 5;
-        int num_regs     = 7; // is_vectorized ? 32 : 8;
-        int cur_read_reg = 0;
-        int cur_write_reg = 0;
+        if (moves.size())
+        {
+            strong_assert(moves[0].src.offset == 0);
+            strong_assert(moves[0].dest.offset == 0);
+        }
 
-        int src_loc = 0;
-        int dst_loc = 0;
+        offsets_to_post_increment(moves);
+
+        int src_loc  = 0;
+        int dest_loc = 0;
 
         auto issue_read = [&](auto const& loc) {
-            auto delta = loc.offset * 4 - src_loc;
+            auto delta = loc.offset;
 
-            LN_LOG(INFO) << tabs.back() << "READ REG[" << cur_read_reg << " : "
-                         << loc.mask << "] in[" << loc.offset
+            LN_LOG(INFO) << tabs.back() << "READ in[" << (src_loc / 4)
                          << "] (delta: " << delta << ")\n";
 
-            if (true || delta < -256 || delta > 255)
+            src_loc += delta;
+
+            if (is_vectorized)
             {
-                sadd_imm(in_reg, delta);
-                if (is_vectorized)
+                switch (loc.mask)
                 {
-                    switch (loc.mask)
+                case 1:
+                    if (delta && delta <= 254 && delta >= -256)
                     {
-                    case 1:
-                        ldr(SReg(first_reg + cur_read_reg), ptr(in_reg));
-                        break;
-                    case 2:
-                        ldr(DReg(first_reg + cur_read_reg), ptr(in_reg));
-                        break;
-                    case 4:
-                        ldr(QReg(first_reg + cur_read_reg), ptr(in_reg));
-                        break;
-                    default:
-                        strong_assert(false && "Mask not supported");
+                        ldr(WReg(movReg1.getIdx()), post_ptr(in_reg, delta));
                     }
-                }
-                else
-                {
-                    ldr(SReg(first_reg + cur_read_reg), ptr(in_reg));
+                    else
+                    {
+                        ldr(WReg(movReg1.getIdx()), ptr(in_reg));
+                        sadd_imm(in_reg, delta);
+                    }
+                    break;
+                case 2:
+                    if (delta && delta <= 252 && delta >= -256)
+                    {
+                        ldr(movReg1, post_ptr(in_reg, delta));
+                    }
+                    else
+                    {
+                        ldr(movReg1, ptr(in_reg));
+                        sadd_imm(in_reg, delta);
+                    }
+                    break;
+                case 4:
+                    if (delta && delta <= 504 && delta >= -512)
+                    {
+                        ldp(movReg1, movReg2, post_ptr(in_reg, delta));
+                    }
+                    else
+                    {
+                        ldp(movReg1, movReg2, ptr(in_reg));
+                        sadd_imm(in_reg, delta);
+                    }
+                    break;
+                default:
+                    strong_assert(false && "Mask not supported");
                 }
             }
             else
             {
-                if (is_vectorized)
+                if (delta && delta <= 254 && delta >= -256)
                 {
-                    switch (loc.mask)
-                    {
-                    case 1:
-                        ldr(SReg(first_reg + cur_read_reg),
-                            pre_ptr(in_reg, delta));
-                        break;
-                    case 2:
-                        ldr(DReg(first_reg + cur_read_reg),
-                            pre_ptr(in_reg, delta));
-                        break;
-                    case 4:
-                        ldr(QReg(first_reg + cur_read_reg),
-                            pre_ptr(in_reg, delta));
-                        break;
-                    default:
-                        strong_assert(false && "Mask not supported");
-                    }
+                    ldr(WReg(movReg1.getIdx()), post_ptr(in_reg, delta));
                 }
                 else
                 {
-                    ldr(SReg(first_reg + cur_read_reg), pre_ptr(in_reg, delta));
+                    ldr(WReg(movReg1.getIdx()), ptr(in_reg));
+                    sadd_imm(in_reg, delta);
                 }
             }
-
-            cur_read_reg = (cur_read_reg + 1) % num_regs;
-            src_loc      = loc.offset * 4;
         };
 
         auto issue_write = [&](auto const& loc) {
-            auto delta = loc.offset * 4 - dst_loc;
+            auto delta = loc.offset;
 
-            LN_LOG(INFO) << tabs.back() << "WRITE REG[" << cur_write_reg
-                         << " : " << loc.mask << "] out[" << loc.offset
+            LN_LOG(INFO) << tabs.back() << "WRITE out[" << (dest_loc / 4)
                          << "]\n";
 
-            if (true || delta < -256 || delta > 255)
+            dest_loc += delta;
+
+            if (is_vectorized)
             {
-                sadd_imm(out_reg, delta);
-                if (is_vectorized)
+                switch (loc.mask)
                 {
-                    switch (loc.mask)
+                case 1:
+                    if (delta && delta <= 254 && delta >= -256)
                     {
-                    case 1:
-                        str(SReg(first_reg + cur_write_reg), ptr(out_reg));
-                        break;
-                    case 2:
-                        str(DReg(first_reg + cur_write_reg), ptr(out_reg));
-                        break;
-                    case 4:
-                        str(QReg(first_reg + cur_write_reg), ptr(out_reg));
-                        break;
-                    default:
-                        strong_assert(false && "Mask not supported");
+                        str(WReg(movReg1.getIdx()), post_ptr(out_reg, delta));
                     }
-                }
-                else
-                {
-                    str(SReg(first_reg + cur_write_reg), ptr(out_reg));
+                    else
+                    {
+                        str(WReg(movReg1.getIdx()), ptr(out_reg));
+                        sadd_imm(out_reg, delta);
+                    }
+                    break;
+                case 2:
+                    if (delta && delta <= 252 && delta >= -256)
+                    {
+                        str(movReg1, post_ptr(out_reg, delta));
+                    }
+                    else
+                    {
+                        str(movReg1, ptr(out_reg));
+                        sadd_imm(out_reg, delta);
+                    }
+                    break;
+                case 4:
+                    if (delta && delta <= 504 && delta >= -512)
+                    {
+                        stp(movReg1, movReg2, post_ptr(out_reg, delta));
+                    }
+                    else
+                    {
+                        stp(movReg1, movReg2, ptr(out_reg));
+                        sadd_imm(out_reg, delta);
+                    }
+                    break;
+                default:
+                    strong_assert(false && "Mask not supported");
                 }
             }
             else
             {
-                if (is_vectorized)
+                if (delta && delta <= 254 && delta >= -256)
                 {
-                    switch (loc.mask)
-                    {
-                    case 1:
-                        str(SReg(first_reg + cur_write_reg),
-                            pre_ptr(out_reg, delta));
-                        break;
-                    case 2:
-                        str(DReg(first_reg + cur_write_reg),
-                            pre_ptr(out_reg, delta));
-                        break;
-                    case 4:
-                        str(QReg(first_reg + cur_write_reg),
-                            pre_ptr(out_reg, delta));
-                        break;
-                    default:
-                        strong_assert(false && "Mask not supported");
-                    }
+                    str(WReg(movReg1.getIdx()), post_ptr(out_reg, delta));
                 }
                 else
                 {
-                    str(SReg(first_reg + cur_write_reg),
-                        pre_ptr(out_reg, delta));
+                    str(WReg(movReg1.getIdx()), ptr(out_reg));
+                    sadd_imm(out_reg, delta);
                 }
             }
-
-            cur_write_reg = (cur_write_reg + 1) % num_regs;
-            dst_loc       = loc.offset * 4;
         };
 
         for (int i = 0; i < moves.size(); ++i)
         {
-            if (i + 5 < moves.size())
-            {
-                for (int j = 0; j < 5; ++j)
-                {
-                    issue_read(moves[i + j].src);
-                }
-                for (int j = 0; j < 5; ++j)
-                {
-                    issue_write(moves[i + j].dest);
-                }
-                i += 4;
-            }
-            else
-            {
-                issue_read(moves[i].src);
-                issue_write(moves[i].dest);
-            }
+            issue_read(moves[i].src);
+            issue_write(moves[i].dest);
         }
 
         sadd_imm(in_reg, -src_loc);
-        sadd_imm(out_reg, -dst_loc);
+        sadd_imm(out_reg, -dest_loc);
     }
 
     void issue_loop_helper(int depth, bool save_loop, bool save_ptrs,

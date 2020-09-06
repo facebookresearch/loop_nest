@@ -63,21 +63,12 @@ class FMA_loop_nest_jitter<aarch64>
                                  int alpha)>
 {
 private:
-    std::vector<std::any> raii;
-
     using base =
         code_generator<void(float* C, float const* A, float const* B, int)>;
     using Vmm         = VReg;
     using multi_vregs = multi_vreg<Vmm>;
 
     static constexpr int vector_size = isa_traits<aarch64>::vector_size;
-
-    std::shared_ptr<Label> make_label()
-    {
-        auto ret = std::make_shared<Label>();
-        raii.push_back(ret);
-        return ret;
-    }
 
     void meta_push(XReg const& op) { str(op, post_ptr(stack_reg, 8)); }
 
