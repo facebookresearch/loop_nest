@@ -535,6 +535,9 @@ private:
 
     void issue_unrolled_moves(std::vector<move_operation> moves)
     {
+        // Optimal moving as per:
+        // https://static.docs.arm.com/uan0015/b/Cortex_A57_Software_Optimization_Guide_external.pdf
+
         for (auto const& m : moves)
         {
             LN_LOG(INFO) << tabs.back() << "OUT[" << m.dest.offset << "] <- in["

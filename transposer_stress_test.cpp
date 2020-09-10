@@ -117,7 +117,7 @@ int main()
             std::cout << "MU=" << max_unrolled << std::endl;
             std::cout << "MAXABSDIFF: " << madiff << std::endl;
 
-            // assert(madiff < 0.000001);
+            assert(madiff < 0.000001);
         }
     }
 }
