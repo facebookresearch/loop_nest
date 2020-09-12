@@ -986,6 +986,7 @@ private:
 
             jmp(doneInitLabel, T_NEAR);
 
+            align_to(16);
             L(loadDataLabel);
 
             issue_C_loads(loads, tail_mask);
@@ -1005,9 +1006,11 @@ private:
                 }
 
                 issue_C_elementwise_preop(loads, tail_mask);
+                align_to(16);
                 L(donePreOp);
             }
 
+            align_to(16);
             L(doneInitLabel);
         }
         else
@@ -1065,6 +1068,7 @@ private:
                     tail_mask ? std::optional<OpMask>(tail_k_mask)
                               : std::nullopt);
 
+                align_to(16);
                 L(not_last_label);
             }
         }
@@ -1142,6 +1146,8 @@ private:
 
                     elementwise_postop->process_batch(
                         *this, {{c, xmm0}}, {xmm1}, C_traits.access, R());
+
+                    align_to(16);
                     L(not_last_label);
                 }
 
@@ -1221,6 +1227,7 @@ private:
                     tail_mask ? std::optional<Vmm>(ymm_tail_mask)
                               : std::nullopt);
 
+                align_to(16);
                 L(not_last_label);
             }
         }
@@ -1267,6 +1274,8 @@ private:
 
                     elementwise_postop->process_batch(
                         *this, {{c, xmm0}}, {xmm1}, C_traits.access, R());
+
+                    align_to(16);
                     L(not_last_label);
                 }
 
@@ -3007,6 +3016,7 @@ private:
             {
                 mov(loopReg_.cvt32(), full_iterations);
                 Label loopLabel;
+                align_to(16);
                 L(loopLabel);
 
                 // --------------------------------------------------

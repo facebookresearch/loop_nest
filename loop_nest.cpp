@@ -29,6 +29,318 @@ int main()
     using facebook::sysml::aot::avx2_plus;
     using facebook::sysml::aot::avx512;
 
+    // 2D convolution example:
+    // O(c_out, o_h, o_w) = I(c_i, o_h + k_h, ow + k_w) * K(c_o, c_i,
+    // k_h, k_w) if (0)
+    {
+        std::cout << "Benchmark: 16" << std::endl;
+
+        int CIN  = 128;
+        int COUT = 128 + 3;
+        int OS   = 56 + 4;
+        int KS   = 3;
+        int IS   = OS + KS - 1;
+
+        auto gen_loop_nest = [&]() {
+            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+                       {{"c_out", 16}, //
+                        {"o_h", 1},
+                        {"o_w", 28},
+                        {"c_in", 16},
+                        {"c_in", 1},
+                        {"o_w", 1}, //
+                        //{"o_w", 1},    //
+                        {"k_h", 1},    //
+                        {"k_w", 1},    //
+                        {"c_out", 1}}, //
+                       // The second argument is a map of the dimension sizes
+                       {{"c_out", COUT},
+                        {"o_w", OS},
+                        {"k_w", KS},
+                        {"c_in", CIN},
+                        {"o_h", OS},
+                        {"k_h", KS}},
+                       // Vars of C (other variables are reduction variables)
+                       {"c_out", "o_w", "o_h"},
+                       // Variables of A, note that i_w and i_h are not used
+                       {"c_in", "i_w", "i_h"},
+                       // Variables of B
+                       {"c_in", "c_out", "k_w", "k_h"},
+                       // C's strides for each variable
+                       {{"o_w", COUT}, {"c_out", 1}, {"o_h", COUT * OS}},
+                       // A's strides for each variable Note how we
+                       // provide strides for i/k_h and i/k_w, this is
+                       // because the access to A is based on output
+                       // and reduction variables
+                       {{"o_w", CIN},
+                        {"k_w", CIN},
+                        {"c_in", 1},
+                        {"o_h", IS * CIN},
+                        {"k_h", IS * CIN}},
+                       // B's strides for each variable
+                       {{"c_out", 1},
+                        {"c_in", COUT},
+                        {"k_w", COUT * CIN},
+                        {"k_h", COUT * CIN * KS}},
+                       facebook::sysml::aot::fma)
+                .get_shared();
+        };
+
+        auto compile_secs = measureFastestWithWarmup(gen_loop_nest, 0, 1);
+        std::cout << "Compile: " << compile_secs << std::endl;
+
+        auto fn = gen_loop_nest();
+        fn.save_to_file("zi.asm");
+        // fn.register_perf("fn10");
+
+        auto A  = getRandomVector<float>(CIN * IS * IS);
+        auto B  = getRandomVector<float>(COUT * CIN * KS * KS);
+        auto CN = std::vector<float>(COUT * OS * OS);
+        auto CJ = std::vector<float>(COUT * OS * OS);
+
+        baseline_Conv(COUT, CIN, OS, OS, KS, KS, A.data(), B.data(), CN.data());
+
+        fn(CJ.data(), A.data(), B.data(), 0);
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS,
+                                CN.data())
+                  << "\n";
+
+        auto secs = measureFastestWithWarmup(
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 1, 1);
+
+        double gflops = 2.0 * CIN * COUT * OS * OS * KS * KS / 1000000000;
+
+        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
+    }
+
+    // 2D convolution example:
+    // O(c_out, o_h, o_w) = I(c_i, o_h + k_h, ow + k_w) * K(c_o, c_i,
+    // k_h, k_w) if (0)
+    {
+        std::cout << "Benchmark Padded Conv: 16" << std::endl;
+
+        int CIN  = 128;
+        int COUT = 128 + 3;
+        int OS   = 56 + 4;
+        int KS   = 3;
+
+        int PS = 1;
+        int IS = OS + KS - 1 - 2 * PS;
+
+        strong_assert(IS == OS);
+
+        std::set<std::string> C_formula = {"c_out", "o_w", "o_h"};
+        std::set<std::string> A_formula = {"c_in", "i_w", "i_h"};
+        std::set<std::string> B_formula = {"c_in", "c_out", "k_w", "k_h"};
+
+        std::map<std::string, int> C_strides = {
+            {"o_w", COUT}, {"c_out", 1}, {"o_h", COUT * OS}};
+        std::map<std::string, int> A_strides = {{"o_w", CIN},
+                                                {"k_w", CIN},
+                                                {"c_in", 1},
+                                                {"o_h", IS * CIN},
+                                                {"k_h", IS * CIN}};
+        std::map<std::string, int> B_strides = {{"c_out", 1},
+                                                {"c_in", COUT},
+                                                {"k_w", COUT * CIN},
+                                                {"k_h", COUT * CIN * KS}};
+
+        auto fn_c = facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+                        {{"c_out", 16}, //
+                         {"o_h", 1},
+                         {"o_w", 28},
+                         {"c_in", 16},
+                         {"c_in", 1},
+                         {"o_w", 1}, //
+                         //{"o_w", 1},    //
+                         {"k_h", 1},    //
+                         {"k_w", 1},    //
+                         {"c_out", 1}}, //
+                        // The second argument is a map of the dimension sizes
+                        {{"c_out", COUT},
+                         {"o_w", OS - 2 * PS},
+                         {"k_w", KS},
+                         {"c_in", CIN},
+                         {"o_h", OS - 2 * PS},
+                         {"k_h", KS}},
+
+                        C_formula, A_formula, B_formula, C_strides, A_strides,
+                        B_strides, facebook::sysml::aot::fma)
+                        .get_shared();
+
+        int in_c_off  = 0;
+        int out_c_off = (PS * OS + PS) * COUT;
+        int ker_c_off = 0;
+
+        // Bottom left
+        auto fn_corners =
+            facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+                {{"c_out", 16}, //
+                 {"o_h", 1},
+                 {"o_w", 28},
+                 {"c_in", 16},
+                 {"c_in", 1},
+                 {"o_w", 1}, //
+                 //{"o_w", 1},    //
+                 {"k_h", 1},    //
+                 {"k_w", 1},    //
+                 {"c_out", 1}}, //
+                // The second argument is a map of the dimension sizes
+                {{"c_out", COUT},
+                 {"o_w", PS},
+                 {"k_w", KS - PS},
+                 {"c_in", CIN},
+                 {"o_h", PS},
+                 {"k_h", KS - PS}},
+
+                C_formula, A_formula, B_formula, C_strides, A_strides,
+                B_strides, facebook::sysml::aot::fma)
+                .get_shared();
+
+        int in_bl_off  = 0;
+        int out_bl_off = 0;
+        int ker_bl_off = (PS * KS + PS) * CIN * COUT;
+
+        int in_br_off  = (OS - 2 * PS) * CIN;
+        int out_br_off = (OS - PS) * COUT;
+        int ker_br_off = (PS * KS) * CIN * COUT;
+
+        int in_tl_off  = (OS - 2 * PS) * OS * CIN;
+        int out_tl_off = (OS - PS) * OS * COUT;
+        int ker_tl_off = (PS)*CIN * COUT;
+
+        int in_tr_off  = in_tl_off + in_br_off;
+        int out_tr_off = out_tl_off + out_br_off;
+        int ker_tr_off = 0;
+
+        // Bottom-Top
+        auto fn_bt =
+            facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+                {{"c_out", 16}, //
+                 {"o_h", 1},
+                 {"o_w", 28},
+                 {"c_in", 16},
+                 {"c_in", 1},
+                 {"o_w", 1}, //
+                 //{"o_w", 1},    //
+                 {"k_h", 1}, //
+                 {"k_w", 1}, //
+                 {"c_out",
+                  1}}, //
+                       // The second argument is a map of the dimension sizes
+                {{"c_out", COUT},
+                 {"o_w", OS - 2 * PS},
+                 {"k_w", KS},
+                 {"c_in", CIN},
+                 {"o_h", PS},
+                 {"k_h", KS - PS}},
+
+                C_formula, A_formula, B_formula, C_strides, A_strides,
+                B_strides, facebook::sysml::aot::fma)
+                .get_shared();
+
+        int in_b_off  = 0;
+        int out_b_off = (PS)*COUT;
+        int ker_b_off = (PS * KS) * CIN * COUT;
+
+        int in_t_off  = (OS - 2 * PS) * OS * CIN;
+        int out_t_off = ((OS - PS) * OS + PS) * COUT;
+        int ker_t_off = 0;
+
+        // Left-Right
+        auto fn_lr =
+            facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+                {{"c_out", 16}, //
+                 {"o_h", 1},
+                 {"o_w", 28},
+                 {"c_in", 16},
+                 {"c_in", 1},
+                 {"o_w", 1}, //
+                 //{"o_w", 1},    //
+                 {"k_h", 1}, //
+                 {"k_w", 1}, //
+                 {"c_out",
+                  1}}, //
+                       // The second argument is a map of the dimension sizes
+                {{"c_out", COUT},
+                 {"o_w", PS},
+                 {"k_w", KS - PS},
+                 {"c_in", CIN},
+                 {"o_h", OS - 2 * PS},
+                 {"k_h", KS}},
+
+                C_formula, A_formula, B_formula, C_strides, A_strides,
+                B_strides, facebook::sysml::aot::fma)
+                .get_shared();
+
+        int in_l_off  = 0;
+        int out_l_off = (PS * OS) * COUT;
+        int ker_l_off = (PS)*CIN * COUT;
+
+        int in_r_off  = (OS - 2 * PS) * CIN;
+        int out_r_off = (PS * OS + (OS - PS)) * COUT;
+        int ker_r_off = 0;
+
+        fn_c.save_to_file("zi.asm");
+        // fn.register_perf("fn10");
+
+        auto A  = getRandomVector<float>(CIN * OS * OS);
+        auto B  = getRandomVector<float>(COUT * CIN * KS * KS);
+        auto CN = std::vector<float>(COUT * OS * OS);
+        auto CJ = std::vector<float>(COUT * OS * OS);
+
+        baseline_padded_Conv(COUT, CIN, OS, OS, KS, KS, PS, PS, A.data(),
+                             B.data(), CN.data());
+
+        auto do_it = [&]() {
+            fn_corners(CJ.data() + out_bl_off, A.data() + in_bl_off,
+                       B.data() + ker_bl_off, 0);
+
+            fn_bt(CJ.data() + out_b_off, A.data() + in_b_off,
+                  B.data() + ker_b_off, 0);
+
+            fn_corners(CJ.data() + out_br_off, A.data() + in_br_off,
+                       B.data() + ker_br_off, 0);
+
+            fn_lr(CJ.data() + out_l_off, A.data() + in_l_off,
+                  B.data() + ker_l_off, 0);
+
+            fn_c(CJ.data() + out_c_off, A.data() + in_c_off,
+                 B.data() + ker_c_off, 0);
+
+            fn_lr(CJ.data() + out_r_off, A.data() + in_r_off,
+                  B.data() + ker_r_off, 0);
+
+            fn_corners(CJ.data() + out_tl_off, A.data() + in_tl_off,
+                       B.data() + ker_tl_off, 0);
+
+            fn_bt(CJ.data() + out_t_off, A.data() + in_t_off,
+                  B.data() + ker_t_off, 0);
+
+            fn_corners(CJ.data() + out_tr_off, A.data() + in_tr_off,
+                       B.data() + ker_tr_off, 0);
+        };
+
+        // fn_c(CJ.data(), A.data(), B.data(), 0);
+
+        do_it();
+
+        std::cout << "MAXABSDIFF: "
+                  << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS,
+                                CN.data())
+                  << "\n";
+
+        auto secs = measureFastestWithWarmup([&]() { do_it(); }, 1, 10);
+
+        double gflops = 2.0 * CIN * COUT * OS * OS * KS * KS / 1000000000;
+
+        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
+    }
+
+    return 0;
+
     // WOW this is actually pretty efficient!
     // Playing with weird schedules
     // Matrix-Matrix product

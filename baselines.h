@@ -37,6 +37,51 @@ inline void baseline_CW_HWC(unsigned IOC, unsigned OHW, unsigned KHW,
     }
 }
 
+inline void baseline_padded_CW_HWC(unsigned IOC, unsigned OHW, unsigned KHW,
+                                   unsigned HW_PAD, float const* AData,
+                                   float const* BData, float* CData,
+                                   int alpha = 0)
+{
+    unsigned IHW = OHW + KHW - 1 - 2 * HW_PAD;
+
+    for (unsigned oh = 0; oh < OHW; ++oh)
+    {
+        for (unsigned ow = 0; ow < OHW; ++ow)
+        {
+            for (unsigned ioc = 0; ioc < IOC; ++ioc)
+            {
+                float& c = CData[ioc + ow * IOC + oh * OHW * IOC];
+
+                if (alpha == 0)
+                {
+                    c = 0.f;
+                }
+
+                for (unsigned kh = 0; kh < KHW; ++kh)
+                {
+                    unsigned ih = oh + kh;
+
+                    if (ih >= HW_PAD && (ih - HW_PAD < IHW))
+                    {
+                        ih -= HW_PAD;
+                        for (unsigned kw = 0; kw < KHW; ++kw)
+                        {
+                            unsigned iw = ow + kw;
+
+                            if (iw >= HW_PAD && (iw - HW_PAD < IHW))
+                            {
+                                iw -= HW_PAD;
+                                c += AData[ioc + iw * IOC + ih * IOC * IHW] *
+                                     BData[ioc + kw * IOC + kh * IOC * KHW];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 inline void baseline_MM(unsigned ArCr, unsigned AcBr, unsigned BcCc, int LDA,
                         int LDB, int LDC, float const* AData,
                         float const* BData, float* CData, int alpha = 0)
@@ -178,6 +223,54 @@ inline void baseline_Conv(unsigned COUT, unsigned CIN, unsigned OH, int OW,
                                       (ow + kw) * CIN] *
                                 BData[cout + cin * COUT + kw * CIN * COUT +
                                       kh * CIN * COUT * KW];
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+inline void baseline_padded_Conv(unsigned COUT, unsigned CIN, unsigned OH,
+                                 int OW, int KH, int KW, int PH, int PW,
+                                 float const* AData, float const* BData,
+                                 float* CData)
+{
+    int IH = OH + KH - 1 - 2 * PH;
+    int IW = OW + KW - 1 - 2 * PW;
+
+    for (int cout = 0; cout < COUT; ++cout)
+    {
+        for (int oh = 0; oh < OH; ++oh)
+        {
+            for (int ow = 0; ow < OW; ++ow)
+            {
+                CData[cout + ow * COUT + oh * COUT * OW] = 0.f;
+                for (int cin = 0; cin < CIN; ++cin)
+                {
+                    for (int kh = 0; kh < KH; ++kh)
+                    {
+                        int ih = oh + kh;
+
+                        if (ih >= PH && (ih - PH < IH))
+                        {
+                            ih -= PH;
+
+                            for (int kw = 0; kw < KW; ++kw)
+                            {
+                                int iw = ow + kw;
+
+                                if (iw >= PW && (iw - PW < IW))
+                                {
+                                    iw -= PW;
+
+                                    CData[cout + ow * COUT + oh * COUT * OW] +=
+                                        AData[cin + ih * CIN * IW + iw * CIN] *
+                                        BData[cout + cin * COUT +
+                                              kw * CIN * COUT +
+                                              kh * CIN * COUT * KW];
+                                }
+                            }
                         }
                     }
                 }
