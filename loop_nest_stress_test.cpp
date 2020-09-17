@@ -90,9 +90,8 @@ int main()
                         // A's strides for each variable
                         {{"ArCr", AcBr}, {"AcBr", 1}},
                         // B's strides for each variable
-                        {{"AcBr", BcCc}, {"BcCc", 1}}, nullptr,
-                        max_fmas_unrolled,
-                        nullptr)
+                        {{"AcBr", BcCc}, {"BcCc", 1}},
+                        facebook::sysml::aot::fma, max_fmas_unrolled, nullptr)
                         .get_shared();
 
                 auto A = getRandomVector<float>(AcBr * ArCr);
