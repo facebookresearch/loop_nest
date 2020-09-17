@@ -2194,6 +2194,44 @@ private:
         op_pair->issue_epilogue(*this);
     }
 
+    void check_representation()
+    {
+        // Make sure strides (and sizes) exist for each order variable
+        for (auto const& o : order)
+        {
+            strong_assert(A_strides.count(o.first) > 0 ||
+                          B_strides.count(o.first) > 0 ||
+                          C_strides.count(o.first) > 0);
+            strong_assert(sizes.count(o.first) > 0);
+        }
+
+        std::map<std::string, int> last_step;
+
+        for (auto const& o : order)
+        {
+            if (last_step.count(o.first))
+            {
+                strong_assert(last_step[o.first] >= o.second &&
+                              "The steps in 'order' need to be non-increasing");
+            }
+            last_step[o.first] = o.second;
+        }
+
+        for (auto const& o : order)
+        {
+            strong_assert(last_step[o.first] == 1 &&
+                          "Last step in order not equal to 1");
+        }
+
+        for (auto const& o : order)
+        {
+            if (o.first == vectorized_var)
+            {
+                strong_assert(o.second == 1 || (o.second % vector_size == 0));
+            }
+        }
+    }
+
     void set_tensor_traits()
     {
 
@@ -3846,6 +3884,8 @@ public:
 
         vectorized_var = order.back().first;
         LN_LOG(DEBUG) << "Vectorized along: " << vectorized_var << "\n";
+
+        check_representation();
 
         // compute and set approximate FLOPs and memory
         compute_effective_flops();
