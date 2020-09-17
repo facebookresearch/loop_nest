@@ -2202,7 +2202,7 @@ private:
             strong_assert(A_strides.count(o.first) > 0 ||
                           B_strides.count(o.first) > 0 ||
                           C_strides.count(o.first) > 0);
-            strong_assert(sizes.count(o.first) > 0 && sizes[o.first] > 0);
+            strong_assert(sizes.count(o.first) > 0 && sizes.at(o.first) > 0);
         }
 
         std::map<std::string, int> last_step;
