@@ -1031,6 +1031,11 @@ private:
         OpMask full_k_mask          = k3;
         OpMask temp_k_mask          = k4;
 
+        for (auto const& c : stores)
+        {
+            C_VMMs[c].reduce(*this, op_pair);
+        }
+
         if (issue_max_alpha_logic && elementwise_postop)
         {
             if (C_traits.access == VECTOR_PACKED ||
@@ -1046,7 +1051,6 @@ private:
 
                 for (auto const& c : stores)
                 {
-                    C_VMMs[c].reduce(*this, op_pair);
                     stores_and_regs.push_back({c, C_VMMs[c][0]});
 
                     LN_LOG(INFO)
@@ -1098,7 +1102,6 @@ private:
         {
             LN_LOG(INFO) << tabs.back() << "STORE " << c.readable() << "\n";
 
-            C_VMMs[c].reduce(*this, op_pair);
             Label not_last_label;
 
             switch (C_traits.access)
@@ -1183,6 +1186,11 @@ private:
         Ymm ymm_tail_mask;
         int next_vector_register = 0;
 
+        for (auto const& c : stores)
+        {
+            C_VMMs[c].reduce(*this, op_pair);
+        }
+
         if (issue_max_alpha_logic && elementwise_postop)
         {
             if (C_traits.access == VECTOR_PACKED ||
@@ -1197,7 +1205,6 @@ private:
 
                 for (auto const& c : stores)
                 {
-                    C_VMMs[c].reduce(*this, op_pair);
                     stores_and_regs.push_back({c, C_VMMs[c][0]});
 
                     LN_LOG(INFO)
@@ -1244,8 +1251,6 @@ private:
         for (auto const& c : stores)
         {
             LN_LOG(INFO) << tabs.back() << "STORE " << c.readable() << "\n";
-
-            C_VMMs[c].reduce(*this, op_pair);
 
             Label not_last_label;
 

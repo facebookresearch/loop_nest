@@ -1762,21 +1762,21 @@ private:
         strong_assert(ordered_stores.size());
         add_imm(tmpCReg_, ordered_stores.front().offset * 4);
 
+        for (auto const& c : ordered_stores)
+        {
+            LN_LOG(INFO) << tabs.back() << "STORE " << c.readable() << "\n";
+            C_VMMs[c].reduce(*this);
+        }
+        for (auto const& c : ordered_stores)
+        {
+            if (C_traits.access == SCALAR && vectorized_var != "NONE")
+            {
+                C_VMMs[c].full_reduce(*this, 4);
+            }
+        }
+
         if (postop && postop->is_relu())
         {
-            for (auto const& c : ordered_stores)
-            {
-                LN_LOG(INFO) << tabs.back() << "STORE " << c.readable() << "\n";
-                C_VMMs[c].reduce(*this);
-            }
-            for (auto const& c : ordered_stores)
-            {
-                if (C_traits.access == SCALAR && vectorized_var != "NONE")
-                {
-                    C_VMMs[c].full_reduce(*this, 4);
-                }
-            }
-
             auto donePostOpLabel = make_label();
 
             meta_cmp(AlphaReg_, max_alpha - 1);
@@ -1853,15 +1853,9 @@ private:
                     incrs.erase(incrs.begin());
                 }
 
-                C_VMMs[c].reduce(*this);
-
                 switch (C_traits.access)
                 {
                 case SCALAR:
-                    if (vectorized_var != "NONE")
-                    {
-                        C_VMMs[c].full_reduce(*this, c.mask);
-                    }
                     store_scalar(C_VMMs[c][0], tmpCReg_, 0, incr);
                     break;
 
