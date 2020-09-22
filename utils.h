@@ -42,7 +42,7 @@ void apply_relu(Float* Begin, float* End)
 }
 
 template <class Float>
-Float maxAbsDiff(Float const* LBegin, Float const* LEnd, Float const* RBegin)
+Float max_abs_difference(Float const* LBegin, Float const* LEnd, Float const* RBegin)
 {
     Float res = 0;
     for (; LBegin != LEnd; ++LBegin, ++RBegin)
@@ -53,7 +53,7 @@ Float maxAbsDiff(Float const* LBegin, Float const* LEnd, Float const* RBegin)
 }
 
 template <class Float>
-Float maxAbsDiffVerbose(Float const* LBegin, Float const* LEnd,
+Float max_abs_differenceVerbose(Float const* LBegin, Float const* LEnd,
                         Float const* RBegin)
 {
     int   off = 0;
@@ -68,7 +68,7 @@ Float maxAbsDiffVerbose(Float const* LBegin, Float const* LEnd,
 }
 
 template <class Float>
-Float maxAbsDiffVerbose(Float const* LBegin, Float const* LEnd,
+Float max_abs_differenceVerbose(Float const* LBegin, Float const* LEnd,
                         Float const* RBegin, float delta)
 {
     int   off = 0;
@@ -87,7 +87,7 @@ Float maxAbsDiffVerbose(Float const* LBegin, Float const* LEnd,
 }
 
 template <class Float>
-aligned_vector<Float> getRandomVector(unsigned size,
+aligned_vector<Float> get_random_vector(unsigned size,
                                       unsigned extra_elements = 16)
 {
     aligned_vector<Float> res(size + extra_elements);
@@ -188,8 +188,8 @@ template <class BaseLineImpl, class JITImpl>
 void check_correctness(BaseLineImpl&& baseline_fn, JITImpl&& jit_fn, int A_size,
                        int B_size, int C_size, int alpha = 0)
 {
-    auto A = getRandomVector<float>(A_size);
-    auto B = getRandomVector<float>(B_size);
+    auto A = get_random_vector<float>(A_size);
+    auto B = get_random_vector<float>(B_size);
 
     auto CN = aligned_vector<float>(C_size);
     auto CJ = std::vector<float>(C_size);
@@ -198,15 +198,15 @@ void check_correctness(BaseLineImpl&& baseline_fn, JITImpl&& jit_fn, int A_size,
     jit_fn(CJ.data(), A.data(), B.data(), alpha);
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + C_size, CN.data()) << "\n";
+              << max_abs_difference(CJ.data(), CJ.data() + C_size, CN.data()) << "\n";
 }
 
 template <class Fn>
 void bench_implementation(Fn&& fn, int A_size, int B_size, int C_size,
                           double gflops, int warmup = 5, int iters = 10)
 {
-    auto A = getRandomVector<float>(A_size);
-    auto B = getRandomVector<float>(B_size);
+    auto A = get_random_vector<float>(A_size);
+    auto B = get_random_vector<float>(B_size);
     auto C = std::vector<float>(C_size);
 
     auto secs = measureFastestWithWarmup(
@@ -220,8 +220,8 @@ void bench_implementation_fmas_per_cycle(Fn&& fn, int A_size, int B_size,
                                          int C_size, double flops,
                                          int warmup = 5, int iters = 10)
 {
-    auto A = getRandomVector<float>(A_size);
-    auto B = getRandomVector<float>(B_size);
+    auto A = get_random_vector<float>(A_size);
+    auto B = get_random_vector<float>(B_size);
     auto C = std::vector<float>(C_size);
 
     auto secs = measureMinCyclesWithWarmup(

@@ -24,7 +24,7 @@ void check_equivalence(Halide::Buffer<float> result,
                        float*                baseline_result_start)
 {
     std::int64_t num_elements = result.size_in_bytes() / 4;
-    float        diff = maxAbsDiff(result.data(), result.data() + num_elements,
+    float        diff = max_abs_difference(result.data(), result.data() + num_elements,
                             baseline_result_start);
     std::cout << "diff: " << diff << std::endl;
     assert(diff <= 1e-4);
@@ -51,9 +51,9 @@ int main()
         const int AcBr = 32;
         const int BcCc = 32;
 
-        auto A_vec = getRandomVector<float>(AcBr * ArCr);
-        auto B_vec = getRandomVector<float>(AcBr * BcCc);
-        auto CN    = getRandomVector<float>(ArCr * BcCc);
+        auto A_vec = get_random_vector<float>(AcBr * ArCr);
+        auto B_vec = get_random_vector<float>(AcBr * BcCc);
+        auto CN    = get_random_vector<float>(ArCr * BcCc);
 
         // Start Halide definitions
         Halide::Buffer<float> A(A_vec.data(), {AcBr, ArCr}, "A");
@@ -100,9 +100,9 @@ int main()
         const int AcBr = 256;
         const int BcCc = 256;
 
-        auto A_vec = getRandomVector<float>(AcBr * ArCr);
-        auto B_vec = getRandomVector<float>(AcBr * BcCc);
-        auto CN    = getRandomVector<float>(ArCr * BcCc);
+        auto A_vec = get_random_vector<float>(AcBr * ArCr);
+        auto B_vec = get_random_vector<float>(AcBr * BcCc);
+        auto CN    = get_random_vector<float>(ArCr * BcCc);
 
         // Start Halide definitions
         Halide::Buffer<float> A(A_vec.data(), {AcBr, ArCr}, "A");
@@ -158,8 +158,8 @@ int main()
         const int KS   = 3;
         const int IS   = OS + KS - 1;
 
-        auto A_vec = getRandomVector<float>(GIN * CIN * IS * IS);
-        auto B_vec = getRandomVector<float>(GOUT * GIN * COUT * CIN * KS * KS);
+        auto A_vec = get_random_vector<float>(GIN * CIN * IS * IS);
+        auto B_vec = get_random_vector<float>(GOUT * GIN * COUT * CIN * KS * KS);
         auto CN    = std::vector<float>(GOUT * COUT * OS * OS);
 
         Halide::Buffer<float> A(A_vec.data(), GIN * CIN * IS * IS);
@@ -222,8 +222,8 @@ int main()
         const int BcCc = 333;
 
         float A_vec = 1.0;
-        auto  B_vec = getRandomVector<float>(AcBr * BcCc);
-        auto  CN    = getRandomVector<float>(ArCr * BcCc);
+        auto  B_vec = get_random_vector<float>(AcBr * BcCc);
+        auto  CN    = get_random_vector<float>(ArCr * BcCc);
 
         // Start Halide definitions
         Halide::Buffer<float> A(&A_vec, {1, 1});

@@ -1,9 +1,0 @@
-AcBr,256,ArCr,3,BcCc,16,AcBr,1,AcBr,1,ArCr,1,BcCc,1
-AcBr,256,ArCr,256,BcCc,256
-ArCr,BcCc
-AcBr,ArCr
-AcBr,BcCc
-ArCr,256,BcCc,1
-AcBr,1,ArCr,256
-AcBr,256,BcCc,1
-1024

@@ -46,9 +46,9 @@ void test_loop_nest_against_slow_baseline(
             B_size += (s.second - 1) * B_strides.at(s.first);
     }
 
-    auto A  = getRandomVector<float>(A_size);
-    auto B  = getRandomVector<float>(B_size);
-    auto CN = getRandomVector<float>(C_size);
+    auto A  = get_random_vector<float>(A_size);
+    auto B  = get_random_vector<float>(B_size);
+    auto CN = get_random_vector<float>(C_size);
     auto CJ = CN;
 
     auto jit_fn = loop_nest_code_generator<ISA>(order, sizes, C_formula, A_formula,
@@ -66,7 +66,7 @@ void test_loop_nest_against_slow_baseline(
     baseline_fn(CN.data(), A.data(), B.data(), alpha);
 
     std::cout << "MAXABSDIFF: ( " << C_size << " ) "
-              << maxAbsDiff(CJ.data(), CJ.data() + C_size, CN.data()) << "\n";
+              << max_abs_difference(CJ.data(), CJ.data() + C_size, CN.data()) << "\n";
 }
 
 } // namespace aot

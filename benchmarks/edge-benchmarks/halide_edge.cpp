@@ -73,10 +73,10 @@ int main() {
         // B's strides for each variable
         {{"AcBr", BcCc}, {"BcCc", 1}}, 1024);
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     baseline_MM(ArCr, AcBr, BcCc, 1, ArCr, 1, AcBr, 1, ArCr, A.data(), B.data(),
@@ -89,7 +89,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -166,9 +166,9 @@ int main() {
          {"k_w", COUT},
          {"c_out", 1}});
 
-    auto A = getRandomVector<float>(GIN * CIN * IS * IS);
-    auto B = getRandomVector<float>(GOUT * GIN * COUT * CIN * KS * KS);
-    auto CN = getRandomVector<float>(GOUT * COUT * OS * OS);
+    auto A = get_random_vector<float>(GIN * CIN * IS * IS);
+    auto B = get_random_vector<float>(GOUT * GIN * COUT * CIN * KS * KS);
+    auto CN = get_random_vector<float>(GOUT * COUT * OS * OS);
     auto CJ = CN;
 
     baseline_Conv_NCHW8c(GOUT, COUT, GIN, CIN, OS, OS, KS, KS, A.data(),
@@ -181,7 +181,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + COUT * OS * OS, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -235,8 +235,8 @@ int main() {
         {{"AcBr", BcCc}, {"BcCc", 1}}, 512);
 
     float A = 1.f;
-    auto B = getRandomVector<float>(AcBr * BcCc);
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto B = get_random_vector<float>(AcBr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     baseline_MM(ArCr, AcBr, BcCc, 0, 0, BcCc, 1, BcCc, 1, &A, B.data(),
@@ -249,7 +249,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), &A, B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -300,8 +300,8 @@ int main() {
         {{"AcBr", 1}, {"BcCc", AcBr}}, 512);
 
     float A = 1.f;
-    auto B = getRandomVector<float>(AcBr * BcCc);
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto B = get_random_vector<float>(AcBr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     // fixed this wrt original
@@ -315,7 +315,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), &A, B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -371,10 +371,10 @@ int main() {
         // B's strides for each variable
         {{"AcBr", 1}, {"BcCc", AcBr}}, 512);
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     baseline_MM(ArCr, AcBr, BcCc, 1, ArCr, 1, AcBr, 1, ArCr, A.data(), B.data(),
@@ -387,7 +387,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -430,10 +430,10 @@ int main() {
         // B's strides for each variable
         {{"k", 2}}, 1024);
 
-    auto A = getRandomVector<float>(AcBr * ArCr * 2);
-    auto B = getRandomVector<float>(AcBr * BcCc * 2);
+    auto A = get_random_vector<float>(AcBr * ArCr * 2);
+    auto B = get_random_vector<float>(AcBr * BcCc * 2);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     baseline_MM(ArCr, AcBr, BcCc, k * 2, 2, 2, 2, 1, 1, A.data(), B.data(),
@@ -446,7 +446,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -512,10 +512,10 @@ int main() {
         // B's strides for each variable
         {{"AcBr", BcCc}, {"BcCc", 1}}, 512);
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(), B.data(),
@@ -528,7 +528,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -589,10 +589,10 @@ int main() {
         // B's strides for each variable
         {{"AcBr", BcCc}, {"BcCc", 1}}, 2);
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(), B.data(),
@@ -605,7 +605,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -648,10 +648,10 @@ int main() {
         // B's strides for each variable
         {{"k", 1}});
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, A.data(), B.data(),
@@ -664,7 +664,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -720,10 +720,10 @@ int main() {
         // B's strides for each variable
         {{"AcBr", 1}, {"BcCc", AcBr}}, 1024);
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     baseline_MM_row_col_major(ArCr, AcBr, BcCc, AcBr, AcBr, BcCc, A.data(),
@@ -736,7 +736,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -788,10 +788,10 @@ int main() {
         // B's strides for each variable
         {{"AcBr", BcCc}, {"BcCc", 1}});
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc + 16);
+    auto CN = get_random_vector<float>(ArCr * BcCc + 16);
     auto CJ = CN;
 
     baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, A.data(), B.data(),
@@ -804,7 +804,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -862,10 +862,10 @@ int main() {
         // B's strides for each variable
         {{"AcBr", BcCc}, {"BcCc", 1}});
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, A.data(), B.data(),
@@ -878,7 +878,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -946,10 +946,10 @@ int main() {
         // B's strides for each variable
         {{"KX", KY * KZ}, {"KY", KZ}, {"KZ", 1}}, 1024);
 
-    auto A = getRandomVector<float>(IX * IY * IZ);
-    auto B = getRandomVector<float>(KX * KY * KZ);
+    auto A = get_random_vector<float>(IX * IY * IZ);
+    auto B = get_random_vector<float>(KX * KY * KZ);
 
-    auto CN = getRandomVector<float>(OX * OY * OZ);
+    auto CN = get_random_vector<float>(OX * OY * OZ);
     auto CJ = CN;
 
     baseline_3DConv(OX, OY, OZ, KX, KY, KZ, A.data(), B.data(), CN.data());
@@ -961,7 +961,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + OX * OY * OZ, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + OX * OY * OZ, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -1002,10 +1002,10 @@ int main() {
         // B's strides for each variable
         {{"k", c}, {"c", 1}});
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     baseline_MM(ArCr, AcBr, BcCc, 0, 1, c, 1, 0, 1, A.data(), B.data(),
@@ -1018,7 +1018,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -1059,10 +1059,10 @@ int main() {
         // B's strides for each variable
         {{"k", c}, {"c", 1}});
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     baseline_MM(ArCr, AcBr, BcCc, 0, 1, c, 1, 0, 1, A.data(), B.data(),
@@ -1075,7 +1075,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -1142,9 +1142,9 @@ int main() {
          {"k_w", COUT * CIN},
          {"k_h", COUT * CIN * KS}});
 
-    auto A = getRandomVector<float>(CIN * IS * IS);
-    auto B = getRandomVector<float>(COUT * CIN * KS * KS);
-    auto CN = getRandomVector<float>(COUT * OS * OS);
+    auto A = get_random_vector<float>(CIN * IS * IS);
+    auto B = get_random_vector<float>(COUT * CIN * KS * KS);
+    auto CN = get_random_vector<float>(COUT * OS * OS);
     auto CJ = CN;
 
     baseline_Conv(COUT, CIN, OS, OS, KS, KS, A.data(), B.data(), CN.data());
@@ -1156,7 +1156,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + COUT * OS * OS, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(

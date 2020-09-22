@@ -1,6 +1,8 @@
-#include "transposer.h"
-#include "transposer_baseline.h"
-#include "utils.h"
+#include "dabun/check.hpp"
+#include "dabun/measure.hpp"
+#include "dabun/random_vector.hpp"
+#include "dabun/transposer.hpp"
+#include "transposer_baseline.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -14,16 +16,9 @@
 #include <string>
 #include <vector>
 
-#ifndef DABUN_ISA
-#define DABUN_ISA avx2
-#endif
-
 int main()
 {
-    using facebook::sysml::aot::aarch64;
-    using facebook::sysml::aot::avx2;
-    using facebook::sysml::aot::avx2_plus;
-    using facebook::sysml::aot::avx512;
+    using namespace dabun;
 
     srand(0);
 
@@ -58,9 +53,8 @@ int main()
                 {
                     if (o.second != 1)
                     {
-                        o.second = facebook::sysml::aot::round_up(
-                            o.second, facebook::sysml::aot::isa_traits<
-                                          DABUN_ISA>::vector_size);
+                        o.second = round_up(o.second,
+                                            isa_traits<DABUN_ISA>::vector_size);
                     }
                 }
                 std::cout << o.first << "=" << o.second << "  ";
@@ -71,16 +65,16 @@ int main()
 
             std::cout << "MU=" << max_unrolled << std::endl;
 
-            auto fn_baselome = facebook::sysml::aot::transposer_baseline(
-                full_order, // The second argument is a
-                            // map of the dimension sizes
-                {{"AcBr", AcBr}, {"ArCr", ArCr}},
-                // out's strides for each variable.
-                {{"ArCr", AcBr}, {"AcBr", 1}},
-                // in's strides for each variable
-                {{"ArCr", 1}, {"AcBr", ArCr}});
+            auto fn_baselome =
+                transposer_baseline(full_order, // The second argument is a
+                                                // map of the dimension sizes
+                                    {{"AcBr", AcBr}, {"ArCr", ArCr}},
+                                    // out's strides for each variable.
+                                    {{"ArCr", AcBr}, {"AcBr", 1}},
+                                    // in's strides for each variable
+                                    {{"ArCr", 1}, {"AcBr", ArCr}});
 
-            auto fn = facebook::sysml::aot::transposer_jitter<DABUN_ISA>(
+            auto fn = transposer_code_generator<DABUN_ISA>(
                           full_order, // The second argument is a map of the
                                       // dimension sizes
                           {{"AcBr", AcBr}, {"ArCr", ArCr}},
@@ -92,15 +86,15 @@ int main()
 
             fn.save_to_file("zi.asm");
 
-            auto A  = getRandomVector<float>(AcBr * ArCr);
-            auto CN = getRandomVector<float>(ArCr * AcBr);
+            auto A  = get_random_vector<float>(AcBr * ArCr);
+            auto CN = get_random_vector<float>(ArCr * AcBr);
             auto CJ = CN;
 
             fn_baselome(CN.data(), A.data());
             fn(CJ.data(), A.data());
 
-            auto madiff =
-                maxAbsDiff(CJ.data(), CJ.data() + ArCr * AcBr, CN.data());
+            auto madiff = max_abs_difference(CJ.data(), CJ.data() + ArCr * AcBr,
+                                             CN.data());
 
             std::cout << "ArCr=" << ArCr << " ";
             std::cout << "AcBr=" << AcBr << " ";

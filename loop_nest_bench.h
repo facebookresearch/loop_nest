@@ -48,9 +48,9 @@ void loop_nest_bench(std::vector<std::pair<std::string, int>> const& order,
             flops *= s.second;
     }
 
-    auto A  = getRandomVector<float>(A_size);
-    auto B  = getRandomVector<float>(B_size);
-    auto CN = getRandomVector<float>(C_size);
+    auto A  = get_random_vector<float>(A_size);
+    auto B  = get_random_vector<float>(B_size);
+    auto CN = get_random_vector<float>(C_size);
 
     auto jit_fn = loop_nest_code_generator<ISA>(order, sizes, C_formula, A_formula,
                                             B_formula, C_strides, A_strides,

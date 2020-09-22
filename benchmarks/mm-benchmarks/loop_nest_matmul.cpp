@@ -74,10 +74,10 @@ int main(int argc, char *argv[]) {
     auto fn = aot_fn_cast<void(float *, float const *, float const *, int)>(
         std::move(fny));
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     fn(CJ.data(), A.data(), B.data(), 0);

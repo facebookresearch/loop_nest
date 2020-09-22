@@ -94,10 +94,10 @@ int main()
                         facebook::sysml::aot::fma, max_fmas_unrolled, nullptr)
                         .get_shared();
 
-                auto A = getRandomVector<float>(AcBr * ArCr);
-                auto B = getRandomVector<float>(AcBr * BcCc);
+                auto A = get_random_vector<float>(AcBr * ArCr);
+                auto B = get_random_vector<float>(AcBr * BcCc);
 
-                auto CN = getRandomVector<float>(ArCr * BcCc);
+                auto CN = get_random_vector<float>(ArCr * BcCc);
                 auto CJ = CN;
 
                 baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1,
@@ -108,7 +108,7 @@ int main()
                 fn(CJ.data(), A.data(), B.data(), 1);
 
                 auto madiff =
-                    maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data());
+                    max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data());
 
                 std::cout << "MAXABSDIFF: " << madiff << std::endl;
 

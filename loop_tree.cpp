@@ -115,14 +115,14 @@ int main()
         ----------> Execution
         */
 
-        auto A1  = getRandomVector<float>(AcBr1 * ArCr);
-        auto B1  = getRandomVector<float>(AcBr1 * BcCc);
-        auto CN1 = getRandomVector<float>(ArCr * BcCc);
+        auto A1  = get_random_vector<float>(AcBr1 * ArCr);
+        auto B1  = get_random_vector<float>(AcBr1 * BcCc);
+        auto CN1 = get_random_vector<float>(ArCr * BcCc);
         auto CJ1 = CN1;
 
-        auto A2  = getRandomVector<float>(AcBr2 * ArCr);
-        auto B2  = getRandomVector<float>(AcBr2 * BcCc);
-        auto CN2 = getRandomVector<float>(ArCr * BcCc);
+        auto A2  = get_random_vector<float>(AcBr2 * ArCr);
+        auto B2  = get_random_vector<float>(AcBr2 * BcCc);
+        auto CN2 = get_random_vector<float>(ArCr * BcCc);
         auto CJ2 = CN2;
 
         baseline_MM(ArCr, AcBr1, BcCc, AcBr1, 1, BcCc, 1, BcCc, 1, A1.data(),
@@ -138,12 +138,12 @@ int main()
         fn(tensors);
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ1.data(), CJ1.data() + ArCr * BcCc,
+                  << max_abs_difference(CJ1.data(), CJ1.data() + ArCr * BcCc,
                                 CN1.data())
                   << "\n";
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ2.data(), CJ2.data() + ArCr * BcCc,
+                  << max_abs_difference(CJ2.data(), CJ2.data() + ArCr * BcCc,
                                 CN2.data())
                   << "\n";
     }
@@ -231,14 +231,14 @@ int main()
         ----------> Execution
         */
 
-        auto A1  = getRandomVector<float>(AcBr1 * ArCr);
-        auto B1  = getRandomVector<float>(AcBr1 * BcCc);
-        auto CN1 = getRandomVector<float>(ArCr * BcCc);
+        auto A1  = get_random_vector<float>(AcBr1 * ArCr);
+        auto B1  = get_random_vector<float>(AcBr1 * BcCc);
+        auto CN1 = get_random_vector<float>(ArCr * BcCc);
         auto CJ1 = CN1;
 
-        auto A2  = getRandomVector<float>(AcBr2 * ArCr);
-        auto B2  = getRandomVector<float>(AcBr2 * BcCc);
-        auto CN2 = getRandomVector<float>(ArCr * BcCc);
+        auto A2  = get_random_vector<float>(AcBr2 * ArCr);
+        auto B2  = get_random_vector<float>(AcBr2 * BcCc);
+        auto CN2 = get_random_vector<float>(ArCr * BcCc);
         auto CJ2 = CN2;
 
         baseline_MM(ArCr, AcBr1, BcCc, AcBr1, 1, BcCc, 1, BcCc, 1, A1.data(),
@@ -254,12 +254,12 @@ int main()
         fn(tensors);
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ1.data(), CJ1.data() + ArCr * BcCc,
+                  << max_abs_difference(CJ1.data(), CJ1.data() + ArCr * BcCc,
                                 CN1.data())
                   << "\n";
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ2.data(), CJ2.data() + ArCr * BcCc,
+                  << max_abs_difference(CJ2.data(), CJ2.data() + ArCr * BcCc,
                                 CN2.data())
                   << "\n";
     }
@@ -349,14 +349,14 @@ int main()
        ----------> Execution
        */
 
-        auto A1  = getRandomVector<float>(AcBr1 * ArCr);
-        auto B1  = getRandomVector<float>(AcBr1 * BcCc);
-        auto CN1 = getRandomVector<float>(ArCr * BcCc);
+        auto A1  = get_random_vector<float>(AcBr1 * ArCr);
+        auto B1  = get_random_vector<float>(AcBr1 * BcCc);
+        auto CN1 = get_random_vector<float>(ArCr * BcCc);
         auto CJ1 = CN1;
 
-        auto A2  = getRandomVector<float>(AcBr2 * ArCr);
-        auto B2  = getRandomVector<float>(AcBr2 * BcCc);
-        auto CN2 = getRandomVector<float>(ArCr * BcCc);
+        auto A2  = get_random_vector<float>(AcBr2 * ArCr);
+        auto B2  = get_random_vector<float>(AcBr2 * BcCc);
+        auto CN2 = get_random_vector<float>(ArCr * BcCc);
         auto CJ2 = CN2;
 
         baseline_MM(ArCr, AcBr1, BcCc, AcBr1, 1, BcCc, 1, BcCc, 1, A1.data(),
@@ -372,12 +372,12 @@ int main()
         fn(tensors);
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ1.data(), CJ1.data() + ArCr * BcCc,
+                  << max_abs_difference(CJ1.data(), CJ1.data() + ArCr * BcCc,
                                 CN1.data())
                   << "\n";
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ2.data(), CJ2.data() + ArCr * BcCc,
+                  << max_abs_difference(CJ2.data(), CJ2.data() + ArCr * BcCc,
                                 CN2.data())
                   << "\n";
     }
@@ -476,14 +476,14 @@ int main()
        ----------> Execution
        */
 
-        auto A1  = getRandomVector<float>(AcBr1 * ArCr1);
-        auto B1  = getRandomVector<float>(AcBr1 * BcCc);
-        auto CN1 = getRandomVector<float>(ArCr1 * BcCc);
+        auto A1  = get_random_vector<float>(AcBr1 * ArCr1);
+        auto B1  = get_random_vector<float>(AcBr1 * BcCc);
+        auto CN1 = get_random_vector<float>(ArCr1 * BcCc);
         auto CJ1 = CN1;
 
-        auto A2  = getRandomVector<float>(AcBr2 * ArCr2);
-        auto B2  = getRandomVector<float>(AcBr2 * BcCc);
-        auto CN2 = getRandomVector<float>(ArCr2 * BcCc);
+        auto A2  = get_random_vector<float>(AcBr2 * ArCr2);
+        auto B2  = get_random_vector<float>(AcBr2 * BcCc);
+        auto CN2 = get_random_vector<float>(ArCr2 * BcCc);
         auto CJ2 = CN2;
 
         baseline_MM(ArCr1, AcBr1, BcCc, AcBr1, 1, BcCc, 1, BcCc, 1, A1.data(),
@@ -499,12 +499,12 @@ int main()
         fn(tensors);
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ1.data(), CJ1.data() + ArCr1 * BcCc,
+                  << max_abs_difference(CJ1.data(), CJ1.data() + ArCr1 * BcCc,
                                 CN1.data())
                   << "\n";
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ2.data(), CJ2.data() + ArCr2 * BcCc,
+                  << max_abs_difference(CJ2.data(), CJ2.data() + ArCr2 * BcCc,
                                 CN2.data())
                   << "\n";
     }
@@ -587,10 +587,10 @@ int main()
        ----------> Execution
        */
 
-        auto A  = getRandomVector<float>(AcBr * ArCr);
-        auto B1 = getRandomVector<float>(AcBr * BcCc);
-        auto B2 = getRandomVector<float>(AcBr * BcCc);
-        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto A  = get_random_vector<float>(AcBr * ArCr);
+        auto B1 = get_random_vector<float>(AcBr * BcCc);
+        auto B2 = get_random_vector<float>(AcBr * BcCc);
+        auto CN = get_random_vector<float>(ArCr * BcCc);
         auto CJ = CN;
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
@@ -604,7 +604,7 @@ int main()
         fn(tensors);
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -657,10 +657,10 @@ int main()
 
         auto fn = tree->get_fn();
 
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float>(AcBr * ArCr);
+        auto B = get_random_vector<float>(AcBr * BcCc);
 
-        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto CN = get_random_vector<float>(ArCr * BcCc);
         auto CJ = CN;
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
@@ -669,7 +669,7 @@ int main()
         fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -721,10 +721,10 @@ int main()
 
         auto fn = tree->get_fn();
 
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float>(AcBr * ArCr);
+        auto B = get_random_vector<float>(AcBr * BcCc);
 
-        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto CN = get_random_vector<float>(ArCr * BcCc);
         auto CJ = CN;
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
@@ -733,7 +733,7 @@ int main()
         fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -778,9 +778,9 @@ int main()
         /*
        ----------> Execution
        */
-        auto A  = getRandomVector<float>(R * C);
-        auto B  = getRandomVector<float>(R * C);
-        auto BJ = getRandomVector<float>(R * C);
+        auto A  = get_random_vector<float>(R * C);
+        auto B  = get_random_vector<float>(R * C);
+        auto BJ = get_random_vector<float>(R * C);
 
         auto transpose = facebook::sysml::aot::transposer_baseline(
             order, sizes, out_strides, in_strides);
@@ -790,7 +790,7 @@ int main()
         fn({{"A", A.data()}, {"C", BJ.data()}});
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(BJ.data(), BJ.data() + R * C, B.data()) << "\n";
+                  << max_abs_difference(BJ.data(), BJ.data() + R * C, B.data()) << "\n";
     }
 
 #ifndef NELEMENTWISE
@@ -851,13 +851,13 @@ int main()
         /*
         ----------> Execution
         */
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float>(AcBr * ArCr);
+        auto B = get_random_vector<float>(AcBr * BcCc);
 
-        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto CN = get_random_vector<float>(ArCr * BcCc);
         auto CJ = CN;
 
-        auto bias = getRandomVector<float>(1 * BcCc * 1);
+        auto bias = get_random_vector<float>(1 * BcCc * 1);
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
                     B.data(), CN.data(), 0);
@@ -870,7 +870,7 @@ int main()
             {"bias", bias.data()}});
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -931,11 +931,11 @@ int main()
         /*
         ----------> Execution
         */
-        auto A    = getRandomVector<float>(AcBr * ArCr);
-        auto B    = getRandomVector<float>(AcBr * BcCc);
-        auto CN   = getRandomVector<float>(ArCr * BcCc);
+        auto A    = get_random_vector<float>(AcBr * ArCr);
+        auto B    = get_random_vector<float>(AcBr * BcCc);
+        auto CN   = get_random_vector<float>(ArCr * BcCc);
         auto CJ   = CN;
-        auto bias = getRandomVector<float>(1 * BcCc * 1);
+        auto bias = get_random_vector<float>(1 * BcCc * 1);
 
         baseline_matrix_bias(ArCr, BcCc, BcCc, 1, 0, 1, CN.data(), bias.data());
         apply_relu(CN.data(), CN.data() + ArCr * BcCc);
@@ -948,7 +948,7 @@ int main()
             {"bias", bias.data()}});
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -1017,8 +1017,8 @@ int main()
         /*
         ----------> Execution
         */
-        auto A  = getRandomVector<float>(IX * IY * IZ);
-        auto B  = getRandomVector<float>(KX * KY * KZ);
+        auto A  = get_random_vector<float>(IX * IY * IZ);
+        auto B  = get_random_vector<float>(KX * KY * KZ);
         auto CN = std::vector<float>(OX * OY * OZ);
         auto CJ = std::vector<float>(OX * OY * OZ);
 
@@ -1031,7 +1031,7 @@ int main()
             fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
 
             std::cout << "MAXABSDIFF: "
-                      << maxAbsDiff(CJ.data(), CJ.data() + OX * OY * OZ,
+                      << max_abs_difference(CJ.data(), CJ.data() + OX * OY * OZ,
                                     CN.data())
                       << "\n";
         }
@@ -1102,8 +1102,8 @@ int main()
         /*
         ----------> Execution
         */
-        auto A  = getRandomVector<float>(CIN * IS * IS);
-        auto B  = getRandomVector<float>(COUT * CIN * KS * KS);
+        auto A  = get_random_vector<float>(CIN * IS * IS);
+        auto B  = get_random_vector<float>(COUT * CIN * KS * KS);
         auto CN = std::vector<float>(COUT * OS * OS);
         auto CJ = std::vector<float>(COUT * OS * OS);
 
@@ -1115,7 +1115,7 @@ int main()
             fn({{"C", CJ.data()}, {"A", A.data()}, {"B", B.data()}});
 
             std::cout << "MAXABSDIFF: "
-                      << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS,
+                      << max_abs_difference(CJ.data(), CJ.data() + COUT * OS * OS,
                                     CN.data())
                       << "\n";
         }

@@ -1,5 +1,5 @@
-#include "transposer.h"
-#include "utils.h"
+#include "dabun/measure.hpp"
+#include "dabun/transposer.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -13,11 +13,7 @@
 #include <string>
 #include <vector>
 
-namespace facebook
-{
-namespace sysml
-{
-namespace aot
+namespace dabun
 {
 
 template <class ISA>
@@ -25,8 +21,7 @@ void transposer_bench(std::vector<std::pair<std::string, int>> const& order,
                       std::map<std::string, int> const&               sizes,
                       std::map<std::string, int> const& out_strides,
                       std::map<std::string, int> const& in_strides,
-                      int max_unrolled_fmas = 320, int total_iterations = 100,
-                      int warmup_iterations = 10)
+                      int max_unrolled_fmas = 320, int total_iterations = 100)
 
 {
     auto total_moved_bytes =
@@ -43,17 +38,17 @@ void transposer_bench(std::vector<std::pair<std::string, int>> const& order,
         out_size += (s.second - 1) * out_strides.at(s.first);
     }
 
-    auto A = getRandomVector<float>(in_size);
-    auto B = getRandomVector<float>(out_size);
+    auto A = get_random_vector<float>(in_size);
+    auto B = get_random_vector<float>(out_size);
 
-    auto jit_fn = transposer_jitter<ISA>(order, sizes, out_strides, in_strides,
-                                         max_unrolled_fmas)
+    auto jit_fn = transposer_code_generator<ISA>(order, sizes, out_strides,
+                                                 in_strides, max_unrolled_fmas)
                       .get_unique();
 
     jit_fn.save_to_file("zi.asm");
 
-    auto secs = measureFastestWithWarmup([&]() { jit_fn(B.data(), A.data()); },
-                                         warmup_iterations, total_iterations);
+    auto secs = measure_fastest([&]() { jit_fn(B.data(), A.data()); },
+                                total_iterations);
 
     double moved_gbytes = 1.0 * total_moved_bytes / 1000000000;
 
@@ -61,6 +56,4 @@ void transposer_bench(std::vector<std::pair<std::string, int>> const& order,
     std::cout << "MSEC: " << (secs / 1000) << "\n";
 }
 
-} // namespace aot
-} // namespace sysml
-} // namespace facebook
+} // namespace dabun

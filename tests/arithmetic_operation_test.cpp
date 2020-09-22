@@ -95,10 +95,10 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn1");
 
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float>(AcBr * ArCr);
+        auto B = get_random_vector<float>(AcBr * BcCc);
 
-        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto CN = get_random_vector<float>(ArCr * BcCc);
         auto CJ = CN;
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, ArCr, 1, A.data(),
@@ -109,7 +109,7 @@ int main()
         fn(CJ.data(), A.data(), B.data(), 0);
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -190,8 +190,8 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn9");
 
-        auto A  = getRandomVector<float>(GIN * CIN * IS * IS);
-        auto B  = getRandomVector<float>(GOUT * GIN * COUT * CIN * KS * KS);
+        auto A  = get_random_vector<float>(GIN * CIN * IS * IS);
+        auto B  = get_random_vector<float>(GOUT * GIN * COUT * CIN * KS * KS);
         auto CN = std::vector<float>(GOUT * COUT * OS * OS);
         auto CJ = std::vector<float>(GOUT * COUT * OS * OS);
 
@@ -203,7 +203,7 @@ int main()
         // apply_relu(CN.data(), CN.data() + CN.size());
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS,
+                  << max_abs_difference(CJ.data(), CJ.data() + COUT * OS * OS,
                                 CN.data())
                   << "\n";
     }
@@ -290,8 +290,8 @@ int main()
 
         // float A = 1.f;
 
-        auto B  = getRandomVector<float>(AcBr * BcCc);
-        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto B  = get_random_vector<float>(AcBr * BcCc);
+        auto CN = get_random_vector<float>(ArCr * BcCc);
         auto CJ = CN;
 
         // baseline_MM(ArCr, AcBr, BcCc, 0, 0, BcCc, 1, BcCc, 1, &A, B.data(),
@@ -304,7 +304,7 @@ int main()
 
         // apply_relu(CN.data(), CN.data() + CN.size());
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -362,8 +362,8 @@ int main()
 
         float A = 1.f;
 
-        auto B  = getRandomVector<float>(AcBr * BcCc);
-        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto B  = get_random_vector<float>(AcBr * BcCc);
+        auto CN = get_random_vector<float>(ArCr * BcCc);
         auto CJ = CN;
 
         baseline_MM(ArCr, AcBr, BcCc, 0, 0, 1, AcBr, BcCc, 1, &A, B.data(),
@@ -373,7 +373,7 @@ int main()
         apply_relu(CN.data(), CN.data() + CN.size());
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -441,10 +441,10 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn1");
 
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float>(AcBr * ArCr);
+        auto B = get_random_vector<float>(AcBr * BcCc);
 
-        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto CN = get_random_vector<float>(ArCr * BcCc);
         auto CJ = CN;
 
         baseline_MM(ArCr, AcBr, BcCc, 1, ArCr, 1, AcBr, 1, ArCr, A.data(),
@@ -454,7 +454,7 @@ int main()
         apply_relu(CN.data(), CN.data() + CN.size());
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -502,8 +502,8 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn3");
 
-        auto A = getRandomVector<float>(AcBr * ArCr * 2);
-        auto B = getRandomVector<float>(AcBr * BcCc * 2);
+        auto A = get_random_vector<float>(AcBr * ArCr * 2);
+        auto B = get_random_vector<float>(AcBr * BcCc * 2);
 
         auto CN = std::vector<float>(ArCr * BcCc);
         auto CJ = std::vector<float>(ArCr * BcCc);
@@ -515,7 +515,7 @@ int main()
         apply_relu(CN.data(), CN.data() + CN.size());
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -588,10 +588,10 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn1");
 
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float>(AcBr * ArCr);
+        auto B = get_random_vector<float>(AcBr * BcCc);
 
-        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto CN = get_random_vector<float>(ArCr * BcCc);
         auto CJ = CN;
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, A.data(), B.data(),
@@ -601,7 +601,7 @@ int main()
         apply_relu(CN.data(), CN.data() + CN.size());
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -669,8 +669,8 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn2");
 
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float>(AcBr * ArCr);
+        auto B = get_random_vector<float>(AcBr * BcCc);
 
         auto CN = std::vector<float>(ArCr * BcCc);
         auto CJ = std::vector<float>(ArCr * BcCc);
@@ -682,7 +682,7 @@ int main()
         apply_relu(CN.data(), CN.data() + CN.size());
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -729,8 +729,8 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn3");
 
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float>(AcBr * ArCr);
+        auto B = get_random_vector<float>(AcBr * BcCc);
 
         auto CN = std::vector<float>(ArCr * BcCc);
         auto CJ = std::vector<float>(ArCr * BcCc);
@@ -742,7 +742,7 @@ int main()
         // apply_relu(CN.data(), CN.data() + CN.size());
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -805,8 +805,8 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn4");
 
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float>(AcBr * ArCr);
+        auto B = get_random_vector<float>(AcBr * BcCc);
 
         auto CN = std::vector<float>(ArCr * BcCc);
         auto CJ = std::vector<float>(ArCr * BcCc);
@@ -818,7 +818,7 @@ int main()
         apply_relu(CN.data(), CN.data() + CN.size());
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -881,8 +881,8 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn5");
 
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float>(AcBr * ArCr);
+        auto B = get_random_vector<float>(AcBr * BcCc);
 
         auto CN = std::vector<float>(ArCr * BcCc + 16);
         auto CJ = std::vector<float>(ArCr * BcCc + 16);
@@ -894,7 +894,7 @@ int main()
         // apply_relu(CN.data(), CN.data() + CN.size());
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -958,8 +958,8 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn6");
 
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float>(AcBr * ArCr);
+        auto B = get_random_vector<float>(AcBr * BcCc);
 
         auto CN = std::vector<float>(ArCr * BcCc);
         auto CJ = std::vector<float>(ArCr * BcCc);
@@ -971,7 +971,7 @@ int main()
         // apply_relu(CN.data(), CN.data() + CN.size());
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -1055,8 +1055,8 @@ int main()
         fn.save_to_file("zi.asm");
         fn.register_perf("fn7");
 
-        auto A = getRandomVector<float>(IX * IY * IZ);
-        auto B = getRandomVector<float>(KX * KY * KZ);
+        auto A = get_random_vector<float>(IX * IY * IZ);
+        auto B = get_random_vector<float>(KX * KY * KZ);
 
         auto CN = std::vector<float>(OX * OY * OZ);
         auto CJ = std::vector<float>(OX * OY * OZ);
@@ -1067,7 +1067,7 @@ int main()
         apply_relu(CN.data(), CN.data() + CN.size());
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + OX * OY * OZ, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + OX * OY * OZ, CN.data())
                   << "\n";
     }
 
@@ -1114,8 +1114,8 @@ int main()
         fn.save_to_file("zi.asm");
         fn.register_perf("fn8");
 
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float>(AcBr * ArCr);
+        auto B = get_random_vector<float>(AcBr * BcCc);
 
         auto CJ = std::vector<float>(ArCr * BcCc);
         auto CN = CJ;
@@ -1126,7 +1126,7 @@ int main()
         fn(CJ.data(), A.data(), B.data(), 0);
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -1171,8 +1171,8 @@ int main()
 
         auto fn = gen_loop_nest();
 
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float>(AcBr * ArCr);
+        auto B = get_random_vector<float>(AcBr * BcCc);
 
         auto CJ = std::vector<float>(ArCr * BcCc);
         auto CN = CJ;
@@ -1183,7 +1183,7 @@ int main()
         fn(CJ.data(), A.data(), B.data(), 0);
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -1253,8 +1253,8 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn10");
 
-        auto A  = getRandomVector<float>(CIN * IS * IS);
-        auto B  = getRandomVector<float>(COUT * CIN * KS * KS);
+        auto A  = get_random_vector<float>(CIN * IS * IS);
+        auto B  = get_random_vector<float>(COUT * CIN * KS * KS);
         auto CN = std::vector<float>(COUT * OS * OS);
         auto CJ = std::vector<float>(COUT * OS * OS);
 
@@ -1263,7 +1263,7 @@ int main()
         fn(CJ.data(), A.data(), B.data(), 0);
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS,
+                  << max_abs_difference(CJ.data(), CJ.data() + COUT * OS * OS,
                                 CN.data())
                   << "\n";
     }
@@ -1330,10 +1330,10 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn1");
 
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float>(AcBr * ArCr);
+        auto B = get_random_vector<float>(AcBr * BcCc);
 
-        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto CN = get_random_vector<float>(ArCr * BcCc);
         auto CJ = CN;
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, ArCr, 1, A.data(),
@@ -1344,7 +1344,7 @@ int main()
         fn(CJ.data(), A.data(), B.data(), 0);
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -1425,8 +1425,8 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn9");
 
-        auto A  = getRandomVector<float>(GIN * CIN * IS * IS);
-        auto B  = getRandomVector<float>(GOUT * GIN * COUT * CIN * KS * KS);
+        auto A  = get_random_vector<float>(GIN * CIN * IS * IS);
+        auto B  = get_random_vector<float>(GOUT * GIN * COUT * CIN * KS * KS);
         auto CN = std::vector<float>(GOUT * COUT * OS * OS);
         auto CJ = std::vector<float>(GOUT * COUT * OS * OS);
 
@@ -1436,7 +1436,7 @@ int main()
         fn(CJ.data(), A.data(), B.data(), 0);
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS,
+                  << max_abs_difference(CJ.data(), CJ.data() + COUT * OS * OS,
                                 CN.data())
                   << "\n";
     }
@@ -1503,10 +1503,10 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn1");
 
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float>(AcBr * ArCr);
+        auto B = get_random_vector<float>(AcBr * BcCc);
 
-        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto CN = get_random_vector<float>(ArCr * BcCc);
         auto CJ = CN;
 
         baseline_MM_op_pair(
@@ -1520,7 +1520,7 @@ int main()
         fn(CJ.data(), A.data(), B.data(), 0);
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -1600,8 +1600,8 @@ int main()
         fn.save_to_file("zi.asm");
         fn.register_perf("fn9");
 
-        auto A  = getRandomVector<float>(GIN * CIN * IS * IS);
-        auto B  = getRandomVector<float>(GOUT * GIN * COUT * CIN * KS * KS);
+        auto A  = get_random_vector<float>(GIN * CIN * IS * IS);
+        auto B  = get_random_vector<float>(GOUT * GIN * COUT * CIN * KS * KS);
         auto CN = std::vector<float>(GOUT * COUT * OS * OS);
         auto CJ = std::vector<float>(GOUT * COUT * OS * OS);
 
@@ -1611,7 +1611,7 @@ int main()
         fn(CJ.data(), A.data(), B.data(), 0);
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS,
+                  << max_abs_difference(CJ.data(), CJ.data() + COUT * OS * OS,
                                 CN.data())
                   << "\n";
     }
@@ -1678,10 +1678,10 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn1");
 
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float>(AcBr * ArCr);
+        auto B = get_random_vector<float>(AcBr * BcCc);
 
-        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto CN = get_random_vector<float>(ArCr * BcCc);
         auto CJ = CN;
 
         baseline_MM_op_pair(
@@ -1695,7 +1695,7 @@ int main()
         fn(CJ.data(), A.data(), B.data(), 0);
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 
@@ -1761,10 +1761,10 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn1");
 
-        auto A = getRandomVector<float>(AcBr * ArCr);
-        auto B = getRandomVector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float>(AcBr * ArCr);
+        auto B = get_random_vector<float>(AcBr * BcCc);
 
-        auto CN = getRandomVector<float>(ArCr * BcCc);
+        auto CN = get_random_vector<float>(ArCr * BcCc);
         auto CJ = CN;
 
         baseline_MM_op_pair(
@@ -1778,7 +1778,7 @@ int main()
         fn(CJ.data(), A.data(), B.data(), 0);
 
         std::cout << "MAXABSDIFF: "
-                  << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
                   << "\n";
     }
 }

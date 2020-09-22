@@ -89,9 +89,9 @@ int main(int argc, char* argv[])
     auto fn  = aot_fn_cast<void(float*, float const*, float const*, int)>(
         std::move(fny));
 
-    auto A = getRandomVector<float>(compute_size(sizes, A_strides));
-    auto B = getRandomVector<float>(compute_size(sizes, B_strides));
-    auto C = getRandomVector<float>(compute_size(sizes, C_strides));
+    auto A = get_random_vector<float>(compute_size(sizes, A_strides));
+    auto B = get_random_vector<float>(compute_size(sizes, B_strides));
+    auto C = get_random_vector<float>(compute_size(sizes, C_strides));
 
     auto secs = measureFastestWithWarmup(
         [&]() { fn(C.data(), A.data(), B.data(), 0); }, 10, 1000);
