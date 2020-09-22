@@ -96,7 +96,7 @@ private:
         return T(ptr, size, get_deleter());
     }
 
-#if defined(ARM_LOOP_NEST) || defined(LOOP_NEST_ARM)
+#if defined(DABUN_ARM)
 
 protected:
     std::vector<std::any> raii;
@@ -112,7 +112,7 @@ public:
 #endif
 
 public:
-#if !defined(LOOP_NEST_ARM)
+#if !defined(DABUN_ARM)
     using Reg64  = Xbyak::Reg64;
     using Label  = Xbyak::Label;
     using Xmm    = Xbyak::Xmm;
