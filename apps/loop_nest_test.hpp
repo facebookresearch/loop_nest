@@ -1,8 +1,11 @@
 #pragma once
 
-#include "loop_nest.h"
-#include "loop_nest_baseline.h"
-#include "utils.h"
+#include "dabun/arithmetic_operation.hpp"
+#include "dabun/check.hpp"
+#include "dabun/loop_nest.hpp"
+#include "dabun/measure.hpp"
+#include "dabun/random_vector.hpp"
+#include "loop_nest_baseline.hpp"
 
 #include <functional>
 #include <map>
@@ -11,11 +14,7 @@
 #include <utility>
 #include <vector>
 
-namespace facebook
-{
-namespace sysml
-{
-namespace aot
+namespace dabun
 {
 
 template <class ISA>
@@ -51,24 +50,23 @@ void test_loop_nest_against_slow_baseline(
     auto CN = get_random_vector<float>(C_size);
     auto CJ = CN;
 
-    auto jit_fn = loop_nest_code_generator<ISA>(order, sizes, C_formula, A_formula,
-                                            B_formula, C_strides, A_strides,
-                                            B_strides, max_unrolled_fmas)
+    auto jit_fn = loop_nest_code_generator<ISA>(
+                      order, sizes, C_formula, A_formula, B_formula, C_strides,
+                      A_strides, B_strides, fma, max_unrolled_fmas)
                       .get_shared();
 
     jit_fn.save_to_file("zi.asm");
 
     auto baseline_fn =
         loop_nest_baseline(order, sizes, C_formula, A_formula, B_formula,
-                           C_strides, A_strides, B_strides, true);
+                           C_strides, A_strides, B_strides, false);
 
     jit_fn(CJ.data(), A.data(), B.data(), alpha);
     baseline_fn(CN.data(), A.data(), B.data(), alpha);
 
     std::cout << "MAXABSDIFF: ( " << C_size << " ) "
-              << max_abs_difference(CJ.data(), CJ.data() + C_size, CN.data()) << "\n";
+              << max_abs_difference(CJ.data(), CJ.data() + C_size, CN.data())
+              << "\n";
 }
 
-} // namespace aot
-} // namespace sysml
-} // namespace facebook
+} // namespace dabun

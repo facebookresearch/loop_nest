@@ -1,7 +1,7 @@
 [submodule "xbyak"]
-	path = xbyak
+	path = extern/xbyak
 	url = https://github.com/herumi/xbyak
 [submodule "xbyak_aarch64"]
-	path = xbyak_aarch64
+	path = extern/xbyak_aarch64
 	url = https://github.com/zlateski/xbyak_aarch64
 	branch = fjmaster

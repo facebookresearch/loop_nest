@@ -7,11 +7,7 @@
 #include <utility>
 #include <vector>
 
-namespace facebook
-{
-namespace sysml
-{
-namespace aot
+namespace dabun
 {
 
 auto loop_nest_slow_baseline(
@@ -307,6 +303,4 @@ auto loop_nest_baseline(std::vector<std::pair<std::string, int>> const& order,
     };
 }
 
-} // namespace aot
-} // namespace sysml
-} // namespace facebook
+} // namespace dabun

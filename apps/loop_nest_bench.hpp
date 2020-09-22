@@ -1,7 +1,9 @@
 #pragma once
 
-#include "loop_nest.h"
-#include "utils.h"
+#include "dabun/arithmetic_operation.hpp"
+#include "dabun/loop_nest.hpp"
+#include "dabun/measure.hpp"
+#include "dabun/random_vector.hpp"
 
 #include <functional>
 #include <map>
@@ -10,11 +12,7 @@
 #include <utility>
 #include <vector>
 
-namespace facebook
-{
-namespace sysml
-{
-namespace aot
+namespace dabun
 {
 
 template <class ISA>
@@ -26,8 +24,7 @@ void loop_nest_bench(std::vector<std::pair<std::string, int>> const& order,
                      std::map<std::string, int> const&               C_strides,
                      std::map<std::string, int> const&               A_strides,
                      std::map<std::string, int> const& B_strides, int alpha = 0,
-                     int max_unrolled_fmas = 320, int total_iterations = 100,
-                     int warmup_iterations = 10)
+                     int max_unrolled_fmas = 320, int total_iterations = 100)
 {
     std::int64_t C_size = 1;
     std::int64_t A_size = 1;
@@ -52,16 +49,16 @@ void loop_nest_bench(std::vector<std::pair<std::string, int>> const& order,
     auto B  = get_random_vector<float>(B_size);
     auto CN = get_random_vector<float>(C_size);
 
-    auto jit_fn = loop_nest_code_generator<ISA>(order, sizes, C_formula, A_formula,
-                                            B_formula, C_strides, A_strides,
-                                            B_strides, max_unrolled_fmas)
+    auto jit_fn = loop_nest_code_generator<ISA>(
+                      order, sizes, C_formula, A_formula, B_formula, C_strides,
+                      A_strides, B_strides, dabun::fma, max_unrolled_fmas)
                       .get_shared();
 
     jit_fn.save_to_file("zi.asm");
 
-    auto secs = measureFastestWithWarmup(
-        [&]() { jit_fn(CN.data(), A.data(), B.data(), alpha); },
-        warmup_iterations, total_iterations);
+    auto secs =
+        measure_fastest([&]() { jit_fn(CN.data(), A.data(), B.data(), alpha); },
+                        total_iterations);
 
     double gflops = flops / 1000000000;
 
@@ -70,6 +67,4 @@ void loop_nest_bench(std::vector<std::pair<std::string, int>> const& order,
     std::cout << "GFLOPS: " << (gflops / secs) << "\n";
 }
 
-} // namespace aot
-} // namespace sysml
-} // namespace facebook
+} // namespace dabun

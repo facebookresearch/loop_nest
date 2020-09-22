@@ -1,4 +1,5 @@
 #pragma once
+
 #include <limits>
 
 inline void baseline_CW_HWC(unsigned IOC, unsigned OHW, unsigned KHW,

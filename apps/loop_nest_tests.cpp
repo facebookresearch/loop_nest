@@ -1,24 +1,9 @@
-#include "loop_nest_baseline.h"
-#include "loop_nest_test.h"
-
-#include <xmmintrin.h>
-
-#ifndef DABUN_ISA
-#define DABUN_ISA avx2
-#endif
+#include "loop_nest_baseline.hpp"
+#include "loop_nest_test.hpp"
 
 int main()
 {
-    // DAZ
-    _mm_setcsr(_mm_getcsr() | 0x0040);
-    // FTZ
-    _mm_setcsr(_mm_getcsr() | 0x8000);
-
-    using facebook::sysml::aot::avx2;
-    using facebook::sysml::aot::avx2_plus;
-    using facebook::sysml::aot::avx512;
-
-    using facebook::sysml::aot::test_loop_nest_against_slow_baseline;
+    using namespace dabun;
 
     // 2D convolution NCHW example:
     // O(c_out, o_h, o_w) = I(c_i, o_h + k_h, ow + k_w) * K(c_o, c_i,
@@ -70,7 +55,8 @@ int main()
             {{"c_out", KS * KS * CIN},
              {"c_in", KS * KS},
              {"k_w", 1},
-             {"k_h", KS}}, 32);
+             {"k_h", KS}},
+            32);
     }
 
     // outer product M(r, c) = A(r) * B(c)

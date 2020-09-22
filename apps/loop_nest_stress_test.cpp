@@ -1,7 +1,11 @@
-#include "loop_nest.h"
+#include "baselines.hpp"
+#include "loop_nest_baseline.hpp"
 
-#include "baselines.h"
-#include "utils.h"
+#include "dabun/arithmetic_operation.hpp"
+#include "dabun/check.hpp"
+#include "dabun/loop_nest.hpp"
+#include "dabun/measure.hpp"
+#include "dabun/random_vector.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -21,10 +25,7 @@
 
 int main()
 {
-    using facebook::sysml::aot::aarch64;
-    using facebook::sysml::aot::avx2;
-    using facebook::sysml::aot::avx2_plus;
-    using facebook::sysml::aot::avx512;
+    using namespace dabun;
 
     for (int rounds = 0; rounds < 1000000; ++rounds)
     {
@@ -60,9 +61,8 @@ int main()
                     {
                         if (o.second != 1)
                         {
-                            o.second = facebook::sysml::aot::round_up(
-                                o.second, facebook::sysml::aot::isa_traits<
-                                              DABUN_ISA>::vector_size);
+                            o.second = round_up(
+                                o.second, isa_traits<DABUN_ISA>::vector_size);
                         }
                     }
                     std::cout << o.first << "=" << o.second << "  ";
@@ -75,7 +75,7 @@ int main()
                 std::cout << "MU=" << max_fmas_unrolled << std::endl;
 
                 auto fn =
-                    facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
+                    loop_nest_code_generator<DABUN_ISA>(
                         full_order, // The second argument is a map of the
                                     // dimension sizes
                         {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
@@ -90,8 +90,8 @@ int main()
                         // A's strides for each variable
                         {{"ArCr", AcBr}, {"AcBr", 1}},
                         // B's strides for each variable
-                        {{"AcBr", BcCc}, {"BcCc", 1}},
-                        facebook::sysml::aot::fma, max_fmas_unrolled, nullptr)
+                        {{"AcBr", BcCc}, {"BcCc", 1}}, dabun::fma,
+                        max_fmas_unrolled, nullptr)
                         .get_shared();
 
                 auto A = get_random_vector<float>(AcBr * ArCr);
@@ -107,8 +107,8 @@ int main()
 
                 fn(CJ.data(), A.data(), B.data(), 1);
 
-                auto madiff =
-                    max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data());
+                auto madiff = max_abs_difference(
+                    CJ.data(), CJ.data() + ArCr * BcCc, CN.data());
 
                 std::cout << "MAXABSDIFF: " << madiff << std::endl;
 
