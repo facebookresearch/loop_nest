@@ -10,8 +10,8 @@
 #include <string>
 #include <vector>
 
-#ifndef CT_ISA
-#define CT_ISA avx2
+#ifndef DABUN_ISA
+#define DABUN_ISA avx2
 #endif
 
 std::int64_t compute_size(std::map<std::string, int> sizes,
@@ -74,7 +74,7 @@ int main(int argc, char* argv[])
     auto B_strides    = serialized.get_strides("B");
     auto unroll_limit = serialized.get_unroll_limit();
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         order, sizes, C_formula, A_formula, B_formula, C_strides, A_strides,
         B_strides, unroll_limit);
 

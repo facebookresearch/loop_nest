@@ -1,33 +1,21 @@
-// TODO(partially done) - generalize to FN(alpha C + A * B + W)
-// -- needs the W
-
-// TODO - arbitrary inner operation
-
-// TODO(partially done) - Better tails (try to reuse the fully unrolled code)
-
-// TODO(partially done) - document the logic for relu (with the +1
-// thing) We are using the upper 31 bits of AlphaReg store the sum of
-// all visited dimensions
+// Copyright 2004-present Facebook. All Rights Reserved.
 
 #pragma once
 
-#if defined(LOOP_NEST_ARM) || defined(ARM_LOOP_NEST)
-#include "arm_loop_nest.h"
-#else
-
-#include "address_packer.h"
-#include "arithmetic_operation.h"
-#include "code_generator.h"
-#include "common.h"
-#include "configuration.h"
-#include "denormals.h"
-#include "elementwise_operation.h"
-#include "isa.h"
-#include "log.h"
-#include "math.h"
-#include "most_frequent_queue.h"
-#include "multi_vmm.h"
-#include "utils.h"
+#include "dabun/code_generator.hpp"
+#include "dabun/common.hpp"
+#include "dabun/core.hpp"
+#include "dabun/denormals.hpp"
+#include "dabun/detail/most_frequent_queue.hpp"
+#include "dabun/isa.hpp"
+#include "dabun/log.hpp"
+#include "dabun/math.hpp"
+#include "dabun/x86/address_packer.hpp"
+#include "dabun/x86/arithmetic_operation.hpp"
+#include "dabun/x86/configuration.hpp"
+#include "dabun/x86/elementwise_operation.hpp"
+#include "dabun/x86/multi_vmm.hpp"
+// #include "utils.h"
 
 #include <boost/multi_index/composite_key.hpp>
 #include <boost/multi_index/member.hpp>
@@ -44,15 +32,13 @@
 #include <variant>
 #include <vector>
 
-namespace facebook
+namespace dabun
 {
-namespace sysml
-{
-namespace aot
+namespace x86
 {
 
 template <class ISA>
-class FMA_loop_nest_jitter
+class loop_nest_code_generator
     : public code_generator<void(float* C, float const* A, float const* B,
                                  int alpha)>
 {
@@ -1031,6 +1017,14 @@ private:
         OpMask full_k_mask          = k3;
         OpMask temp_k_mask          = k4;
 
+        std::cout << "ISSUE_MAX_ALPHA: " << issue_max_alpha_logic
+                  << " ----------------\n";
+
+        for (auto const& c : stores)
+        {
+            C_VMMs[c].reduce(*this, op_pair);
+        }
+
         if (issue_max_alpha_logic && elementwise_postop)
         {
             if (C_traits.access == VECTOR_PACKED ||
@@ -1481,7 +1475,7 @@ private:
             }
         };
 
-        most_frequent_queue<memory_argument> queue;
+        dabun::detail::most_frequent_queue<memory_argument> queue;
 
         for (auto const& p : addressers)
         {
@@ -1750,29 +1744,6 @@ private:
             return;
         }
 
-        // TODO(zi) Implement the new strategies when possible. With
-        // all in-reg arguments for the FMAs
-
-        // INPROGRESS - some analysis code is commented out below
-
-        // std::map<memory_argument, int> freq;
-        // for (auto const& f : fmas)
-        // {
-        //     ++freq[f.src1];
-        //     ++freq[f.src2];
-        // }
-
-        // std::set<int> degrees;
-        // for (auto const& p : freq)
-        // {
-        //     degrees.insert(p.second);
-        // }
-
-        // std::cout << "DEGREES:";
-        // for (auto const d : degrees)
-        //     std::cout << ' ' << d;
-        // std::cout << std::endl;
-
         // Assignment of vector registers
         Vmm arg1_register, arg2_register;
         Vmm arg_A_strides, arg_B_strides;
@@ -1830,7 +1801,7 @@ private:
 
         strong_assert(next_vector_register <= auxiliary_registers);
 
-        most_frequent_queue<memory_argument> queue;
+        dabun::detail::most_frequent_queue<memory_argument> queue;
 
         for (auto const& p : addressers)
         {
@@ -2803,9 +2774,9 @@ private:
             }
         };
 
-        std::map<address_load, int>                    global_patterns;
-        std::map<int, std::shared_ptr<address_packer>> addressers;
-        most_frequent_queue<memory_argument>           queue;
+        std::map<address_load, int>                         global_patterns;
+        std::map<int, std::shared_ptr<address_packer>>      addressers;
+        dabun::detail::most_frequent_queue<memory_argument> queue;
 
         auto unrolled_fmas_copy = unrolled_fmas;
 
@@ -3089,6 +3060,8 @@ private:
             }
             else if (full_iterations == 1)
             {
+                std::cout << "HERHERHEREHREHR----------------------------------"
+                             "--------------------\n";
                 // --------------------------------------------------
                 // RECURSION
                 if (tail && depth < depth_for_register_blocked_C &&
@@ -3829,7 +3802,7 @@ public:
     std::int64_t get_total_memory() const { return total_memory_; }
 
 public:
-    FMA_loop_nest_jitter(
+    loop_nest_code_generator(
         std::vector<std::pair<std::string, int>> const& _order,
         std::map<std::string, int> const&               sizes,
         std::set<std::string> const&                    C_formula,
@@ -4008,8 +3981,5 @@ public:
     }
 };
 
-} // namespace aot
-} // namespace sysml
-} // namespace facebook
-
-#endif
+} // namespace x86
+} // namespace dabun

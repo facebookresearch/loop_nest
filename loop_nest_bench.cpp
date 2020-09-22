@@ -3,8 +3,8 @@
 
 #include <xmmintrin.h>
 
-#ifndef CT_ISA
-#define CT_ISA avx2
+#ifndef DABUN_ISA
+#define DABUN_ISA avx2
 #endif
 
 int main()
@@ -29,7 +29,7 @@ int main()
         int KS   = 3;
         int IS   = OS + KS - 1;
 
-        loop_nest_bench<CT_ISA>(
+        loop_nest_bench<DABUN_ISA>(
             {{"c_out", 16}, //
              {"o_h", 1},
              {"o_w", 28},
@@ -86,7 +86,7 @@ int main()
         int KS   = 3;
         int IS   = OS + KS - 1;
 
-        loop_nest_bench<CT_ISA>(
+        loop_nest_bench<DABUN_ISA>(
             {{"g_out", 1}, //
              {"o_w", 28},
              {"o_h", 1},

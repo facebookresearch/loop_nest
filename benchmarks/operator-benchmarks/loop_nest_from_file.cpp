@@ -9,8 +9,8 @@
 #include <string>
 #include <vector>
 
-#ifndef CT_ISA
-#define CT_ISA avx2
+#ifndef DABUN_ISA
+#define DABUN_ISA avx2
 #endif
 
 std::int64_t compute_size(std::map<std::string, int> sizes,
@@ -74,7 +74,7 @@ int main(int argc, char* argv[])
     auto unroll_limit = serialized.get_unroll_limit();
 
     auto gen_loop_nest = [&]() {
-        return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+        return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                    order, sizes, C_formula, A_formula, B_formula, C_strides,
                    A_strides, B_strides, facebook::sysml::aot::fma,
                    unroll_limit)

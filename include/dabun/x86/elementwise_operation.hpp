@@ -1,18 +1,10 @@
-#pragma once
+// Copyright 2004-present Facebook. All Rights Reserved.
 
 #pragma once
 
-#if defined(ARM_LOOP_NEST)
-
-#include "arm_elementwise_operation.h"
-
-#else
-
-#define XBYAK_NO_OP_NAMES
-#include "xbyak/xbyak.h"
-
-#include "common.h"
-#include "isa.h"
+#include "dabun/common.hpp"
+#include "dabun/isa.hpp"
+#include "dabun/x86/xbyak.hpp"
 
 #include <map>
 #include <memory>
@@ -22,11 +14,9 @@
 #include <utility>
 #include <vector>
 
-namespace facebook
+namespace dabun
 {
-namespace sysml
-{
-namespace aot
+namespace x86
 {
 
 template <class ISA>
@@ -695,8 +685,5 @@ compose(std::shared_ptr<elementwise_operation<ISA>> const& first,
     return std::make_shared<composed_elementwise<ISA, ISAs...>>(first, rest...);
 }
 
-} // namespace aot
-} // namespace sysml
-} // namespace facebook
-
-#endif
+} // namespace x86
+} // namespace dabun

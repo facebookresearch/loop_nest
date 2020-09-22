@@ -8,8 +8,8 @@
 #include "translate_to_halide.h"
 #include "utils.h"
 
-#ifndef CT_ISA
-#define CT_ISA avx2
+#ifndef DABUN_ISA
+#define DABUN_ISA avx2
 #endif
 
 int main() {
@@ -25,7 +25,7 @@ int main() {
     int AcBr = 256;
     int BcCc = 256;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         // The first argument is the loop order in the form of
         // {dimension, stride}.  For now the outer dimension
         // has to divide the stride.  This is effectively the
@@ -95,7 +95,7 @@ int main() {
     int AcBr = 512;
     int BcCc = 512;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         // The first argument is the loop order in the form of
         // {dimension, stride}.  For now the outer dimension
         // has to divide the stride.  This is effectively the
@@ -170,7 +170,7 @@ int main() {
     int k = AcBr;
     int r = ArCr;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         {{"r", 16}, //
          {"r", 1},  //
          {"k", 64},
@@ -228,7 +228,7 @@ int main() {
     int k = AcBr;
     int c = BcCc;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         {{"k", 4},  //
          {"k", 1},  //
          {"c", 1}}, //
@@ -288,7 +288,7 @@ int main() {
     int KS = 3;
     int IS = OS + KS - 1;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         {{"g_out", 1}, //
          {"o_w", 28},
          {"o_h", 1},
@@ -383,7 +383,7 @@ int main() {
     int IY = OY + KY - 1;
     int IZ = OZ + KZ - 1;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         // have arbitray number of splits.
         {{"OX", 1},  // To block B in L2 cache
          {"OY", 10}, // This and the next are for the register

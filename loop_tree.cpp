@@ -10,8 +10,8 @@
 #include "transposer_bench.h"
 #include "utils.h"
 
-#ifndef CT_ISA
-#define CT_ISA avx2
+#ifndef DABUN_ISA
+#define DABUN_ISA avx2
 #endif
 
 // just for testing
@@ -68,7 +68,7 @@ int main()
 
         // C1 += A1 * B1
         // alpha 1 -> accumulate (no zero init)
-        auto mm1 = make_compute_node<CT_ISA>(
+        auto mm1 = make_compute_node<DABUN_ISA>(
             {"A1", "B1"}, "C1", mm1_strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 1, 100);
 
@@ -76,7 +76,7 @@ int main()
         for AcBr1:
             C1 += A1 * B1
         */
-        auto ln1 = make_for_loop_node<CT_ISA>("AcBr1", 1, {mm1});
+        auto ln1 = make_for_loop_node<DABUN_ISA>("AcBr1", 1, {mm1});
 
         std::map<std::string, std::map<std::string, int>> mm2_strides = {
             {"C2", {{"ArCr", BcCc}, {"BcCc", 1}}},
@@ -84,7 +84,7 @@ int main()
             {"B2", {{"AcBr2", BcCc}, {"BcCc", 1}}}};
 
         // C2 += A2 * B2
-        auto mm2 = make_compute_node<CT_ISA>(
+        auto mm2 = make_compute_node<DABUN_ISA>(
             {"A2", "B2"}, "C2", mm2_strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 1, 100);
 
@@ -92,7 +92,7 @@ int main()
         for AcBr2:
             C2 += A2 * B2
         */
-        auto ln2 = make_for_loop_node<CT_ISA>("AcBr2", 1, {mm2});
+        auto ln2 = make_for_loop_node<DABUN_ISA>("AcBr2", 1, {mm2});
 
         /*
         for BcCc:
@@ -103,10 +103,10 @@ int main()
                 for AcBr2:
                     C2 += A2 * B2
         */
-        auto root = make_for_loop_node<CT_ISA>(
-            "BcCc", 1, {make_for_loop_node<CT_ISA>("ArCr", 1, {ln1, ln2})});
+        auto root = make_for_loop_node<DABUN_ISA>(
+            "BcCc", 1, {make_for_loop_node<DABUN_ISA>("ArCr", 1, {ln1, ln2})});
 
-        auto tree = make_loop_tree_program<CT_ISA>({root}, sizes, formulas,
+        auto tree = make_loop_tree_program<DABUN_ISA>({root}, sizes, formulas,
                                                    MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
@@ -183,7 +183,7 @@ int main()
             {"B1", {{"AcBr1", BcCc}, {"BcCc", 1}}}};
 
         // C1 += A1 * B1
-        auto mm1 = make_compute_node<CT_ISA>(
+        auto mm1 = make_compute_node<DABUN_ISA>(
             {"A1", "B1"}, "C1", mm1_strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 0, 100);
 
@@ -191,7 +191,7 @@ int main()
         for AcBr1:
             C1 += A1 * B1
         */
-        auto ln1 = make_for_loop_node<CT_ISA>("AcBr1", 1, {mm1});
+        auto ln1 = make_for_loop_node<DABUN_ISA>("AcBr1", 1, {mm1});
 
         std::map<std::string, std::map<std::string, int>> mm2_strides = {
             {"C2", {{"ArCr", BcCc}, {"BcCc", 1}}},
@@ -199,7 +199,7 @@ int main()
             {"B2", {{"AcBr2", BcCc}, {"BcCc", 1}}}};
 
         // C2 += A2 * B2
-        auto mm2 = make_compute_node<CT_ISA>(
+        auto mm2 = make_compute_node<DABUN_ISA>(
             {"A2", "B2"}, "C2", mm2_strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 0, 100);
 
@@ -207,7 +207,7 @@ int main()
         for AcBr2:
             C2 += A2 * B2
         */
-        auto ln2 = make_for_loop_node<CT_ISA>("AcBr2", 1, {mm2});
+        auto ln2 = make_for_loop_node<DABUN_ISA>("AcBr2", 1, {mm2});
 
         /*
         for BcCc:
@@ -219,10 +219,10 @@ int main()
                 for AcBr2:
                     C2 += A2 * B2
         */
-        auto root = make_for_loop_node<CT_ISA>(
-            "BcCc", 1, {make_for_loop_node<CT_ISA>("ArCr", 1, {ln1, ln2})});
+        auto root = make_for_loop_node<DABUN_ISA>(
+            "BcCc", 1, {make_for_loop_node<DABUN_ISA>("ArCr", 1, {ln1, ln2})});
 
-        auto tree = make_loop_tree_program<CT_ISA>({root}, sizes, formulas,
+        auto tree = make_loop_tree_program<DABUN_ISA>({root}, sizes, formulas,
                                                    MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
@@ -302,7 +302,7 @@ int main()
             {"B1", {{"AcBr1", BcCc}, {"BcCc", 1}}}};
 
         // C1 += A1 * B1
-        auto mm1 = make_compute_node<CT_ISA>(
+        auto mm1 = make_compute_node<DABUN_ISA>(
             {"A1", "B1"}, "C1", mm1_strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 1, 100);
 
@@ -313,10 +313,10 @@ int main()
                 for AcBr1:
                     C1 += A1 * B1
         */
-        auto ln1 = make_for_loop_node<CT_ISA>(
+        auto ln1 = make_for_loop_node<DABUN_ISA>(
             "BcCc", 1,
-            {make_for_loop_node<CT_ISA>(
-                "ArCr", 1, {make_for_loop_node<CT_ISA>("AcBr1", 1, {mm1})})});
+            {make_for_loop_node<DABUN_ISA>(
+                "ArCr", 1, {make_for_loop_node<DABUN_ISA>("AcBr1", 1, {mm1})})});
 
         std::map<std::string, std::map<std::string, int>> mm2_strides = {
             {"C2", {{"ArCr", BcCc}, {"BcCc", 1}}},
@@ -324,7 +324,7 @@ int main()
             {"B2", {{"AcBr2", BcCc}, {"BcCc", 1}}}};
 
         // C2 += A2 * B2
-        auto mm2 = make_compute_node<CT_ISA>(
+        auto mm2 = make_compute_node<DABUN_ISA>(
             {"A2", "B2"}, "C2", mm2_strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 0, 100);
 
@@ -335,12 +335,12 @@ int main()
                 for AcBr2:
                     C2 += A2 * B2
         */
-        auto ln2 = make_for_loop_node<CT_ISA>(
+        auto ln2 = make_for_loop_node<DABUN_ISA>(
             "BcCc", 1,
-            {make_for_loop_node<CT_ISA>(
-                "ArCr", 1, {make_for_loop_node<CT_ISA>("AcBr2", 1, {mm2})})});
+            {make_for_loop_node<DABUN_ISA>(
+                "ArCr", 1, {make_for_loop_node<DABUN_ISA>("AcBr2", 1, {mm2})})});
 
-        auto tree = make_loop_tree_program<CT_ISA>({ln1, ln2}, sizes, formulas,
+        auto tree = make_loop_tree_program<DABUN_ISA>({ln1, ln2}, sizes, formulas,
                                                    MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
@@ -422,7 +422,7 @@ int main()
             {"B1", {{"AcBr1", BcCc}, {"BcCc", 1}}}};
 
         // C1 += A1 * B1 with zero init
-        auto mm1 = make_compute_node<CT_ISA>(
+        auto mm1 = make_compute_node<DABUN_ISA>(
             {"A1", "B1"}, "C1", mm1_strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 0, 100);
 
@@ -432,8 +432,8 @@ int main()
             for AcBr1:
                 C1 += A1 * B1
         */
-        auto ln1 = make_for_loop_node<CT_ISA>(
-            "ArCr1", 1, {make_for_loop_node<CT_ISA>("AcBr1", 1, {mm1})});
+        auto ln1 = make_for_loop_node<DABUN_ISA>(
+            "ArCr1", 1, {make_for_loop_node<DABUN_ISA>("AcBr1", 1, {mm1})});
 
         std::map<std::string, std::map<std::string, int>> mm2_strides = {
             {"C2", {{"ArCr2", BcCc}, {"BcCc", 1}}},
@@ -441,7 +441,7 @@ int main()
             {"B2", {{"AcBr2", BcCc}, {"BcCc", 1}}}};
 
         // C2  += A2 * B2
-        auto mm2 = make_compute_node<CT_ISA>(
+        auto mm2 = make_compute_node<DABUN_ISA>(
             {"A2", "B2"}, "C2", mm2_strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 1, 100);
 
@@ -451,8 +451,8 @@ int main()
             for AcBr2:
                 C2 += A2 * B2
         */
-        auto ln2 = make_for_loop_node<CT_ISA>(
-            "ArCr2", 1, {make_for_loop_node<CT_ISA>("AcBr2", 1, {mm2})});
+        auto ln2 = make_for_loop_node<DABUN_ISA>(
+            "ArCr2", 1, {make_for_loop_node<DABUN_ISA>("AcBr2", 1, {mm2})});
 
         /*
         for BcCc:
@@ -465,9 +465,9 @@ int main()
                 for AcBr2:
                     C2 += A2 * B2
         */
-        auto root = make_for_loop_node<CT_ISA>("BcCc", 1, {ln1, ln2});
+        auto root = make_for_loop_node<DABUN_ISA>("BcCc", 1, {ln1, ln2});
 
-        auto tree = make_loop_tree_program<CT_ISA>({root}, sizes, formulas,
+        auto tree = make_loop_tree_program<DABUN_ISA>({root}, sizes, formulas,
                                                    MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
@@ -545,7 +545,7 @@ int main()
             {"B2", {{"AcBr", 1}, {"BcCc", AcBr}}}};
 
         // C[ArCr, BcCc] += A[ArCr, AcBr] * B2[BcCc, AcBr] (with zero init)
-        auto mm = make_compute_node<CT_ISA>(
+        auto mm = make_compute_node<DABUN_ISA>(
             {"A", "B2"}, "C", mm_strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 0, 100);
 
@@ -554,7 +554,7 @@ int main()
             // jitted
             C[ArCr, BcCc] += A[ArCr, AcBr] * B2[BcCc, AcBr]
         */
-        auto ln = make_for_loop_node<CT_ISA>("ArCr", 1, {mm});
+        auto ln = make_for_loop_node<DABUN_ISA>("ArCr", 1, {mm});
 
         std::map<std::string, std::map<std::string, int>> transpose_strides = {
             {"B1", {{"AcBr", BcCc}, {"BcCc", 1}}},
@@ -562,7 +562,7 @@ int main()
 
         // B2[BcCc, AcBr] = B1[AcBr, BcCc]
         auto tr =
-            make_transpose_node<CT_ISA>("B1", "B2", transpose_strides, 100);
+            make_transpose_node<DABUN_ISA>("B1", "B2", transpose_strides, 100);
 
         /*
         C = 0
@@ -575,10 +575,10 @@ int main()
                     // jitted
                     C[ArCr, BcCc] += A[ArCr, AcBr] * B2[BcCc, AcBr]
         */
-        auto root = make_for_loop_node<CT_ISA>(
-            "BcCc", 1, {make_for_loop_node<CT_ISA>("AcBr", 1, {tr, ln})});
+        auto root = make_for_loop_node<DABUN_ISA>(
+            "BcCc", 1, {make_for_loop_node<DABUN_ISA>("AcBr", 1, {tr, ln})});
 
-        auto tree = make_loop_tree_program<CT_ISA>({root}, sizes, formulas,
+        auto tree = make_loop_tree_program<DABUN_ISA>({root}, sizes, formulas,
                                                    MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
@@ -640,7 +640,7 @@ int main()
             {"B", {{"AcBr", BcCc}, {"BcCc", 1}}}};
 
         // C += A * B
-        auto mm = make_compute_node<CT_ISA>(
+        auto mm = make_compute_node<DABUN_ISA>(
             {"A", "B"}, "C", strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 1, 322);
 
@@ -648,11 +648,11 @@ int main()
         auto curr = mm;
         for (auto it = order.rbegin(); it != order.rend(); it++)
         {
-            curr = make_for_loop_node<CT_ISA>(it->first, it->second, {curr});
+            curr = make_for_loop_node<DABUN_ISA>(it->first, it->second, {curr});
         }
 
         auto nodes = {curr};
-        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas,
+        auto tree  = make_loop_tree_program<DABUN_ISA>(nodes, sizes, formulas,
                                                    MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
@@ -704,7 +704,7 @@ int main()
             {"B", {{"AcBr", BcCc}, {"BcCc", 1}}}};
 
         // C += A * B (with zero-init)
-        auto mm = make_compute_node<CT_ISA>(
+        auto mm = make_compute_node<DABUN_ISA>(
             {"A", "B"}, "C", strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 0, 322);
 
@@ -712,11 +712,11 @@ int main()
         auto curr = mm;
         for (auto it = order.rbegin(); it != order.rend(); it++)
         {
-            curr = make_for_loop_node<CT_ISA>(it->first, it->second, {curr});
+            curr = make_for_loop_node<DABUN_ISA>(it->first, it->second, {curr});
         }
 
         auto nodes = {curr};
-        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas,
+        auto tree  = make_loop_tree_program<DABUN_ISA>(nodes, sizes, formulas,
                                                    MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
@@ -757,20 +757,20 @@ int main()
             {"A", in_strides}, {"C", out_strides}};
 
         // transpose "A" into "C"
-        auto tr = make_transpose_node<CT_ISA>("A", "C", strides);
+        auto tr = make_transpose_node<DABUN_ISA>("A", "C", strides);
 
         // add for-loops from the order
         auto curr = tr;
         for (auto it = order.rbegin(); it != order.rend(); it++)
         {
-            curr = make_for_loop_node<CT_ISA>(it->first, it->second, {curr});
+            curr = make_for_loop_node<DABUN_ISA>(it->first, it->second, {curr});
         }
 
         auto nodes = {curr};
         // technically formulas aren't used in transpose so not
         //  necessary here
         // (but are always a required parameter for now)
-        auto tree = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas,
+        auto tree = make_loop_tree_program<DABUN_ISA>(nodes, sizes, formulas,
                                                    MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
@@ -829,21 +829,21 @@ int main()
 
         // C += A * B (with zero-init)
         // followed by relu(C + bias) before storing
-        auto mm = make_compute_node<CT_ISA>(
+        auto mm = make_compute_node<DABUN_ISA>(
             {"A", "B"}, "C", strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 0, std::nullopt, nullptr, {},
-            compose(elementwise_bias<CT_ISA>, elementwise_relu<CT_ISA>),
+            compose(elementwise_bias<DABUN_ISA>, elementwise_relu<DABUN_ISA>),
             {"bias"});
 
         // add for-loops from the order
         auto curr = mm;
         for (auto it = order.rbegin(); it != order.rend(); it++)
         {
-            curr = make_for_loop_node<CT_ISA>(it->first, it->second, {curr});
+            curr = make_for_loop_node<DABUN_ISA>(it->first, it->second, {curr});
         }
 
         auto nodes = {curr};
-        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas,
+        auto tree  = make_loop_tree_program<DABUN_ISA>(nodes, sizes, formulas,
                                                    MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
@@ -909,21 +909,21 @@ int main()
 
         // C += A * B (without zero-init)
         // followed by relu(C + bias) before storing
-        auto mm = make_compute_node<CT_ISA>(
+        auto mm = make_compute_node<DABUN_ISA>(
             {"A", "B"}, "C", strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 1, std::nullopt,
-            compose(elementwise_bias<CT_ISA>, elementwise_relu<CT_ISA>),
+            compose(elementwise_bias<DABUN_ISA>, elementwise_relu<DABUN_ISA>),
             {"bias"}, nullptr, {});
 
         // add for-loops from the order
         auto curr = mm;
         for (auto it = order.rbegin(); it != order.rend(); it++)
         {
-            curr = make_for_loop_node<CT_ISA>(it->first, it->second, {curr});
+            curr = make_for_loop_node<DABUN_ISA>(it->first, it->second, {curr});
         }
 
         auto nodes = {curr};
-        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas,
+        auto tree  = make_loop_tree_program<DABUN_ISA>(nodes, sizes, formulas,
                                                    MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
@@ -996,20 +996,20 @@ int main()
             {"B", {{"KX", KY * KZ}, {"KY", KZ}, {"KZ", 1}}}};
 
         // innermost op with zero init, and relu postop
-        auto mm = make_compute_node<CT_ISA>(
+        auto mm = make_compute_node<DABUN_ISA>(
             {"A", "B"}, "C", strides, arithmetic_op_kind::plus,
             arithmetic_op_kind::multiplies, 0, std::nullopt, nullptr, {},
-            facebook::sysml::aot::elementwise_relu<CT_ISA>);
+            facebook::sysml::aot::elementwise_relu<DABUN_ISA>);
 
         // add for-loops from the order
         auto curr = mm;
         for (auto it = order.rbegin(); it != order.rend(); it++)
         {
-            curr = make_for_loop_node<CT_ISA>(it->first, it->second, {curr});
+            curr = make_for_loop_node<DABUN_ISA>(it->first, it->second, {curr});
         }
 
         auto nodes = {curr};
-        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas,
+        auto tree  = make_loop_tree_program<DABUN_ISA>(nodes, sizes, formulas,
                                                    MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();
@@ -1082,7 +1082,7 @@ int main()
               {"k_h", COUT * CIN * KS}}}};
 
         // innermost op with zero init
-        auto mm = make_compute_node<CT_ISA>({"A", "B"}, "C", strides,
+        auto mm = make_compute_node<DABUN_ISA>({"A", "B"}, "C", strides,
                                             arithmetic_op_kind::plus,
                                             arithmetic_op_kind::multiplies, 0);
 
@@ -1090,11 +1090,11 @@ int main()
         auto curr = mm;
         for (auto it = order.rbegin(); it != order.rend(); it++)
         {
-            curr = make_for_loop_node<CT_ISA>(it->first, it->second, {curr});
+            curr = make_for_loop_node<DABUN_ISA>(it->first, it->second, {curr});
         }
 
         auto nodes = {curr};
-        auto tree  = make_loop_tree_program<CT_ISA>(nodes, sizes, formulas,
+        auto tree  = make_loop_tree_program<DABUN_ISA>(nodes, sizes, formulas,
                                                    MAX_INTERPRETED_DEPTH);
 
         auto fn = tree->get_fn();

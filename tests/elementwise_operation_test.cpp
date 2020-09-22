@@ -16,8 +16,8 @@
 #include <string>
 #include <vector>
 
-#ifndef CT_ISA
-#define CT_ISA avx2
+#ifndef DABUN_ISA
+#define DABUN_ISA avx2
 #endif
 
 int main()
@@ -38,7 +38,7 @@ int main()
         int BcCc = 256;
 
         auto gen_loop_nest = [&]() {
-            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+            return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -73,8 +73,8 @@ int main()
                        // B's strides for each variable
                        {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
                        1024, nullptr, {},
-                       compose(elementwise_bias<CT_ISA>,
-                               elementwise_relu<CT_ISA>),
+                       compose(elementwise_bias<DABUN_ISA>,
+                               elementwise_relu<DABUN_ISA>),
                        {
                            {{"BcCc", 1}},
                        })
@@ -113,7 +113,7 @@ int main()
         int BcCc = 255;
 
         auto gen_loop_nest = [&]() {
-            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+            return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -148,7 +148,7 @@ int main()
                        // B's strides for each variable
                        {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
                        1024, nullptr, {},
-                       facebook::sysml::aot::elementwise_bias<CT_ISA>,
+                       facebook::sysml::aot::elementwise_bias<DABUN_ISA>,
                        {
                            {{"BcCc", 1}},
                        })
@@ -186,7 +186,7 @@ int main()
         int BcCc = 255;
 
         auto gen_loop_nest = [&]() {
-            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+            return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -221,7 +221,7 @@ int main()
                        // B's strides for each variable
                        {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
                        1024, nullptr, {},
-                       facebook::sysml::aot::elementwise_bias<CT_ISA>,
+                       facebook::sysml::aot::elementwise_bias<DABUN_ISA>,
                        {
                            {{"BcCc", 3}},
                        })
@@ -259,7 +259,7 @@ int main()
         int BcCc = 256;
 
         auto gen_loop_nest = [&]() {
-            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+            return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -292,7 +292,7 @@ int main()
                        // B's strides for each variable
                        {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
                        20, nullptr, {},
-                       facebook::sysml::aot::elementwise_bias<CT_ISA>,
+                       facebook::sysml::aot::elementwise_bias<DABUN_ISA>,
                        {
                            {{"BcCc", 1}},
                        })
@@ -330,7 +330,7 @@ int main()
         int BcCc = 256;
 
         auto gen_loop_nest = [&]() {
-            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+            return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -363,7 +363,7 @@ int main()
                        // B's strides for each variable
                        {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
                        20, nullptr, {},
-                       facebook::sysml::aot::elementwise_bias<CT_ISA>,
+                       facebook::sysml::aot::elementwise_bias<DABUN_ISA>,
                        {
                            {{"ArCr", 0}, {"BcCc", 1}},
                        })
@@ -402,7 +402,7 @@ int main()
         int BcCc = 256;
 
         auto gen_loop_nest = [&]() {
-            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+            return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -436,7 +436,7 @@ int main()
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
                        {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
-                       1024, facebook::sysml::aot::elementwise_bias<CT_ISA>,
+                       1024, facebook::sysml::aot::elementwise_bias<DABUN_ISA>,
                        {
                            {{"BcCc", 1}},
                        })
@@ -474,7 +474,7 @@ int main()
         int BcCc = 255;
 
         auto gen_loop_nest = [&]() {
-            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+            return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -508,7 +508,7 @@ int main()
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
                        {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
-                       1024, facebook::sysml::aot::elementwise_bias<CT_ISA>,
+                       1024, facebook::sysml::aot::elementwise_bias<DABUN_ISA>,
                        {
                            {{"BcCc", 1}},
                        })
@@ -547,7 +547,7 @@ int main()
         int BcCc = 255;
 
         auto gen_loop_nest = [&]() {
-            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+            return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -581,7 +581,7 @@ int main()
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
                        {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
-                       1024, facebook::sysml::aot::elementwise_bias<CT_ISA>,
+                       1024, facebook::sysml::aot::elementwise_bias<DABUN_ISA>,
                        {
                            {{"BcCc", 3}},
                        })
@@ -619,7 +619,7 @@ int main()
         int BcCc = 256;
 
         auto gen_loop_nest = [&]() {
-            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+            return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -651,7 +651,7 @@ int main()
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
                        {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
-                       20, facebook::sysml::aot::elementwise_bias<CT_ISA>,
+                       20, facebook::sysml::aot::elementwise_bias<DABUN_ISA>,
                        {
                            {{"BcCc", 1}},
                        })
@@ -689,7 +689,7 @@ int main()
         int BcCc = 256;
 
         auto gen_loop_nest = [&]() {
-            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+            return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -721,7 +721,7 @@ int main()
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
                        {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
-                       20, facebook::sysml::aot::elementwise_bias<CT_ISA>,
+                       20, facebook::sysml::aot::elementwise_bias<DABUN_ISA>,
                        {
                            {{"ArCr", 0}, {"BcCc", 1}},
                        })
@@ -760,7 +760,7 @@ int main()
         int BcCc = 256;
 
         auto gen_loop_nest = [&]() {
-            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+            return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -794,7 +794,7 @@ int main()
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
                        {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
-                       1024, facebook::sysml::aot::elementwise_multiply<CT_ISA>,
+                       1024, facebook::sysml::aot::elementwise_multiply<DABUN_ISA>,
                        {
                            {{"ArCr", 0}, {"BcCc", 0}},
                        })
@@ -833,7 +833,7 @@ int main()
         int BcCc = 255;
 
         auto gen_loop_nest = [&]() {
-            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+            return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -867,11 +867,11 @@ int main()
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
                        {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
-                       1024, facebook::sysml::aot::elementwise_multiply<CT_ISA>,
+                       1024, facebook::sysml::aot::elementwise_multiply<DABUN_ISA>,
                        {
                            {{"ArCr", 0}, {"BcCc", 0}},
                        },
-                       facebook::sysml::aot::elementwise_relu<CT_ISA>)
+                       facebook::sysml::aot::elementwise_relu<DABUN_ISA>)
                 .get_unique();
         };
 
@@ -909,7 +909,7 @@ int main()
         int BcCc = 255;
 
         auto gen_loop_nest = [&]() {
-            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+            return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -943,9 +943,9 @@ int main()
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
                        {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
-                       1024, facebook::sysml::aot::elementwise_multiply<CT_ISA>,
+                       1024, facebook::sysml::aot::elementwise_multiply<DABUN_ISA>,
                        {{{"ArCr", 0}, {"BcCc", 0}}},
-                       facebook::sysml::aot::elementwise_bias<CT_ISA>,
+                       facebook::sysml::aot::elementwise_bias<DABUN_ISA>,
                        {
                            {{"BcCc", 3}},
                        })
@@ -986,7 +986,7 @@ int main()
         int BcCc = 256;
 
         auto gen_loop_nest = [&]() {
-            return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+            return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -1018,9 +1018,9 @@ int main()
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
                        {{"AcBr", BcCc}, {"BcCc", 1}}, facebook::sysml::aot::fma,
-                       20, facebook::sysml::aot::elementwise_multiply<CT_ISA>,
+                       20, facebook::sysml::aot::elementwise_multiply<DABUN_ISA>,
                        {{{"ArCr", 0}, {"BcCc", 0}}},
-                       facebook::sysml::aot::elementwise_bias<CT_ISA>,
+                       facebook::sysml::aot::elementwise_bias<DABUN_ISA>,
                        {
                            {{"BcCc", 1}},
                        })

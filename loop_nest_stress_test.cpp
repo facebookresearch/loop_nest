@@ -15,8 +15,8 @@
 #include <string>
 #include <vector>
 
-#ifndef CT_ISA
-#define CT_ISA avx2
+#ifndef DABUN_ISA
+#define DABUN_ISA avx2
 #endif
 
 int main()
@@ -62,7 +62,7 @@ int main()
                         {
                             o.second = facebook::sysml::aot::round_up(
                                 o.second, facebook::sysml::aot::isa_traits<
-                                              CT_ISA>::vector_size);
+                                              DABUN_ISA>::vector_size);
                         }
                     }
                     std::cout << o.first << "=" << o.second << "  ";
@@ -75,7 +75,7 @@ int main()
                 std::cout << "MU=" << max_fmas_unrolled << std::endl;
 
                 auto fn =
-                    facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+                    facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                         full_order, // The second argument is a map of the
                                     // dimension sizes
                         {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},

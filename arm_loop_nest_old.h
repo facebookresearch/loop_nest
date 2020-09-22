@@ -55,10 +55,10 @@ struct tensor_location_t
 // https://stackoverflow.com/questions/27941220/push-lr-and-pop-lr-in-arm-arch64
 
 template <class>
-class FMA_loop_nest_jitter;
+class loop_nest_code_generator;
 
 template <>
-class FMA_loop_nest_jitter<aarch64>
+class loop_nest_code_generator<aarch64>
     : public code_generator<void(float* C, float const* A, float const* B,
                                  int alpha)>
 {
@@ -2841,7 +2841,7 @@ public:
     std::int64_t get_total_memory() const { return total_memory_; }
 
 public:
-    FMA_loop_nest_jitter(
+    loop_nest_code_generator(
         std::vector<std::pair<std::string, int>> const& _order,
         std::map<std::string, int> const&               sizes,
         std::set<std::string> const&                    C_formula,

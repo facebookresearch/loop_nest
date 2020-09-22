@@ -4,13 +4,13 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(ISA "avx512" CACHE STRING "ISA to build for")
 
-if ( $ENV{CT_ISA} NOT STREQUAL "" )
-  set(ISA $ENV{CT_ISA})
+if ( $ENV{DABUN_ISA} NOT STREQUAL "" )
+  set(ISA $ENV{DABUN_ISA})
 endif()
 
 message("Building for ${ISA}")
 
-set(CMAKE_CXX_FLAGS "-march=native -DCT_ISA=${ISA}")
+set(CMAKE_CXX_FLAGS "-march=native -DDABUN_ISA=${ISA}")
 set(INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/)
 set(XBYAK_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/xbyak)
 

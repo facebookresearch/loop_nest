@@ -2,13 +2,11 @@
 
 #include <cassert>
 
-#include "arithmetic_operation.h"
+#include "dabun/x86/arithmetic_operation.hpp"
 
-namespace facebook
+namespace dabun
 {
-namespace sysml
-{
-namespace aot
+namespace x86
 {
 
 // The main usage of the multi_vmm class is to increase the amount of
@@ -112,6 +110,5 @@ public:
     }
 };
 
-} // namespace aot
-} // namespace sysml
-} // namespace facebook
+} // namespace x86
+} // namespace dabun

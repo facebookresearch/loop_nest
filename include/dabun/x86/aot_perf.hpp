@@ -27,12 +27,9 @@
 
 #pragma once
 
-#define XBYAK_NO_OP_NAMES
-#include "xbyak/xbyak.h"
-#include "xbyak/xbyak_util.h"
-
-#include "log.h"
-#include "oprof-jitdump.h"
+#include "dabun/log.hpp"
+#include "dabun/x86/oprof-jitdump.hpp"
+#include "dabun/x86/xbyak.hpp"
 
 #include <cstdio>
 #include <cstring>
@@ -43,11 +40,7 @@
 #include <sys/types.h>
 #include <time.h>
 
-namespace facebook
-{
-namespace sysml
-{
-namespace aot
+namespace dabun
 {
 
 namespace detail
@@ -350,6 +343,4 @@ inline detail::profiler_wrapper& get_xbyak_profiler()
     return p;
 }
 
-} // namespace aot
-} // namespace sysml
-} // namespace facebook
+} // namespace dabun

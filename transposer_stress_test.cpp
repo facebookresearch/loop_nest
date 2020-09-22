@@ -14,8 +14,8 @@
 #include <string>
 #include <vector>
 
-#ifndef CT_ISA
-#define CT_ISA avx2
+#ifndef DABUN_ISA
+#define DABUN_ISA avx2
 #endif
 
 int main()
@@ -60,7 +60,7 @@ int main()
                     {
                         o.second = facebook::sysml::aot::round_up(
                             o.second, facebook::sysml::aot::isa_traits<
-                                          CT_ISA>::vector_size);
+                                          DABUN_ISA>::vector_size);
                     }
                 }
                 std::cout << o.first << "=" << o.second << "  ";
@@ -80,7 +80,7 @@ int main()
                 // in's strides for each variable
                 {{"ArCr", 1}, {"AcBr", ArCr}});
 
-            auto fn = facebook::sysml::aot::transposer_jitter<CT_ISA>(
+            auto fn = facebook::sysml::aot::transposer_jitter<DABUN_ISA>(
                           full_order, // The second argument is a map of the
                                       // dimension sizes
                           {{"AcBr", AcBr}, {"ArCr", ArCr}},

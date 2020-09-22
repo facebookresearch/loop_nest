@@ -18,8 +18,8 @@
 #include <string>
 #include <vector>
 
-#ifndef CT_ISA
-#define CT_ISA avx2
+#ifndef DABUN_ISA
+#define DABUN_ISA avx2
 #endif
 
 #ifndef PLUS_OP
@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
         std::make_shared<operation_pair<PLUS_OP, MULTIPLIES_OP>>();
 
     auto gen_loop_nest = [&]() {
-      return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+      return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                  schedule, {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
                  {"ArCr", "BcCc"}, {"ArCr", "AcBr"}, {"AcBr", "BcCc"},
                  {{"ArCr", BcCc}, {"BcCc", 1}}, {{"ArCr", AcBr}, {"AcBr", 1}},

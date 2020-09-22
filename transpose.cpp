@@ -36,7 +36,7 @@ int main()
             {{"R", 1}, {"C", R}});
 
         auto transpose_jit =
-            facebook::sysml::aot::transposer_jitter<CT_ISA>(
+            facebook::sysml::aot::transposer_jitter<DABUN_ISA>(
                 {{"C", 13}, {"R", 12}, {"C", 9}, {"R", 4}, {"C", 1}, {"R", 1}},
                 // Sizes
                 {{"R", R}, {"C", C}},
@@ -96,12 +96,12 @@ int main()
         //     std::cout << "\n";
         // }
 
-        // facebook::sysml::aot::transposer_bench<CT_ISA>(
+        // facebook::sysml::aot::transposer_bench<DABUN_ISA>(
         //     {{"C", 128}, {"R", 128}, {"C", 1}, {"R", 1}}, {{"R", R}, {"C",
         //     C}},
         //     {{"R", 1}, {"C", R}}, {{"R", 1}, {"C", C}}, 32, 1, 0);
 
-        // facebook::sysml::aot::transposer_bench<CT_ISA>(
+        // facebook::sysml::aot::transposer_bench<DABUN_ISA>(
         //     {{"R", 16}, {"R", 1}, {"C", 1}}, {{"R", R}, {"C", C}},
         //     {{"R", C}, {"C", 1}}, {{"R", 1}, {"C", R}}, 16, 1, 0);
     }

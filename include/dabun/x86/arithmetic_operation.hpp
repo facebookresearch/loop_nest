@@ -2,27 +2,18 @@
 
 #pragma once
 
-#if defined(LOOP_NEST_ARM)
+#include "dabun/x86/xbyak.hpp"
 
-#include "arm_arithmetic_operation.h"
-
-#else
-
-#define XBYAK_NO_OP_NAMES
-#include "xbyak/xbyak.h"
-
-#include "common.h"
-#include "isa.h"
+#include "dabun/common.hpp"
+#include "dabun/isa.hpp"
 
 #include <cstdint>
 #include <limits>
 #include <memory>
 
-namespace facebook
+namespace dabun
 {
-namespace sysml
-{
-namespace aot
+namespace x86
 {
 
 class basic_plus
@@ -426,8 +417,5 @@ inline std::shared_ptr<operation_pair_base> const multiply_min =
 inline std::shared_ptr<operation_pair_base> const plus_max =
     std::make_shared<operation_pair<max, basic_plus>>();
 
-} // namespace aot
-} // namespace sysml
-} // namespace facebook
-
-#endif
+} // namespace x86
+} // namespace dabun

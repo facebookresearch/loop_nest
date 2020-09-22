@@ -24,7 +24,7 @@ def compile_halide(loop_nest_root, halide_root, arch, input_path, output_path, e
         "-lpthread",
         "-ldl",
         "-O3",
-        "-DCT_ISA={}".format(arch),
+        "-DDABUN_ISA={}".format(arch),
         "-o",
         exec_name
     ]

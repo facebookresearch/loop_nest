@@ -1,10 +1,20 @@
 #pragma once
 
-namespace facebook
-{
-namespace sysml
-{
-namespace aot
+#ifndef DABUN_ISA
+
+#if defined(__AVX512F__)
+#define DABUN_ISA avx512
+#elif defined(__aarch64__)
+#define DABUN_ISA aarch64
+#else // default to avx2
+// #elif defined(__AVX2__)
+#define DABUN_ISA avx2
+// #error "ISA not supported"
+#endif
+
+#endif
+
+namespace dabun
 {
 
 struct avx2
@@ -55,6 +65,4 @@ struct isa_traits<aarch64>
     static constexpr int vector_size            = 4;
 };
 
-} // namespace aot
-} // namespace sysml
-} // namespace facebook
+} // namespace dabun

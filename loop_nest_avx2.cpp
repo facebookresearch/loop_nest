@@ -27,7 +27,7 @@ static constexpr int  vector_size = 8;
 static constexpr bool DEBUG       = true;
 static constexpr bool INFO        = true;
 
-class FMA_loop_nest_jitter
+class loop_nest_code_generator
     : public code_generator<void(float* C, float const* A, float const* B)>
 {
 private:
@@ -121,7 +121,7 @@ private:
     }
 
 public:
-    FMA_loop_nest_jitter(std::vector<std::pair<std::string, int>> const& order,
+    loop_nest_code_generator(std::vector<std::pair<std::string, int>> const& order,
                          std::map<std::string, int> const&               sizes,
                          std::set<std::string> const&      C_formula,
                          std::set<std::string> const&      A_formula,
@@ -1031,7 +1031,7 @@ int main()
         int k = AcBr;
         int c = BcCc;
 
-        auto fn = facebook::sysml::aot::FMA_loop_nest_jitter(
+        auto fn = facebook::sysml::aot::loop_nest_code_generator(
                       {{"k", 64}, //
                        {"k", 1},  //
                        {"c", 1}}, //
@@ -1076,7 +1076,7 @@ int main()
         int k = AcBr; // = 64
         int c = BcCc; // = 16 * 28
 
-        auto fn = facebook::sysml::aot::FMA_loop_nest_jitter(
+        auto fn = facebook::sysml::aot::loop_nest_code_generator(
                       {{"k", 4},  //
                        {"k", 1},  //
                        {"c", 1}}, //
@@ -1128,7 +1128,7 @@ int main()
         int k = AcBr;
         int r = ArCr;
 
-        auto fn = facebook::sysml::aot::FMA_loop_nest_jitter(
+        auto fn = facebook::sysml::aot::loop_nest_code_generator(
                       {{"r", 16}, //
                        {"r", 1},  //
                        {"k", 64},
@@ -1186,7 +1186,7 @@ int main()
         int KS   = 3;
         int IS   = OS + KS - 1;
 
-        auto fn = facebook::sysml::aot::FMA_loop_nest_jitter(
+        auto fn = facebook::sysml::aot::loop_nest_code_generator(
                       {{"g_out", 1}, //
                        {"o_w", 28},
                        {"o_h", 1},
@@ -1273,7 +1273,7 @@ int main()
         int IS   = OS + KS - 1;
         ;
 
-        auto fn = facebook::sysml::aot::FMA_loop_nest_jitter(
+        auto fn = facebook::sysml::aot::loop_nest_code_generator(
                       {{"c_out", 16}, //
                        {"o_h", 1},
                        {"o_w", 28},
@@ -1347,7 +1347,7 @@ int main()
         int AcBr = 256;
         int BcCc = 256;
 
-        auto fn = facebook::sysml::aot::FMA_loop_nest_jitter(
+        auto fn = facebook::sysml::aot::loop_nest_code_generator(
                       // The first argument is the loop order in the form of
                       // {dimension, stride}.  For now the outer dimension has
                       // to divide the stride.  This is effectively the same as
@@ -1419,7 +1419,7 @@ int main()
         int AcBr = 256;
         int BcCc = 256;
 
-        auto fn = facebook::sysml::aot::FMA_loop_nest_jitter(
+        auto fn = facebook::sysml::aot::loop_nest_code_generator(
                       // The first argument is the loop order in the form of
                       // {dimension, stride}.  For now the outer dimension has
                       // to divide the stride.  This is effectively the same as

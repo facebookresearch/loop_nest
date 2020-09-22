@@ -866,7 +866,7 @@ public:
 #endif
 
         auto jit_fn =
-            facebook::sysml::aot::FMA_loop_nest_jitter<ISA>(
+            facebook::sysml::aot::loop_nest_code_generator<ISA>(
                 order, sizes, formulas.at(output), formulas.at(inputs[0]),
                 formulas.at(inputs[1]), strides.at(output),
                 strides.at(inputs[0]), strides.at(inputs[1]),

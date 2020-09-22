@@ -24,7 +24,7 @@
 
 #define LN_MM_GET_FLUSH_ZERO_MODE() (_mm_getcsr() & LN_MM_FLUSH_ZERO_MASK)
 
-namespace facebook::sysml
+namespace dabun::detail
 {
 class denormals_disabler
 {
@@ -47,7 +47,7 @@ public:
 
 inline denormals_disabler denormals_disabler_instance;
 
-} // namespace facebook::sysml
+} // namespace dabun::detail
 
 #undef LN_MM_DENORMALS_ZERO_MASK
 #undef LN_MM_DENORMALS_ZERO_ON

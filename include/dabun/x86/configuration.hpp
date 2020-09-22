@@ -2,11 +2,9 @@
 
 #pragma once
 
-namespace facebook
+namespace dabun
 {
-namespace sysml
-{
-namespace aot
+namespace x86
 {
 
 class OptimizationConfiguration
@@ -44,10 +42,10 @@ public:
     bool use_address_packer() const { return use_address_packer_; }
 };
 
-OptimizationConfiguration all_optims(true, true, true);
-// technically no optimizations beyond output tensor register blocking
-OptimizationConfiguration no_optims(false, false, false);
+inline OptimizationConfiguration all_optims(true, true, true);
 
-} // namespace aot
-} // namespace sysml
-} // namespace facebook
+// technically no optimizations beyond output tensor register blocking
+inline OptimizationConfiguration no_optims(false, false, false);
+
+} // namespace x86
+} // namespace dabun

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "xbyak.h"
+#include "dabun/xbyak.hpp"
 
 #include <cassert>
 #include <cstring>
@@ -9,11 +9,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace facebook
-{
-namespace sysml
-{
-namespace aot
+namespace dabun
 {
 
 enum access_kind
@@ -115,6 +111,4 @@ bit_cast(const From& src) noexcept
     return dst;
 }
 
-} // namespace aot
-} // namespace sysml
-} // namespace facebook
+} // namespace dabun

@@ -6,11 +6,9 @@
 #include <set>
 #include <utility>
 
-namespace facebook
+namespace dabun
 {
-namespace sysml
-{
-namespace aot
+namespace detail
 {
 
 // A queue that holds values of type T and a count for each value.  We
@@ -163,6 +161,5 @@ public:
     }
 };
 
-} // namespace aot
-} // namespace sysml
-} // namespace facebook
+} // namespace detail
+} // namespace dabun

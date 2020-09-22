@@ -51,7 +51,7 @@ void test_loop_nest_against_slow_baseline(
     auto CN = getRandomVector<float>(C_size);
     auto CJ = CN;
 
-    auto jit_fn = FMA_loop_nest_jitter<ISA>(order, sizes, C_formula, A_formula,
+    auto jit_fn = loop_nest_code_generator<ISA>(order, sizes, C_formula, A_formula,
                                             B_formula, C_strides, A_strides,
                                             B_strides, max_unrolled_fmas)
                       .get_shared();

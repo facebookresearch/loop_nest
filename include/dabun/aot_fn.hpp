@@ -1,9 +1,9 @@
 #pragma once
 
-#include "xbyak.h"
+#include "dabun/xbyak.hpp"
 
-#if !defined(LOOP_NEST_ARM)
-#include "aot_perf.h"
+#if !defined(DABUN_ARM)
+#include "dabun/x86/aot_perf.hpp"
 #endif
 
 #include <cstdint>
@@ -13,11 +13,7 @@
 #include <string>
 #include <type_traits>
 
-namespace facebook
-{
-namespace sysml
-{
-namespace aot
+namespace dabun
 {
 
 // Forward decl
@@ -133,7 +129,7 @@ public:
         fout.write(reinterpret_cast<char*>(executable_buffer_.get()), size_);
     }
 
-#if !defined(LOOP_NEST_ARM)
+#if !defined(DABUN_ARM)
     void register_perf(std::string const& name = "")
     {
         get_xbyak_profiler().set(name.c_str(), executable_buffer_.get(),
@@ -219,7 +215,7 @@ public:
         fout.write(reinterpret_cast<char*>(executable_buffer_.get()), size_);
     }
 
-#if !defined(LOOP_NEST_ARM)
+#if !defined(DABUN_ARM)
     void register_perf(std::string const& name = "")
     {
         get_xbyak_profiler().set(name.c_str(), executable_buffer_.get(),
@@ -320,7 +316,7 @@ public:
         fout.write(reinterpret_cast<char*>(executable_buffer_ptr_), size_);
     }
 
-#if !defined(LOOP_NEST_ARM)
+#if !defined(DABUN_ARM)
     void register_perf(std::string const& name = "")
     {
         get_xbyak_profiler().set(name.c_str(), executable_buffer_ptr_,
@@ -374,6 +370,4 @@ decltype(auto) aot_fn_cast(From&& from)
     return caster.do_cast(std::forward<From>(from));
 }
 
-} // namespace aot
-} // namespace sysml
-} // namespace facebook
+} // namespace dabun

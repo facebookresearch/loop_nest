@@ -16,8 +16,8 @@ benchmarking
 
 using facebook::sysml::aot::avx2;
 
-#ifndef CT_ISA
-#define CT_ISA avx2
+#ifndef DABUN_ISA
+#define DABUN_ISA avx2
 #endif
 
 void check_equivalence(Halide::Buffer<float> result,
@@ -43,7 +43,7 @@ void benchmarking_stats(Fn&& fn, std::int64_t flops, int warmup, int iters)
 int main()
 {
     using facebook::sysml::aot::avx2;
-    const int vector_size = std::is_same_v<CT_ISA, avx2> ? 8 : 16;
+    const int vector_size = std::is_same_v<DABUN_ISA, avx2> ? 8 : 16;
 
     {
         std::cout << "Toy example" << std::endl;

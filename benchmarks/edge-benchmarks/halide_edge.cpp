@@ -8,8 +8,8 @@
 #include "translate_to_halide.h"
 #include "utils.h"
 
-#ifndef CT_ISA
-#define CT_ISA avx2
+#ifndef DABUN_ISA
+#define DABUN_ISA avx2
 #endif
 
 // export HALIDE_PATH=~/Halide/
@@ -18,7 +18,7 @@
 // -I ${HALIDE_PATH}/include -I./xbyak \
 // -L ${HALIDE_PATH}/bin -lHalide -lpthread -ldl \
 // -std=c++17 \
-// -DCT_ISA=avx512 \
+// -DDABUN_ISA=avx512 \
 // -o translate_to_halide.out && ./translate_to_halide.out
 
 int main() {
@@ -38,7 +38,7 @@ int main() {
     int AcBr = 256;
     int BcCc = 256;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         // The first argument is the loop order in the form of
         // {dimension, stride}.  For now the outer dimension
         // has to divide the stride.  This is effectively the
@@ -115,7 +115,7 @@ int main() {
     int KS = 3;
     int IS = OS + KS - 1;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         {{"g_out", 1}, //
          {"o_w", 28},
          {"o_h", 1},
@@ -206,9 +206,9 @@ int main() {
     int AcBr = 333;
     int BcCc = 333;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         {{"AcBr", 512},
-         {"BcCc", (std::is_same_v<CT_ISA, avx2> ? 8 : 16) * 10},
+         {"BcCc", (std::is_same_v<DABUN_ISA, avx2> ? 8 : 16) * 10},
          {"AcBr", 1},
          {"ArCr", 1},
          {"BcCc", 1}},
@@ -271,9 +271,9 @@ int main() {
     int AcBr = 333;
     int BcCc = 333;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         {{"AcBr", 512},
-         {"BcCc", (std::is_same_v<CT_ISA, avx2> ? 8 : 16) * 10},
+         {"BcCc", (std::is_same_v<DABUN_ISA, avx2> ? 8 : 16) * 10},
          {"AcBr", 1},
          {"ArCr", 1},
          {"BcCc", 1}},
@@ -337,15 +337,15 @@ int main() {
     int AcBr = 333;
     int BcCc = 333;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         // The first argument is the loop order in the form of
         // {dimension, stride}.  For now the outer dimension
         // has to divide the stride.  This is effectively the
         // same as Halide's split into outer and inner
         // variable, but can have arbitray number of splits.
         {{"AcBr", 128},
-         {"ArCr", std::is_same_v<CT_ISA, avx2> ? 12 : 28},
-         {"BcCc", std::is_same_v<CT_ISA, avx2> ? 8 : 16},
+         {"ArCr", std::is_same_v<DABUN_ISA, avx2> ? 12 : 28},
+         {"BcCc", std::is_same_v<DABUN_ISA, avx2> ? 8 : 16},
          {"AcBr", 1},
          {"ArCr", 1},
          {"BcCc", 1}},
@@ -411,7 +411,7 @@ int main() {
     int k = AcBr;
     int r = ArCr;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         {{"r", 16}, //
          {"r", 1},  //
          {"k", 64},
@@ -468,7 +468,7 @@ int main() {
     int AcBr = 333;
     int BcCc = 333;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         // The first argument is the loop order in the form of
         // {dimension, stride}.  For now the outer dimension
         // has to divide the stride.  This is effectively the
@@ -549,7 +549,7 @@ int main() {
     int AcBr = 333;
     int BcCc = 133;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         // The first argument is the loop order in the form of
         // {dimension, stride}.  For now the outer dimension
         // has to divide the stride.  This is effectively the
@@ -629,7 +629,7 @@ int main() {
     int k = AcBr;
     int r = ArCr;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         {{"r", 16}, //
          {"r", 1},  //
          {"k", 64},
@@ -685,7 +685,7 @@ int main() {
     int AcBr = 256 + 3;
     int BcCc = 256 + 3;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         // The first argument is the loop order in the form of
         // {dimension, stride}.  For now the outer dimension
         // has to divide the stride.  This is effectively the
@@ -756,7 +756,7 @@ int main() {
     int AcBr = 1;
     int BcCc = 256 + 251;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         // The first argument is the loop order in the form of
         // {dimension, stride}.  For now the outer dimension
         // has to divide the stride.  This is effectively the
@@ -824,7 +824,7 @@ int main() {
     int AcBr = 256 + 3;
     int BcCc = 259;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         // The first argument is the loop order in the form of
         // {dimension, stride}.  For now the outer dimension
         // has to divide the stride.  This is effectively the
@@ -905,7 +905,7 @@ int main() {
     int IY = OY + KY - 1;
     int IZ = OZ + KZ - 1;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         // have arbitray number of splits.
         {{"OX", 1},  // To block B in L2 cache
          {"OY", 10}, // This and the next are for the register
@@ -984,7 +984,7 @@ int main() {
     int k = AcBr;
     int c = BcCc;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         {{"k", 64}, //
          {"k", 1},  //
          {"c", 1}}, //
@@ -1041,7 +1041,7 @@ int main() {
     int k = AcBr;
     int c = BcCc;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         {{"k", 4},  //
          {"k", 1},  //
          {"c", 1}}, //
@@ -1099,7 +1099,7 @@ int main() {
     int KS = 3;
     int IS = OS + KS - 1;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         {{"c_out", 16}, //
          {"o_h", 1},
          {"o_w", 28},
