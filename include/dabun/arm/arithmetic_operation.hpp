@@ -2,19 +2,11 @@
 
 #pragma once
 
-#if !defined(ARM_LOOP_NEST)
-
-#include "arithmetic_operation.h"
-
-#else
-
 #include <memory>
 
-namespace facebook
+namespace dabun
 {
-namespace sysml
-{
-namespace aot
+namespace arm
 {
 
 class operation_pair_base
@@ -37,8 +29,5 @@ inline std::shared_ptr<operation_pair_base> const multiply_min =
 inline std::shared_ptr<operation_pair_base> const plus_max =
     std::make_shared<operation_pair_base>();
 
-} // namespace aot
-} // namespace sysml
-} // namespace facebook
-
-#endif
+} // namespace arm
+} // namespace dabun

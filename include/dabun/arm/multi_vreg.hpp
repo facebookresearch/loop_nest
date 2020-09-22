@@ -2,11 +2,9 @@
 
 #include <cassert>
 
-namespace facebook
+namespace dabun
 {
-namespace sysml
-{
-namespace aot
+namespace arm
 {
 
 // The main usage of the multi_vreg class is to increase the amount of
@@ -125,6 +123,4 @@ public:
     }
 };
 
-} // namespace aot
-} // namespace sysml
-} // namespace facebook
+} // namespace arm

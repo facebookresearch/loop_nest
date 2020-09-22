@@ -3,14 +3,14 @@
 #include <string>
 #include <vector>
 
-#include "serialization.h"
+#include "dabun/serialization.hpp"
 
 int main()
 {
     int  ArCr = 256;
     int  AcBr = 256;
     int  BcCc = 256;
-    auto s    = facebook::sysml::aot::serialized_loop_nest_inputs(
+    auto s    = dabun::serialized_loop_nest_inputs(
         // The first argument is the loop order in the form of
         // {dimension, stride}.  For now the outer dimension
         // has to divide the stride.  This is effectively the
@@ -47,7 +47,8 @@ int main()
     auto str_rep = s.str();
     std::cout << str_rep << std::endl;
 
-    auto s2       = facebook::sysml::aot::serialized_loop_nest_inputs::from_str(str_rep);
+    auto s2 =
+        dabun::serialized_loop_nest_inputs::from_str(str_rep);
     auto str_rep2 = s2.str();
     std::cout << str_rep2 << std::endl;
 
@@ -55,7 +56,7 @@ int main()
     out << str_rep2;
     out.close();
 
-    auto s3 = facebook::sysml::aot::serialized_loop_nest_inputs::from_file(
+    auto s3 = dabun::serialized_loop_nest_inputs::from_file(
         "jose_test.txt");
     auto str_rep3 = s3.str();
     std::cout << str_rep3 << std::endl;

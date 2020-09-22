@@ -1,17 +1,15 @@
+// Copyright 2004-present Facebook. All Rights Reserved.
+
 #pragma once
 
-#if defined(LOOP_NEST_ARM)
+#include "dabun/code_generator.hpp"
+#include "dabun/common.hpp"
+#include "dabun/core.hpp"
+#include "dabun/isa.hpp"
+#include "dabun/log.hpp"
+#include "dabun/math.hpp"
 
-#include "arm_transposer.h"
-
-#else
-
-#include "code_generator.h"
-#include "common.h"
-#include "isa.h"
-#include "log.h"
-#include "math.h"
-
+#include <any>
 #include <cassert>
 #include <iostream>
 #include <map>
@@ -22,34 +20,114 @@
 #include <utility>
 #include <vector>
 
-namespace facebook
+namespace dabun
 {
-namespace sysml
-{
-namespace aot
+namespace arm
 {
 
 template <class ISA>
-class transposer_jitter
+class transposer_code_generator
     : public code_generator<void(float* Out, float const* In)>
 {
 private:
-    static constexpr int vector_size = isa_traits<ISA>::vector_size;
+    static constexpr int vector_size = isa_traits<aarch64>::vector_size;
 
-    using mask_register_type =
-        std::conditional_t<std::is_same_v<ISA, avx2>, Ymm, OpMask>;
+    using base            = code_generator<void(float*, float const*)>;
+    using memory_argument = memory_argument_type<vector_size>;
 
-    using Vmm = std::conditional_t<std::is_same_v<ISA, avx512>, Zmm, Ymm>;
+    struct move_operation
+    {
+        memory_argument dest, src;
+    };
 
-    // Here we put some default unroll limit.
-    static constexpr int default_max_unrolled_moves = 32;
+    template <class T>
+    void sub_imm(XReg const& srcdst, T imm)
+    {
+        if (imm == 0)
+            return;
+
+        base::sub_imm(srcdst, srcdst, imm, xtmp1);
+    }
+
+    template <class T>
+    void add_imm(XReg const& srcdst, T imm)
+    {
+        if (imm == 0)
+            return;
+
+        base::add_imm(srcdst, srcdst, imm, xtmp1);
+    }
+
+    template <class T>
+    void sadd_imm(XReg const& srcdst, T imm)
+    {
+        if (imm == 0)
+            return;
+
+        if (imm > 0)
+        {
+            add_imm(srcdst, imm);
+        }
+        else
+        {
+            sub_imm(srcdst, -imm);
+        }
+    }
 
 private:
-    Reg64 out_reg  = rdi;
-    Reg64 in_reg   = rsi;
-    Reg64 loop_reg = rax; // TODO(zi) Use multiple loop registers for efficiency
+    void meta_push(XReg const& op) { str(op, post_ptr(stack_reg, 8)); }
 
-    Label mask_label;
+    void meta_pop(XReg const& op) { ldr(op, pre_ptr(stack_reg, -8)); }
+
+    void meta_push(std::vector<XReg> const& regs)
+    {
+        for (auto const& r : regs)
+        {
+            meta_push(r);
+        }
+    }
+
+    void meta_pop(std::vector<XReg> const& regs)
+    {
+        for (auto it = regs.crbegin(); it != regs.crend(); ++it)
+        {
+            meta_pop(*it);
+        }
+    }
+
+    void prepare_stack()
+    {
+        // stack_offset = 0;
+        sub(sp, sp, 1024);
+        sub(sp, sp, 1024);
+        mov(stack_reg, sp);
+        // stp(q8, q9, post_ptr(stack_reg, 64));
+        // stp(q10, q11, post_ptr(stack_reg, 64));
+        // stp(q12, q13, post_ptr(stack_reg, 64));
+        // stp(q14, q15, post_ptr(stack_reg, 64));
+    }
+
+    void restore_stack()
+    {
+        // ldp(q14, q15, pre_ptr(stack_reg, 64));
+        // ldp(q12, q13, pre_ptr(stack_reg, 64));
+        // ldp(q10, q11, pre_ptr(stack_reg, 64));
+        // ldp(q8, q9, pre_ptr(stack_reg, 64));
+        add(sp, sp, 1024);
+        add(sp, sp, 1024);
+    }
+
+private:
+    static constexpr int default_max_unrolled_moves = 32;
+
+    Reg64 out_reg   = x0;
+    Reg64 in_reg    = x1;
+    Reg64 loop_reg  = x2;
+    Reg64 stack_reg = x3;
+    Reg64 xtmp1     = x4;
+
+    Reg64 movReg1 = x5;
+    Reg64 movReg2 = x6;
 
     std::vector<std::pair<std::string, int>> order;
     std::map<std::string, int>               sizes;
@@ -60,39 +138,28 @@ private:
 
     int nest_depth;
 
-    // Used vector (or mask registers). Here the avx512 and avx2_plus
-    // will have the coorect k0 initialized We have more than enough
-    // vector registers, so that we waste some for no particular
-    // reason - just to make the code easier - avx2 case will use real
-    // vector registers, while avx512 uses Opmask registers, and the
-    // corresponding vector registers are not used.  Register renaming
-    // will do it's magic on the die.
-    mask_register_type full_mask_reg     = mask_register_type(1);
-    mask_register_type tail_mask_reg     = mask_register_type(2);
-    mask_register_type in_temp_mask_reg  = mask_register_type(3);
-    mask_register_type out_temp_mask_reg = mask_register_type(4);
-
-    // Possible regs that store the gather/scatter strides
-    Vmm in_access_strides_reg  = Vmm(5);
-    Vmm out_access_strides_reg = Vmm(6);
-
-    // In/out data through the vector reg
-    Vmm in_out_vmm_reg = Vmm(0);
-
     int max_unrolled_moves;
+
+    tensor_traits out_traits;
+    tensor_traits in_traits;
+
+    bool is_vectorized;
 
     // This is temporary until I find a better way for nice logging
     // that allows for easy debugging
     std::vector<std::string> tabs = {""};
 
+    std::vector<in_register_tensor_pointer_type> in_register_tensor_pointers;
+
+private:
     void check_representation()
     {
         // Make sure strides (and sizes) exist for each order variable
         for (auto const& o : order)
         {
-            assert(out_strides.count(o.first) > 0);
-            assert(in_strides.count(o.first) > 0);
-            assert(sizes.count(o.first) > 0);
+            strong_assert(out_strides.count(o.first) > 0);
+            strong_assert(in_strides.count(o.first) > 0);
+            strong_assert(sizes.count(o.first) > 0);
         }
 
         std::map<std::string, int> last_step;
@@ -101,30 +168,60 @@ private:
         {
             if (last_step.count(o.first))
             {
-                assert(last_step[o.first] >= o.second &&
-                       "The steps in 'order' need to be non-increasing");
+                strong_assert(last_step[o.first] >= o.second &&
+                              "The steps in 'order' need to be non-increasing");
             }
             last_step[o.first] = o.second;
         }
 
         for (auto const& o : order)
         {
-            assert(last_step[o.first] == 1 &&
-                   "Last step in order not equal to 1");
+            strong_assert(last_step[o.first] == 1 &&
+                          "Last step in order not equal to 1");
         }
 
         for (auto const& o : order)
         {
             if (o.first == vectorized_var)
             {
-                assert(o.second == 1 || (o.second % vector_size == 0));
+                strong_assert(o.second == 1 || (o.second % vector_size == 0));
             }
         }
     }
 
-    using memory_argument = memory_argument_type<vector_size>;
+    bool set_tensor_traits()
+    {
+        // Strides along the LSD dimension of the compute order
+        int in_access_stride  = in_strides.at(order.back().first);
+        int out_access_stride = out_strides.at(order.back().first);
 
-    std::vector<in_register_tensor_pointer_type> in_register_tensor_pointers;
+        LN_LOG(DEBUG) << "in access stride: " << in_access_stride << "\n";
+        LN_LOG(DEBUG) << "out access stride: " << out_access_stride << "\n";
+
+        is_vectorized = in_access_stride == 1 && out_access_stride == 1;
+
+        access_kind in_access_kind  = is_vectorized ? VECTOR_PACKED : SCALAR;
+        access_kind out_access_kind = is_vectorized ? VECTOR_PACKED : SCALAR;
+
+        // TODO remove redundant information.
+        in_traits = {
+            "in",    in_access_kind,   in_reg,
+            nullptr, in_access_stride, is_vectorized ? vector_size : 1};
+
+        out_traits = {
+            "out",   out_access_kind,   out_reg,
+            nullptr, out_access_stride, is_vectorized ? vector_size : 1};
+
+        return is_vectorized;
+    }
+
+    void set_in_register_tensor_pointers()
+    {
+        in_register_tensor_pointers.push_back(
+            {"in_tensor", in_reg, in_strides});
+        in_register_tensor_pointers.push_back(
+            {"out_tensor", out_reg, out_strides});
+    }
 
     // Pushes the "followed" pointers (C, A or B, and any extra ons
     // that will be used by the future arbitrary innermost operations)
@@ -135,9 +232,9 @@ private:
         {
             if (ptr.strides.count(dim) && ptr.strides.at(dim) != 0)
             {
-                LN_LOG(INFO) << tabs.back() << "PUSH " << ptr.name << "("
-                             << ptr.reg.toString() << ")\n";
-                push(ptr.reg);
+                LN_LOG(INFO) << tabs.back() << "PUSH " << ptr.name << "(X"
+                             << ptr.reg.getIdx() << ")\n";
+                meta_push(ptr.reg);
             }
         }
     }
@@ -151,9 +248,9 @@ private:
             auto const& ptr = *it;
             if (ptr.strides.count(dim) && ptr.strides.at(dim) != 0)
             {
-                LN_LOG(INFO) << tabs.back() << "POP " << ptr.name << "("
-                             << ptr.reg.toString() << ")\n";
-                pop(ptr.reg);
+                LN_LOG(INFO) << tabs.back() << "POP " << ptr.name << "(X"
+                             << ptr.reg.getIdx() << ")\n";
+                meta_pop(ptr.reg);
             }
         }
     };
@@ -167,110 +264,12 @@ private:
             if (ptr.strides.count(dim) && ptr.strides.at(dim) != 0)
             {
                 LN_LOG(INFO)
-                    << tabs.back() << ptr.name << "(" << ptr.reg.toString()
+                    << tabs.back() << ptr.name << "(X" << ptr.reg.getIdx()
                     << ") += " << delta << " * " << ptr.strides.at(dim) << "\n";
-                add(ptr.reg, ptr.strides.at(dim) * delta * 4);
+                add_imm(ptr.reg, ptr.strides.at(dim) * delta * 4);
             }
         }
     };
-
-    struct move_operation
-    {
-        memory_argument dest, src;
-    };
-
-    // Tensor traits
-    tensor_traits out_traits;
-    tensor_traits in_traits;
-
-    // Labels holding strides along LSD of vectorized tensors that are
-    // not packed.
-    Label in_access_strides_label;
-    Label out_access_strides_label;
-
-    void set_tensor_traits()
-    {
-        // Strides along the LSD dimension of the compute order
-        int in_access_stride  = in_strides.at(order.back().first);
-        int out_access_stride = out_strides.at(order.back().first);
-
-        LN_LOG(DEBUG) << "in access stride: " << in_access_stride << "\n";
-        LN_LOG(DEBUG) << "out access stride: " << out_access_stride << "\n";
-
-        access_kind in_access_kind =
-            in_access_stride != 1 ? VECTOR_STRIDED : VECTOR_PACKED;
-        access_kind out_access_kind =
-            out_access_stride != 1 ? VECTOR_STRIDED : VECTOR_PACKED;
-
-        // TODO remove redundant information.
-        in_traits  = {"in",
-                     in_access_kind,
-                     in_reg,
-                     &in_access_strides_label,
-                     in_access_stride,
-                     vector_size};
-        out_traits = {"out",
-                      out_access_kind,
-                      out_reg,
-                      &out_access_strides_label,
-                      out_access_stride,
-                      vector_size};
-    }
-
-    void scatter_avx2_register(Ymm ymm, int mask, Xbyak::RegExp const& base,
-                               int stride)
-    {
-        vmovups(ptr[rsp - 32], ymm);
-        for (int i = 0; i < mask; ++i)
-        {
-            mov(rcx.cvt32(), dword[rsp - 32 + i * 4]);
-            mov(dword[base + i * stride], rcx.cvt32());
-        }
-    }
-
-    void issue_embedded_constants()
-    {
-        align_to(4);
-
-        if (in_traits.access == VECTOR_STRIDED)
-        {
-            L(in_access_strides_label);
-            for (int i = 0; i < vector_size; ++i)
-            {
-                dd(i * in_traits.innermost_stride * 4 /* bytes */);
-            }
-        }
-        if (out_traits.access == VECTOR_STRIDED)
-        {
-            L(out_access_strides_label);
-            for (int i = 0; i < vector_size; ++i)
-            {
-                dd(i * out_traits.innermost_stride * 4 /* bytes */);
-            }
-        }
-
-        // Will be used as a mask for AVX2
-        if (std::is_same_v<ISA, avx2>)
-        {
-            L(mask_label);
-            for (int i = 0; i < 8; ++i)
-            {
-                dd(0xffffffff);
-            }
-            for (int i = 0; i < 8; ++i)
-            {
-                dd(0);
-            }
-        }
-    }
-
-    void set_in_register_tensor_pointers()
-    {
-        in_register_tensor_pointers.push_back(
-            {"in_tensor", in_reg, in_strides});
-        in_register_tensor_pointers.push_back(
-            {"out_tensor", out_reg, out_strides});
-    }
 
     int possibly_inject_a_loop()
     {
@@ -424,28 +423,45 @@ private:
         {
             assert(loop.delta == 1);
 
-            auto fullIterations = limits[loop.var].back() / vector_size;
-            auto rest           = limits[loop.var].back() % vector_size;
+            int vek_size = is_vectorized ? vector_size : 1;
+
+            auto fullIterations = limits[loop.var].back() / vek_size;
+            auto rest           = limits[loop.var].back() % vek_size;
 
             for (int i = 0; i < fullIterations; ++i)
             {
                 memory_argument dest{get_cursor_offset(out_strides),
-                                     &out_traits, vector_size};
+                                     &out_traits, vek_size};
                 memory_argument src{get_cursor_offset(in_strides), &in_traits,
-                                    vector_size};
+                                    vek_size};
 
                 ret.push_back({dest, src});
-                current_coordinate_cursor[loop.var] += vector_size;
+                current_coordinate_cursor[loop.var] += vek_size;
             }
 
             if (rest)
             {
-                memory_argument dest{get_cursor_offset(out_strides),
-                                     &out_traits, rest};
-                memory_argument src{get_cursor_offset(in_strides), &in_traits,
-                                    rest};
+                if (rest > vector_size / 2)
+                {
+                    memory_argument dest{get_cursor_offset(out_strides),
+                                         &out_traits, vector_size / 2};
+                    memory_argument src{get_cursor_offset(in_strides),
+                                        &in_traits, vector_size / 2};
 
-                ret.push_back({dest, src});
+                    ret.push_back({dest, src});
+                    current_coordinate_cursor[loop.var] += vector_size / 2;
+
+                    rest -= vector_size / 2;
+                }
+
+                if (rest)
+                {
+                    memory_argument dest{get_cursor_offset(out_strides),
+                                         &out_traits, rest};
+                    memory_argument src{get_cursor_offset(in_strides),
+                                        &in_traits, rest};
+                    ret.push_back({dest, src});
+                }
             }
 
             current_coordinate_cursor[loop.var] = saved_coordinate;
@@ -484,167 +500,198 @@ private:
         return ret;
     }
 
-    template <class R = ISA>
-    std::enable_if_t<std::is_same_v<R, avx512> || std::is_same_v<R, avx2_plus>>
-    issue_unrolled_moves(std::vector<move_operation> const& moves)
+    void offsets_to_post_increment(std::vector<move_operation>& moves)
     {
-        OpMask mask_reg;
+        std::map<int, int> reg_to_location;
 
-        for (auto const& op : moves)
+        auto process = [&](int reg_id, auto& loc) {
+            if (reg_to_location.count(reg_id))
+            {
+                auto delta = reg_to_location[reg_id] - loc.offset;
+
+                reg_to_location[reg_id] = loc.offset;
+                loc.offset              = delta * 4;
+            }
+            else
+            {
+                reg_to_location[reg_id] = loc.offset;
+                loc.offset              = 0;
+            }
+        };
+
+        for (auto it = moves.rbegin(); it != moves.rend(); ++it)
         {
-            switch (op.src.traits->access)
-            {
-            case VECTOR_PACKED:
-                if (op.src.mask != vector_size)
-                {
-                    vmovups(in_out_vmm_reg | tail_mask_reg,
-                            ptr[in_reg + op.src.offset * 4]);
-                }
-                else
-                {
-                    vmovups(in_out_vmm_reg, ptr[in_reg + op.src.offset * 4]);
-                }
-
-                LN_LOG(INFO) << tabs.back() << "MOVE in[" << op.src.offset
-                             << " | " << op.src.mask << "] TO REG\n";
-                break;
-
-            case VECTOR_STRIDED:
-                mask_reg = (op.src.mask == vector_size) ? full_mask_reg
-                                                        : tail_mask_reg;
-
-                // mov(rcx, 0xffff);
-                // kmovw(in_temp_mask_reg, rcx.cvt32());
-
-                kmovw(in_temp_mask_reg, mask_reg);
-                vgatherdps(
-                    in_out_vmm_reg | in_temp_mask_reg,
-                    ptr[in_reg + op.src.offset * 4 + in_access_strides_reg]);
-
-                LN_LOG(INFO) << tabs.back() << "GATHER in[" << op.src.offset
-                             << ", " << in_strides.at(vectorized_var) << " | "
-                             << op.src.mask << "] TO REG\n";
-                break;
-
-            default:
-                assert(false);
-            }
-
-            mask_reg =
-                (op.dest.mask == vector_size) ? full_mask_reg : tail_mask_reg;
-
-            switch (op.dest.traits->access)
-            {
-            case VECTOR_PACKED:
-                vmovups(ptr[out_reg + op.dest.offset * 4] | mask_reg,
-                        in_out_vmm_reg);
-
-                LN_LOG(INFO)
-                    << tabs.back() << "MOVE REG TO out[" << op.dest.offset
-                    << " | " << op.dest.mask << "]\n";
-                break;
-
-            case VECTOR_STRIDED:
-                kmovw(out_temp_mask_reg, mask_reg);
-                vscatterdps(
-                    ptr[out_reg + op.dest.offset * 4 + out_access_strides_reg] |
-                        out_temp_mask_reg,
-                    in_out_vmm_reg);
-
-                LN_LOG(INFO)
-                    << tabs.back() << "SCATTER REG TO out[" << op.dest.offset
-                    << ", " << out_strides.at(vectorized_var) << " | "
-                    << op.dest.mask << "]\n";
-                break;
-
-            default:
-                assert(false);
-            }
+            process(in_reg.getIdx(), it->src);
+            process(out_reg.getIdx(), it->dest);
         }
     }
 
-    template <class R = ISA>
-    std::enable_if_t<std::is_same_v<R, avx2>>
-    issue_unrolled_moves(std::vector<move_operation> const& moves)
+    void issue_unrolled_moves(std::vector<move_operation> moves)
     {
-        Ymm mask_reg;
+        // Optimal moving as per:
+        // https://static.docs.arm.com/uan0015/b/Cortex_A57_Software_Optimization_Guide_external.pdf
 
-        for (auto const& op : moves)
+        for (auto const& m : moves)
         {
-            switch (op.src.traits->access)
-            {
-            case VECTOR_PACKED:
-                if (op.src.mask != vector_size)
-                {
-                    vmaskmovps(in_out_vmm_reg, tail_mask_reg,
-                               ptr[in_reg + op.src.offset * 4]);
-                }
-                else
-                {
-                    vmovups(in_out_vmm_reg, ptr[in_reg + op.src.offset * 4]);
-                }
-                LN_LOG(INFO) << tabs.back() << "MOVE in[" << op.src.offset
-                             << " | " << op.src.mask << "] TO REG\n";
-                break;
-
-            case VECTOR_STRIDED:
-                mask_reg = (op.src.mask == vector_size) ? full_mask_reg
-                                                        : tail_mask_reg;
-
-                vmovaps(in_temp_mask_reg, mask_reg);
-                vgatherdps(
-                    in_out_vmm_reg,
-                    ptr[in_reg + op.src.offset * 4 + in_access_strides_reg],
-                    in_temp_mask_reg);
-
-                LN_LOG(INFO) << tabs.back() << "GATHER in[" << op.src.offset
-                             << ", " << in_strides.at(vectorized_var) << " | "
-                             << op.src.mask << "] TO REG\n";
-
-                break;
-
-            default:
-                assert(false);
-            }
-
-            switch (op.dest.traits->access)
-            {
-            case VECTOR_PACKED:
-                if (op.dest.mask == vector_size)
-                {
-                    vmovups(ptr[out_reg + op.dest.offset * 4], in_out_vmm_reg);
-                }
-                else
-                {
-                    vmaskmovps(ptr[out_reg + op.dest.offset * 4], tail_mask_reg,
-                               in_out_vmm_reg);
-                }
-                LN_LOG(INFO)
-                    << tabs.back() << "MOVE REG TO out[" << op.dest.offset
-                    << " | " << op.dest.mask << "]\n";
-                break;
-
-            case VECTOR_STRIDED:
-                scatter_avx2_register(in_out_vmm_reg, op.dest.mask,
-                                      out_reg + op.dest.offset * 4,
-                                      out_strides.at(vectorized_var) * 4);
-
-                LN_LOG(INFO)
-                    << tabs.back() << "SCATTER REG TO out[" << op.dest.offset
-                    << ", " << out_strides.at(vectorized_var) << " | "
-                    << op.dest.mask << "]\n";
-                break;
-
-            default:
-                assert(false);
-            }
+            LN_LOG(INFO) << tabs.back() << "OUT[" << m.dest.offset << "] <- in["
+                         << m.src.offset << "]\n";
         }
+
+        LN_LOG(INFO) << tabs.back() << "ISSUING " << moves.size()
+                     << " UNROLLED MOVES\n";
+
+        if (moves.size())
+        {
+            strong_assert(moves[0].src.offset == 0);
+            strong_assert(moves[0].dest.offset == 0);
+        }
+
+        offsets_to_post_increment(moves);
+
+        int src_loc  = 0;
+        int dest_loc = 0;
+
+        auto issue_read = [&](auto const& loc) {
+            auto delta = loc.offset;
+
+            LN_LOG(INFO) << tabs.back() << "READ in[" << (src_loc / 4)
+                         << "] (delta: " << delta << ")\n";
+
+            src_loc += delta;
+
+            if (is_vectorized)
+            {
+                switch (loc.mask)
+                {
+                case 1:
+                    if (delta && delta <= 254 && delta >= -256)
+                    {
+                        ldr(WReg(movReg1.getIdx()), post_ptr(in_reg, delta));
+                    }
+                    else
+                    {
+                        ldr(WReg(movReg1.getIdx()), ptr(in_reg));
+                        sadd_imm(in_reg, delta);
+                    }
+                    break;
+                case 2:
+                    if (delta && delta <= 252 && delta >= -256)
+                    {
+                        ldr(movReg1, post_ptr(in_reg, delta));
+                    }
+                    else
+                    {
+                        ldr(movReg1, ptr(in_reg));
+                        sadd_imm(in_reg, delta);
+                    }
+                    break;
+                case 4:
+                    if (delta && delta <= 504 && delta >= -512)
+                    {
+                        ldp(movReg1, movReg2, post_ptr(in_reg, delta));
+                    }
+                    else
+                    {
+                        ldp(movReg1, movReg2, ptr(in_reg));
+                        sadd_imm(in_reg, delta);
+                    }
+                    break;
+                default:
+                    strong_assert(false && "Mask not supported");
+                }
+            }
+            else
+            {
+                if (delta && delta <= 254 && delta >= -256)
+                {
+                    ldr(WReg(movReg1.getIdx()), post_ptr(in_reg, delta));
+                }
+                else
+                {
+                    ldr(WReg(movReg1.getIdx()), ptr(in_reg));
+                    sadd_imm(in_reg, delta);
+                }
+            }
+        };
+
+        auto issue_write = [&](auto const& loc) {
+            auto delta = loc.offset;
+
+            LN_LOG(INFO) << tabs.back() << "WRITE out[" << (dest_loc / 4)
+                         << "]\n";
+
+            dest_loc += delta;
+
+            if (is_vectorized)
+            {
+                switch (loc.mask)
+                {
+                case 1:
+                    if (delta && delta <= 254 && delta >= -256)
+                    {
+                        str(WReg(movReg1.getIdx()), post_ptr(out_reg, delta));
+                    }
+                    else
+                    {
+                        str(WReg(movReg1.getIdx()), ptr(out_reg));
+                        sadd_imm(out_reg, delta);
+                    }
+                    break;
+                case 2:
+                    if (delta && delta <= 252 && delta >= -256)
+                    {
+                        str(movReg1, post_ptr(out_reg, delta));
+                    }
+                    else
+                    {
+                        str(movReg1, ptr(out_reg));
+                        sadd_imm(out_reg, delta);
+                    }
+                    break;
+                case 4:
+                    if (delta && delta <= 504 && delta >= -512)
+                    {
+                        stp(movReg1, movReg2, post_ptr(out_reg, delta));
+                    }
+                    else
+                    {
+                        stp(movReg1, movReg2, ptr(out_reg));
+                        sadd_imm(out_reg, delta);
+                    }
+                    break;
+                default:
+                    strong_assert(false && "Mask not supported");
+                }
+            }
+            else
+            {
+                if (delta && delta <= 254 && delta >= -256)
+                {
+                    str(WReg(movReg1.getIdx()), post_ptr(out_reg, delta));
+                }
+                else
+                {
+                    str(WReg(movReg1.getIdx()), ptr(out_reg));
+                    sadd_imm(out_reg, delta);
+                }
+            }
+        };
+
+        for (int i = 0; i < moves.size(); ++i)
+        {
+            issue_read(moves[i].src);
+            issue_write(moves[i].dest);
+        }
+
+        sadd_imm(in_reg, -src_loc);
+        sadd_imm(out_reg, -dest_loc);
     }
 
     void issue_loop_helper(int depth, bool save_loop, bool save_ptrs,
                            int unroll_stage)
     {
-        LN_LOG(INFO) << tabs.back() << "// DEPTH: " << depth << "\n";
+        LN_LOG(INFO) << tabs.back() << "// DEPTH: " << depth
+                     << " US: " << unroll_stage << "\n";
 
         if (depth == unroll_stage)
         {
@@ -670,7 +717,7 @@ private:
 
             if (full_iterations > 1 && save_loop)
             {
-                push(loop_reg);
+                meta_push(loop_reg);
             }
 
             if (full_iterations > 0)
@@ -682,9 +729,9 @@ private:
 
             if (full_iterations > 1)
             {
-                mov(loop_reg.cvt32(), full_iterations);
-                Label loopLabel;
-                L(loopLabel);
+                mov_imm(loop_reg, full_iterations);
+                auto loopLabel = make_label();
+                L_aarch64(*loopLabel);
 
                 // --------------------------------------------------
                 // RECURSION
@@ -699,8 +746,8 @@ private:
 
                 advance_pointers(loop.var, loop.delta);
 
-                dec(loop_reg.cvt32());
-                jnz(loopLabel);
+                sub_imm(loop_reg, 1);
+                cbnz(loop_reg, *loopLabel);
             }
             else if (full_iterations == 1)
             {
@@ -743,7 +790,7 @@ private:
 
             if (full_iterations > 1 && save_loop)
             {
-                pop(loop_reg);
+                meta_pop(loop_reg);
             }
 
             if (multiple_iterations && save_ptrs)
@@ -758,49 +805,13 @@ private:
         issue_loop_helper(0, false, false, unroll_stage);
     }
 
-    void initialize_auxiliary_registers()
-    {
-        auto tail_mask = sizes[vectorized_var] % vector_size;
-
-        if constexpr (std::is_same_v<ISA, avx2>)
-        {
-            vmovups(full_mask_reg, ptr[rip + mask_label]);
-            if (tail_mask)
-            {
-                vmovups(tail_mask_reg,
-                        ptr[rip + mask_label + 4 * (8 - tail_mask)]);
-            }
-        }
-        else
-        {
-            mov(rcx, (1 << vector_size) - 1);
-            kmovw(full_mask_reg, rcx.cvt32());
-
-            if (tail_mask)
-            {
-                mov(rcx, (1 << tail_mask) - 1);
-                kmovw(tail_mask_reg, rcx.cvt32());
-            }
-        }
-
-        if (in_traits.access == VECTOR_STRIDED)
-        {
-            vmovups(in_access_strides_reg, ptr[rip + in_access_strides_label]);
-        }
-
-        if (out_traits.access == VECTOR_STRIDED)
-        {
-            vmovups(out_access_strides_reg,
-                    ptr[rip + out_access_strides_label]);
-        }
-    }
-
 public:
-    transposer_jitter(std::vector<std::pair<std::string, int>> const& Order,
-                      std::map<std::string, int> const&               Sizes,
-                      std::map<std::string, int> const& Out_strides,
-                      std::map<std::string, int> const& In_strides,
-                      std::optional<int> user_unroll_limit = std::nullopt)
+    transposer_code_generator(
+        std::vector<std::pair<std::string, int>> const& Order,
+        std::map<std::string, int> const&               Sizes,
+        std::map<std::string, int> const&               Out_strides,
+        std::map<std::string, int> const&               In_strides,
+        std::optional<int> user_unroll_limit = std::nullopt)
         : order(Order)
         , sizes(Sizes)
         , out_strides(Out_strides)
@@ -810,7 +821,7 @@ public:
                                                : default_max_unrolled_moves)
 
     {
-        assert(order.size());
+        strong_assert(order.size());
         vectorized_var = order.back().first;
 
         check_representation();
@@ -818,8 +829,12 @@ public:
         set_tensor_traits();
 
         set_in_register_tensor_pointers();
-
         auto first_unrolled_loop = possibly_inject_a_loop();
+
+        if (!is_vectorized)
+        {
+            vectorized_var = "";
+        }
 
         LN_LOG(INFO) << "First unrolled loop: " << first_unrolled_loop << "\n";
 
@@ -827,19 +842,17 @@ public:
 
         assert(first_unrolled_loop < loops.size());
 
-        initialize_auxiliary_registers();
+        // initialize_auxiliary_registers();
+
+        prepare_stack();
 
         issue_loops(first_unrolled_loop);
 
-        vzeroupper();
-        ret();
+        restore_stack();
 
-        issue_embedded_constants();
+        ret();
     }
 };
 
-} // namespace aot
-} // namespace sysml
-} // namespace facebook
-
-#endif
+} // namespace arm
+} // namespace dabun

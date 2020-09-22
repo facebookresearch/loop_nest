@@ -1,5 +1,5 @@
 #include "baselines.h"
-#include "dabun/x86/loop_nest.hpp"
+#include "dabun/loop_nest.hpp"
 #include "dabun/one_constant.hpp"
 #include "loop_nest_baseline.h"
 #include "utils.h"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <dirent.h>
+#include "dabun/loop_nest.hpp"
 
 #include <fstream>
 #include <map>
@@ -10,13 +10,11 @@
 #include <string>
 #include <vector>
 
-#include "loop_nest.h"
+#include <dirent.h>
 
-namespace facebook
+namespace dabun
 {
-namespace sysml
-{
-namespace aot
+namespace detail
 {
 
 static inline std::string to_string(std::string s) { return s; }
@@ -100,6 +98,48 @@ get_tokenized(std::string str)
     }
 
     return tokenized;
+}
+
+inline void initialize_serialized_ct(std::string output_dir,
+                                     int&        serialized_file_ct)
+{
+    int  i    = 0;
+    DIR* dirp = opendir(output_dir.c_str());
+    if (dirp == NULL)
+    {
+        throw std::runtime_error(
+            "loop_nest serialization failed: No such directory " + output_dir);
+    }
+    dirent* dp;
+
+    while ((dp = readdir(dirp)) != NULL)
+    {
+        std::string file_name(dp->d_name);
+        if (file_name != "." && file_name != "..")
+        {
+            i++;
+        }
+    }
+    closedir(dirp);
+    serialized_file_ct = i;
+}
+
+inline std::string get_file_path(std::string output_dir,
+                                 std::string suffix = ".txt")
+{
+    static int serialized_file_ct = -1;
+
+    if (serialized_file_ct < 0)
+    {
+        initialize_serialized_ct(output_dir, serialized_file_ct);
+    }
+
+    std::ostringstream file_path_ss;
+    file_path_ss << output_dir;
+    file_path_ss << "/";
+    file_path_ss << std::to_string(++serialized_file_ct);
+    file_path_ss << suffix;
+    return file_path_ss.str();
 }
 
 class serialized_loop_nest_inputs
@@ -318,44 +358,9 @@ public:
     }
 };
 
-static int serialized_file_ct = -1;
+} // namespace detail
 
-static inline void initialize_serialized_ct(std::string output_dir)
-{
-    int     i    = 0;
-    DIR*    dirp = opendir(output_dir.c_str());
-    if (dirp == NULL) {
-        throw std::runtime_error("loop_nest serialization failed: No such directory " + output_dir);
-    }
-    dirent* dp;
-
-    while ((dp = readdir(dirp)) != NULL)
-    {
-        std::string file_name(dp->d_name);
-        if (file_name != "." && file_name != "..")
-        {
-            i++;
-        }
-    }
-    closedir(dirp);
-    serialized_file_ct = i;
-}
-
-static inline std::string get_file_path(std::string output_dir,
-                                        std::string suffix = ".txt")
-{
-    if (serialized_file_ct < 0)
-    {
-        initialize_serialized_ct(output_dir);
-    }
-
-    std::ostringstream file_path_ss;
-    file_path_ss << output_dir;
-    file_path_ss << "/";
-    file_path_ss << std::to_string(++serialized_file_ct);
-    file_path_ss << suffix;
-    return file_path_ss.str();
-}
+using detail::serialized_loop_nest_inputs;
 
 inline void
 save_loop_nest_inputs(const std::string& output_dir,
@@ -369,13 +374,11 @@ save_loop_nest_inputs(const std::string& output_dir,
                       const std::map<std::string, int>&               B_strides,
                       std::optional<int> unroll_limit)
 {
-    auto serializer = serialized_loop_nest_inputs(
+    auto serializer = detail::serialized_loop_nest_inputs(
         order, sizes, C_formula, A_formula, B_formula, C_strides, A_strides,
         B_strides, unroll_limit);
-    auto file_path = get_file_path(output_dir);
+    auto file_path = detail::get_file_path(output_dir);
     serializer.to_file(file_path);
 }
 
-} // namespace aot
-} // namespace sysml
-} // namespace facebook
+} // namespace dabun

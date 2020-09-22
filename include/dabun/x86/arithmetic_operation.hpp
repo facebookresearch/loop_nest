@@ -405,7 +405,7 @@ inline std::shared_ptr<operation_pair_base> const fma =
     std::make_shared<operation_pair<basic_plus, basic_multiplies>>();
 
 // exclusively here to test non-fused operations as base case
-inline std::shared_ptr<operation_pair_base> const non_fused_ma =
+inline std::shared_ptr<operation_pair_base> const non_fused_fma =
     std::make_shared<operation_pair<duplicate_base_plus, basic_multiplies>>();
 
 inline std::shared_ptr<operation_pair_base> const multiply_max =
