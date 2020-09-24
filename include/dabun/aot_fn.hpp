@@ -135,6 +135,8 @@ public:
         get_xbyak_profiler().set(name.c_str(), executable_buffer_.get(),
                                  (int)size_);
     }
+#else
+    void register_perf(std::string const&) {}
 #endif
 };
 
@@ -221,6 +223,8 @@ public:
         get_xbyak_profiler().set(name.c_str(), executable_buffer_.get(),
                                  (int)size_);
     }
+#else
+    void register_perf(std::string const&) {}
 #endif
 };
 
@@ -322,6 +326,8 @@ public:
         get_xbyak_profiler().set(name.c_str(), executable_buffer_ptr_,
                                  (int)size_);
     }
+#else
+    void register_perf(std::string const&) {}
 #endif
 };
 

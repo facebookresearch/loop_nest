@@ -81,46 +81,49 @@ public:
 
     VReg first() const { return VReg(first_); }
 
-    template <class Jitter>
-    void half(Jitter& jitter)
+    template <class Code_Generator>
+    void half(Code_Generator& code_generator)
     {
         int h = (size_ + 1) / 2;
         for (int i = 0; i + h < size_; ++i)
         {
-            jitter.fadd(VReg(first_ + i).s4, VReg(first_ + i).s4,
-                        VReg(first_ + i + h).s4);
+            code_generator.fadd(VReg(first_ + i).s4, VReg(first_ + i).s4,
+                                VReg(first_ + i + h).s4);
         }
         size_    = h;
         current_ = 0;
     }
 
-    template <class Jitter>
-    void reduce(Jitter& jitter)
+    template <class Code_Generator>
+    void reduce(Code_Generator& code_generator)
     {
         while (size_ > 1)
         {
-            half(jitter);
+            half(code_generator);
         }
     }
 
-    template <class Jitter>
-    void full_reduce(Jitter& jitter, int mask = 4)
+    template <class Code_Generator>
+    void full_reduce(Code_Generator& code_generator, int mask = 4)
     {
-        reduce(jitter);
+        reduce(code_generator);
         assert(size_ == 1);
         if (mask == 3)
         {
-            jitter.ins(VReg(first_).s4[3], jitter.w4);
+            code_generator.ins(VReg(first_).s4[3], code_generator.w4);
         }
         if (mask > 2)
         {
-            jitter.faddp(VReg(first_).s4, VReg(first_).s4, VReg(first_).s4);
+            code_generator.faddp(VReg(first_).s4, VReg(first_).s4,
+                                 VReg(first_).s4);
         }
         if (mask > 1)
         {
-            jitter.faddp(VReg(first_).s2, VReg(first_).s2, VReg(first_).s2);
+            code_generator.faddp(VReg(first_).s2, VReg(first_).s2,
+                                 VReg(first_).s2);
         }
     }
 };
 
 } // namespace arm
+} // namespace dabun

@@ -86,26 +86,28 @@ public:
 
     Vmm first() const { return Vmm(first_); }
 
-    template <class Jitter>
-    void half(Jitter& jitter, std::shared_ptr<operation_pair_base> op_pair)
+    template <class Code_Generator>
+    void half(Code_Generator&                      code_generator,
+              std::shared_ptr<operation_pair_base> op_pair)
     {
         int h = (size_ + 1) / 2;
         for (int i = 0; i + h < size_; ++i)
         {
-            op_pair->plus(jitter, Vmm(first_ + i), Vmm(first_ + i),
+            op_pair->plus(code_generator, Vmm(first_ + i), Vmm(first_ + i),
                           Vmm(first_ + i + h));
         }
         size_    = h;
         current_ = 0;
     }
 
-    template <class Jitter>
-    void reduce(Jitter& jitter, std::shared_ptr<operation_pair_base> op_pair)
+    template <class Code_Generator>
+    void reduce(Code_Generator&                      code_generator,
+                std::shared_ptr<operation_pair_base> op_pair)
     {
         // size_ = max_touched_ + 1;
         while (size_ > 1)
         {
-            half(jitter, op_pair);
+            half(code_generator, op_pair);
         }
     }
 };

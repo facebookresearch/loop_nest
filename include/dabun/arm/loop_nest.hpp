@@ -1,11 +1,11 @@
 #pragma once
 
 #include "dabun/arm/arithmetic_operation.hpp"
+#include "dabun/arm/configuration.hpp"
 #include "dabun/arm/elementwise_operation.hpp"
 #include "dabun/arm/multi_vreg.hpp"
 #include "dabun/code_generator.hpp"
 #include "dabun/common.hpp"
-#include "dabun/configuration.hpp"
 #include "dabun/core.hpp"
 #include "dabun/isa.hpp"
 #include "dabun/log.hpp"
@@ -298,22 +298,23 @@ private:
     std::deque<std::vector<instruction_t>> instruction_IRs;
 
 private:
-    Reg64 CReg_     = x0;
-    Reg64 AReg_     = x1;
-    Reg64 BReg_     = x2;
-    Reg64 AlphaReg_ = x3;
-    Reg64 ZeroReg_  = x4;
-    Reg64 xtmp1     = x5;
-    Reg64 xtmp2     = x6;
-    Reg64 loopReg_  = x7;
-    Reg64 stack_reg = x9;
-    Reg64 tmpCReg_  = x10;
-    Reg64 tmpAReg_  = x11;
-    Reg64 tmpBReg_  = x12;
+    Reg64 CReg_            = x0;
+    Reg64 AReg_            = x1;
+    Reg64 BReg_            = x2;
+    Reg64 alpha_reg_       = x3;
+    Reg64 ZeroReg_         = x4;
+    Reg64 xtmp1            = x5;
+    Reg64 xtmp2            = x6;
+    Reg64 loopReg_         = x7;
+    Reg64 stack_reg        = x9;
+    Reg64 tmpCReg_         = x10;
+    Reg64 tmpAReg_         = x11;
+    Reg64 tmpBReg_         = x12;
+    Reg64 skip_postop_reg_ = x14;
 
     int insReg_ = 10;
 
-    std::vector<int> possible_loop_registers = {14, 15, 19, 20, 21, 22, 23,
+    std::vector<int> possible_loop_registers = {15, 19, 20, 21, 22, 23,
                                                 24, 25, 26, 27, 28, 29};
 
     std::vector<int> loop_registers;
@@ -1697,7 +1698,7 @@ private:
             auto loadDataLabel = make_label();
             auto doneInitLabel = make_label();
 
-            cbnz(AlphaReg_, *loadDataLabel);
+            cbnz(alpha_reg_, *loadDataLabel);
 
             for (auto const& c : loads)
             {
@@ -1770,8 +1771,9 @@ private:
         {
             auto donePostOpLabel = make_label();
 
-            meta_cmp(AlphaReg_, max_alpha - 1);
+            meta_cmp(alpha_reg_, max_alpha - 1);
             b(Xbyak::LT, *donePostOpLabel);
+            tbnz(skip_postop_reg_, 1, *donePostOpLabel);
 
             for (auto const& c : ordered_stores)
             {
@@ -2878,7 +2880,7 @@ private:
                 if (depth < depth_for_register_blocked_C &&
                     C_formula.count(loop.var) == 0)
                 {
-                    add_imm(AlphaReg_, 2);
+                    add_imm(alpha_reg_, 2);
                 }
 
                 Label doneLabel;
@@ -2912,7 +2914,7 @@ private:
                     if (depth < depth_for_register_blocked_C &&
                         C_formula.count(loop.var) == 0)
                     {
-                        add_imm(AlphaReg_, 2);
+                        add_imm(alpha_reg_, 2);
                     }
 
                     advance_pointers(loop.var, loop.delta);
@@ -2959,7 +2961,7 @@ private:
             {
                 LN_LOG(INFO)
                     << tabs.back() << "SUB LOCKER: " << full_iterations << "\n";
-                sub_imm(AlphaReg_, full_iterations * 2);
+                sub_imm(alpha_reg_, full_iterations * 2);
             }
 
             if (full_iterations > 1 && save_loop)
@@ -3652,7 +3654,7 @@ private:
     std::vector<Reg64> prepare_loop_registers(int unroll_stage)
     {
         loop_registers     = std::vector<int>(unroll_stage, -1);
-        int first_loop_reg = std::min(
+        int first_loop_reg = std::max(
             0, unroll_stage - static_cast<int>(possible_loop_registers.size()));
 
         std::vector<Reg64> to_save;
@@ -3804,6 +3806,9 @@ public:
 
         auto x_regs_to_save = prepare_loop_registers(unroll_stage);
         meta_push(x_regs_to_save);
+
+        mov(skip_postop_reg_, alpha_reg_);
+        and_(alpha_reg_, alpha_reg_, 0x1);
 
         issue_loops(depth_for_register_blocked_C, unroll_stage);
 

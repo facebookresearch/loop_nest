@@ -32,7 +32,7 @@ public:
     virtual std::string name() = 0;
 
     // set up information for followed tensors
-    // called in loop_nest jitter constructor (after that elementwise is
+    // called in loop_nest code_generator constructor (after that elementwise is
     // stateless)
     virtual void
     initialize(std::vector<std::map<std::string, int>> const&, // followed
@@ -51,7 +51,7 @@ public:
         access_kind,                       // C access kind (strided/packed)
         avx512,
         std::optional<Xbyak::Opmask> // tail mask register
-    ) const = 0;
+        ) const = 0;
 
     virtual void
     process_batch(Xbyak::CodeGenerator&,
@@ -61,7 +61,7 @@ public:
                   access_kind, // C access kind (strided/packed)
                   avx2,
                   std::optional<Xbyak::Ymm> // tail maks register
-    ) const = 0;
+                  ) const = 0;
 
     // scalar processing
     virtual void process_batch(

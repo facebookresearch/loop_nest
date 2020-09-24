@@ -12,11 +12,12 @@ double measure_fastest(Fn&& fn, int iterations = 1)
 {
     auto start = std::chrono::high_resolution_clock::now();
     fn();
-    auto end = start;
+    auto end = std::chrono::high_resolution_clock::now();
+    auto nsecs =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+            .count();
 
-    double ret = std::numeric_limits<double>::max();
-
-    for (int i = 0; i < iterations; ++i)
+    for (int i = 1; i < iterations; ++i)
     {
         start = std::chrono::high_resolution_clock::now();
         fn();
@@ -26,10 +27,10 @@ double measure_fastest(Fn&& fn, int iterations = 1)
             std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
                 .count();
 
-        ret = std::min(ret, static_cast<double>(new_time) / 1e9);
+        nsecs = std::min(nsecs, new_time);
     }
 
-    return ret;
+    return static_cast<double>(nsecs) / 1e9;
 }
 
 } // namespace dabun

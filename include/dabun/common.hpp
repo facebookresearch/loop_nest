@@ -3,6 +3,7 @@
 #include "dabun/xbyak.hpp"
 
 #include <cassert>
+#include <cstdint>
 #include <cstring>
 #include <map>
 #include <string>
@@ -11,6 +12,10 @@
 
 namespace dabun
 {
+
+static inline constexpr std::uint64_t skip_postop = 0b10;
+static inline constexpr std::uint64_t alpha_1     = 0b01;
+static inline constexpr std::uint64_t alpha_0     = 0b00;
 
 enum access_kind
 {

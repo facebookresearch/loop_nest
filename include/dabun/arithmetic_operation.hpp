@@ -14,9 +14,9 @@ namespace dabun
 {
 
 using DABUN_ISA_NAMESPACE ::fma;
-using DABUN_ISA_NAMESPACE ::non_fused_fma;
 using DABUN_ISA_NAMESPACE ::multiply_max;
 using DABUN_ISA_NAMESPACE ::multiply_min;
+using DABUN_ISA_NAMESPACE ::non_fused_ma;
 using DABUN_ISA_NAMESPACE ::plus_max;
 
 } // namespace dabun
