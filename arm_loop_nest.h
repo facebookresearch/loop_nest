@@ -471,7 +471,23 @@ private:
     std::vector<instruction_t>
     cortex_a5X_optimized(std::vector<instruction_t> instructions_in)
     {
+        for (auto& insn : instructions_in)
+        {
+            if (std::holds_alternative<load_instruction>(insn))
+            {
+                auto& load = std::get<load_instruction>(insn);
+                strong_assert(load.vreg > -1 && load.vreg < 32);
+            }
+        }
         pair_loads(instructions_in);
+        for (auto& insn : instructions_in)
+        {
+            if (std::holds_alternative<load_instruction>(insn))
+            {
+                auto& load = std::get<load_instruction>(insn);
+                strong_assert(load.vreg > -1 && load.vreg < 32);
+            }
+        }
 
         std::vector<instruction_t> instructions;
 
@@ -538,6 +554,15 @@ private:
             else if (!std::holds_alternative<std::monostate>(insn))
             {
                 instructions.push_back(insn);
+            }
+        }
+
+        for (auto& insn : instructions)
+        {
+            if (std::holds_alternative<load_instruction>(insn))
+            {
+                auto& load = std::get<load_instruction>(insn);
+                strong_assert(load.vreg > -1 && load.vreg < 32);
             }
         }
 
@@ -3091,6 +3116,7 @@ private:
         std::vector<instruction_t> instructions;
 
         auto load_scalar = [&](int vreg, int tensor_idx, int offset) {
+            strong_assert(vreg > -1 && vreg < 32);
             load_instruction insn;
             insn.vreg     = vreg;
             int num_lanes = 1;
@@ -3147,9 +3173,15 @@ private:
             instructions.push_back(insn);
         };
 
-        auto free_a_register = [&]() {
+        auto free_a_register = [&](std::set<int> exclude_regs = {}) {
             auto nu_it = next_usage_index.begin();
             strong_assert(nu_it != next_usage_index.end());
+
+            while (exclude_regs.count(nu_it->vreg_idx))
+            {
+                nu_it++;
+                strong_assert(nu_it != next_usage_index.end());
+            }
 
             int reg_no = nu_it->vreg_idx;
 
@@ -3160,6 +3192,7 @@ private:
                 it = vreg_index.find(reg_no);
             }
 
+            strong_assert(reg_no > -1 && reg_no < 32);
             return reg_no;
         };
 
@@ -3168,11 +3201,17 @@ private:
             tensor_location_t scalar_loc = {src1_reg, fmas[i].src1.offset * 4};
             tensor_location_t vector_loc = {src2_reg, fmas[i].src2.offset * 4};
 
-            int needs_free_regs = 0;
+            int           needs_free_regs = 0;
+            std::set<int> exclude_regs;
+
             if (auto it = tensor_location_index.find(scalar_loc);
                 it == tensor_location_index.end())
             {
                 ++needs_free_regs;
+            }
+            else
+            {
+                exclude_regs.insert(it->vreg_idx);
             }
 
             if (auto it = tensor_location_index.find(vector_loc);
@@ -3180,10 +3219,14 @@ private:
             {
                 ++needs_free_regs;
             }
+            else
+            {
+                exclude_regs.insert(it->vreg_idx);
+            }
 
             while (needs_free_regs > free_regs.size())
             {
-                free_regs.push_back(free_a_register());
+                free_regs.push_back(free_a_register(exclude_regs));
             }
 
             if (auto it = tensor_location_index.find(scalar_loc);
@@ -3357,6 +3400,7 @@ private:
 
         auto load_vector = [&](int vreg, int tensor_idx, int offset,
                                int num_lanes) {
+            strong_assert(vreg > -1 && vreg < 32);
             load_instruction insn;
             insn.vreg = vreg;
 
@@ -3376,9 +3420,15 @@ private:
             instructions.push_back(insn);
         };
 
-        auto free_a_register = [&]() {
+        auto free_a_register = [&](std::set<int> exclude_regs = {}) {
             auto nu_it = next_usage_index.begin();
             strong_assert(nu_it != next_usage_index.end());
+
+            while (exclude_regs.count(nu_it->vreg_idx))
+            {
+                nu_it++;
+                strong_assert(nu_it != next_usage_index.end());
+            }
 
             int reg_no = nu_it->vreg_idx;
 
@@ -3389,6 +3439,7 @@ private:
                 it = vreg_index.find(reg_no);
             }
 
+            strong_assert(reg_no > -1 && reg_no < 32);
             return reg_no;
         };
 
@@ -3416,11 +3467,17 @@ private:
             tensor_location_t first_loc  = {src1_reg, fmas[i].src1.offset * 4};
             tensor_location_t second_loc = {src2_reg, fmas[i].src2.offset * 4};
 
-            int needs_free_regs = 0;
+            int           needs_free_regs = 0;
+            std::set<int> exclude_regs;
+
             if (auto it = tensor_location_index.find(first_loc);
                 it == tensor_location_index.end())
             {
                 ++needs_free_regs;
+            }
+            else
+            {
+                exclude_regs.insert(it->vreg_idx);
             }
 
             if (auto it = tensor_location_index.find(second_loc);
@@ -3428,10 +3485,14 @@ private:
             {
                 ++needs_free_regs;
             }
+            else
+            {
+                exclude_regs.insert(it->vreg_idx);
+            }
 
             while (needs_free_regs > free_regs.size())
             {
-                free_regs.push_back(free_a_register());
+                free_regs.push_back(free_a_register(exclude_regs));
             }
 
             if (auto it = tensor_location_index.find(first_loc);
@@ -3661,7 +3722,7 @@ private:
     std::vector<Reg64> prepare_loop_registers(int unroll_stage)
     {
         loop_registers     = std::vector<int>(unroll_stage, -1);
-        int first_loop_reg = std::min(
+        int first_loop_reg = std::max(
             0, unroll_stage - static_cast<int>(possible_loop_registers.size()));
 
         std::vector<Reg64> to_save;
