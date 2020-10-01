@@ -17,4 +17,8 @@ using DABUN_ISA_NAMESPACE ::elementwise_bias;
 using DABUN_ISA_NAMESPACE ::elementwise_multiply;
 using DABUN_ISA_NAMESPACE ::elementwise_relu;
 
+using DABUN_ISA_NAMESPACE ::elementwise_operation;
+using DABUN_ISA_NAMESPACE ::relu_elementwise_operation;
+using DABUN_ISA_NAMESPACE ::single_tensor_elementwise_operation;
+
 } // namespace dabun

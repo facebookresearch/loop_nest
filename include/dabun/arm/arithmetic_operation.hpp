@@ -13,6 +13,31 @@ class operation_pair_base
 {
 };
 
+template <class PlusType, class MultipliesType>
+class operation_pair : public operation_pair_base
+{
+};
+
+class basic_plus
+{
+};
+
+class duplicate_base_plus
+{
+};
+
+class max
+{
+};
+
+class min
+{
+};
+
+class basic_multiplies
+{
+};
+
 inline std::shared_ptr<operation_pair_base> const fma =
     std::make_shared<operation_pair_base>();
 

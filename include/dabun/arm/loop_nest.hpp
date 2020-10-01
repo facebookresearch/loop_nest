@@ -475,10 +475,7 @@ private:
             {
                 if (--to_skip_loads >= 0)
                 {
-                    if (!std::holds_alternative<std::monostate>(insn))
-                    {
-                        instructions.push_back(insn);
-                    }
+                    instructions.push_back(insn);
                     continue;
                 }
             }
@@ -487,11 +484,7 @@ private:
                 to_skip_loads -= 2;
                 if (to_skip_loads >= 0)
                 {
-                    if (!std::holds_alternative<std::monostate>(insn))
-                    {
-                        instructions.push_back(insn);
-                    }
-                    continue;
+                    instructions.push_back(insn);
                 }
             }
             if (std::holds_alternative<load_instruction>(insn))
@@ -521,10 +514,7 @@ private:
                 }
                 else
                 {
-                    if (!std::holds_alternative<std::monostate>(insn))
-                    {
-                        instructions.push_back(insn);
-                    }
+                    instructions.push_back(insn);
                 }
             }
             else if (!std::holds_alternative<std::monostate>(insn))
@@ -3140,9 +3130,15 @@ private:
             instructions.push_back(insn);
         };
 
-        auto free_a_register = [&]() {
+        auto free_a_register = [&](std::set<int> const& to_avoid) {
             auto nu_it = next_usage_index.begin();
             strong_assert(nu_it != next_usage_index.end());
+
+            while (to_avoid.count(nu_it->vreg_idx))
+            {
+                ++nu_it;
+                strong_assert(nu_it != next_usage_index.end());
+            }
 
             int reg_no = nu_it->vreg_idx;
 
@@ -3161,11 +3157,16 @@ private:
             tensor_location_t scalar_loc = {src1_reg, fmas[i].src1.offset * 4};
             tensor_location_t vector_loc = {src2_reg, fmas[i].src2.offset * 4};
 
-            int needs_free_regs = 0;
+            int           needs_free_regs = 0;
+            std::set<int> to_avoid;
             if (auto it = tensor_location_index.find(scalar_loc);
                 it == tensor_location_index.end())
             {
                 ++needs_free_regs;
+            }
+            else
+            {
+                to_avoid.insert(it->vreg_idx);
             }
 
             if (auto it = tensor_location_index.find(vector_loc);
@@ -3173,10 +3174,14 @@ private:
             {
                 ++needs_free_regs;
             }
+            else
+            {
+                to_avoid.insert(it->vreg_idx);
+            }
 
             while (needs_free_regs > free_regs.size())
             {
-                free_regs.push_back(free_a_register());
+                free_regs.push_back(free_a_register(to_avoid));
             }
 
             if (auto it = tensor_location_index.find(scalar_loc);
@@ -3369,9 +3374,15 @@ private:
             instructions.push_back(insn);
         };
 
-        auto free_a_register = [&]() {
+        auto free_a_register = [&](std::set<int> const& to_avoid) {
             auto nu_it = next_usage_index.begin();
             strong_assert(nu_it != next_usage_index.end());
+
+            while (to_avoid.count(nu_it->vreg_idx))
+            {
+                ++nu_it;
+                strong_assert(nu_it != next_usage_index.end());
+            }
 
             int reg_no = nu_it->vreg_idx;
 
@@ -3409,11 +3420,16 @@ private:
             tensor_location_t first_loc  = {src1_reg, fmas[i].src1.offset * 4};
             tensor_location_t second_loc = {src2_reg, fmas[i].src2.offset * 4};
 
-            int needs_free_regs = 0;
+            int           needs_free_regs = 0;
+            std::set<int> to_avoid;
             if (auto it = tensor_location_index.find(first_loc);
                 it == tensor_location_index.end())
             {
                 ++needs_free_regs;
+            }
+            else
+            {
+                to_avoid.insert(it->vreg_idx);
             }
 
             if (auto it = tensor_location_index.find(second_loc);
@@ -3421,10 +3437,14 @@ private:
             {
                 ++needs_free_regs;
             }
+            else
+            {
+                to_avoid.insert(it->vreg_idx);
+            }
 
             while (needs_free_regs > free_regs.size())
             {
-                free_regs.push_back(free_a_register());
+                free_regs.push_back(free_a_register(to_avoid));
             }
 
             if (auto it = tensor_location_index.find(first_loc);

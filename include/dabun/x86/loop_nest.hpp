@@ -1,6 +1,7 @@
 // Copyright 2004-present Facebook. All Rights Reserved.
 
 // TODO addressers for scalar_vector
+// TODO free_reg restriction logic!
 
 #pragma once
 
@@ -3252,9 +3253,15 @@ private:
             instructions.push_back(insn);
         };
 
-        auto free_a_register = [&]() {
+        auto free_a_register = [&](std::set<int> const& to_avoid) {
             auto nu_it = next_usage_index.begin();
             strong_assert(nu_it != next_usage_index.end());
+
+            while (to_avoid.count(nu_it->vmm_idx))
+            {
+                ++nu_it;
+                strong_assert(nu_it != next_usage_index.end());
+            }
 
             int reg_no = nu_it->vmm_idx;
 
@@ -3279,16 +3286,10 @@ private:
                     return;
                 }
 
-                int r = 0;
-                if (free_regs.size())
-                {
-                    r = free_regs.front();
-                    free_regs.pop_front();
-                }
-                else
-                {
-                    r = free_a_register();
-                }
+                strong_assert(free_regs.size());
+
+                int r = free_regs.front();
+                free_regs.pop_front();
 
                 add_load_instruction(r, mem_location.idx, mem_location.offset,
                                      does_broadcast);
@@ -3323,11 +3324,14 @@ private:
                 if (folding_allowed &&
                     remaining_usages[mem_location].size() == 1)
                 {
-                    return false;
+                    return std::make_pair(false, -1);
                 }
-                return true;
+                return std::make_pair(true, -1);
             }
-            return false;
+            else
+            {
+                return std::make_pair(false, it->vmm_idx);
+            }
         };
 
         for (int i = 0; i < fmas.size(); ++i)
@@ -3349,20 +3353,38 @@ private:
                 }
             }
 
-            if (needs_a_reg(left_loc, false))
+            std::set<int> to_avoid;
+
+            if (auto r = needs_a_reg(left_loc, false); r.first)
             {
                 ++needs_free_regs;
             }
+            else
+            {
+                if (r.second != -1)
+                {
+                    to_avoid.insert(r.second);
+                }
+            }
 
-            if (needs_a_reg(right_loc, fmas[i].src2.traits->access != SCALAR ||
-                                           !std::is_same_v<ISA, avx2>))
+            if (auto r = needs_a_reg(right_loc,
+                                     fmas[i].src2.traits->access != SCALAR ||
+                                         !std::is_same_v<ISA, avx2>);
+                r.first)
             {
                 ++needs_free_regs;
+            }
+            else
+            {
+                if (r.second != -1)
+                {
+                    to_avoid.insert(r.second);
+                }
             }
 
             while (needs_free_regs > free_regs.size())
             {
-                free_regs.push_back(free_a_register());
+                free_regs.push_back(free_a_register(to_avoid));
             }
 
             maybe_issue_load(left_loc, fmas[i].src1.traits->access == SCALAR,

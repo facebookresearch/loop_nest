@@ -22,6 +22,16 @@ public:
     }
 };
 
+template <class ISA>
+class relu_elementwise_operation
+{
+};
+
+template <class ISA>
+class single_tensor_elementwise_operation
+{
+};
+
 template <class T>
 inline auto elementwise_relu = std::make_shared<elementwise_operation<T>>(true);
 
