@@ -463,7 +463,23 @@ private:
     std::vector<instruction_t>
     cortex_a5X_optimized(std::vector<instruction_t> instructions_in)
     {
+        for (auto& insn : instructions_in)
+        {
+            if (std::holds_alternative<load_instruction>(insn))
+            {
+                auto& load = std::get<load_instruction>(insn);
+                strong_assert(load.vreg > -1 && load.vreg < 32);
+            }
+        }
         pair_loads(instructions_in);
+        for (auto& insn : instructions_in)
+        {
+            if (std::holds_alternative<load_instruction>(insn))
+            {
+                auto& load = std::get<load_instruction>(insn);
+                strong_assert(load.vreg > -1 && load.vreg < 32);
+            }
+        }
 
         std::vector<instruction_t> instructions;
 
@@ -520,6 +536,15 @@ private:
             else if (!std::holds_alternative<std::monostate>(insn))
             {
                 instructions.push_back(insn);
+            }
+        }
+
+        for (auto& insn : instructions)
+        {
+            if (std::holds_alternative<load_instruction>(insn))
+            {
+                auto& load = std::get<load_instruction>(insn);
+                strong_assert(load.vreg > -1 && load.vreg < 32);
             }
         }
 
@@ -3074,6 +3099,7 @@ private:
         std::vector<instruction_t> instructions;
 
         auto load_scalar = [&](int vreg, int tensor_idx, int offset) {
+            strong_assert(vreg > -1 && vreg < 32);
             load_instruction insn;
             insn.vreg     = vreg;
             int num_lanes = 1;
@@ -3149,6 +3175,7 @@ private:
                 it = vreg_index.find(reg_no);
             }
 
+            strong_assert(reg_no > -1 && reg_no < 32);
             return reg_no;
         };
 
@@ -3159,6 +3186,7 @@ private:
 
             int           needs_free_regs = 0;
             std::set<int> to_avoid;
+
             if (auto it = tensor_location_index.find(scalar_loc);
                 it == tensor_location_index.end())
             {
@@ -3355,6 +3383,7 @@ private:
 
         auto load_vector = [&](int vreg, int tensor_idx, int offset,
                                int num_lanes) {
+            strong_assert(vreg > -1 && vreg < 32);
             load_instruction insn;
             insn.vreg = vreg;
 
@@ -3393,6 +3422,7 @@ private:
                 it = vreg_index.find(reg_no);
             }
 
+            strong_assert(reg_no > -1 && reg_no < 32);
             return reg_no;
         };
 
@@ -3422,6 +3452,7 @@ private:
 
             int           needs_free_regs = 0;
             std::set<int> to_avoid;
+
             if (auto it = tensor_location_index.find(first_loc);
                 it == tensor_location_index.end())
             {
