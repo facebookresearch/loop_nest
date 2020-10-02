@@ -789,9 +789,6 @@ public:
                     output_idx  = tensors_idx.at(output)](
                        std::vector<float*>& tensors,
                        std::vector<int>&    alpha_offsets) {
-                std::cout << "------ DIFF ITERATION: " << alpha
-                          << " :: " << alpha_offsets[output_idx] << " --- "
-                          << last_iteration << "\n";
 
                 auto last_iter_mask =
                     alpha_offsets[output_idx] == last_iteration ? 0b0 : 0b10;
@@ -799,8 +796,6 @@ public:
                 auto param_mask =
                     ((alpha | alpha_offsets[output_idx]) ? 1 : 0) |
                     last_iter_mask;
-
-                std::cout << "DIFF LITERMASK: " << last_iter_mask << " __ " << param_mask << "\n";
 
                 aot_fn(tensors[output_idx], tensors[input_idx_0],
                        tensors[input_idx_1], param_mask);

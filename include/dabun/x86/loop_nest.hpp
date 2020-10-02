@@ -1194,6 +1194,8 @@ private:
                 Label not_last_label;
                 cmp(alpha_reg_, max_alpha - 1);
                 jl(not_last_label, T_NEAR);
+                test(skip_postop_reg_, ::dabun::skip_postop);
+                jnz(not_last_label);
 
                 std::vector<std::pair<memory_argument, Xbyak::Ymm>>
                     stores_and_regs;
@@ -1267,6 +1269,8 @@ private:
                 {
                     cmp(alpha_reg_, max_alpha - 1);
                     jl(not_last_label);
+                    test(skip_postop_reg_, ::dabun::skip_postop);
+                    jnz(not_last_label);
 
                     LN_LOG(INFO)
                         << tabs.back() << elementwise_postop->name() << " "
@@ -3763,8 +3767,8 @@ public:
 
         push({r15, r14, r13, r12, rbx});
 
-        mov(skip_postop_reg_.cvt32(), alpha_reg_.cvt32());
-        and_(alpha_reg_.cvt32(), 0x1);
+        mov(skip_postop_reg_, alpha_reg_);
+        and_(alpha_reg_, 0x1);
 
         // Regs to be saved: RBX and R12-R15 (we don't use RBP)
 

@@ -54,9 +54,9 @@ int main()
        ----------> Definition
        */
 
-        int ArCr = 1;
+        int ArCr = 100;
         int AcBr = 100;
-        int BcCc = 2;
+        int BcCc = 100;
 
         std::map<std::string, int> sizes = {
             {"ArCr", ArCr}, {"AcBr", AcBr}, {"BcCc", BcCc}};
@@ -138,8 +138,6 @@ int main()
                                         CN.data())
                   << "\n";
     }
-
-    return 0;
 
     {
         /*
