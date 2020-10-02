@@ -16,12 +16,12 @@ namespace loop_tree
 
 // forward declaration
 template <class ISA>
-class loop_tree_node;
+class node;
 
 // Type aliases for readability
 // void (vector of tensors, vector of alpha offsets)
 using loop_tree_fn_type =
-    std::function<void(std::vector<float*> const&, std::vector<int> const&)>;
+    std::function<void(std::vector<float*>&, std::vector<int>&)>;
 
 // map from name to map of strides
 using strides_map_type = std::map<std::string, std::map<std::string, int>>;
@@ -33,7 +33,17 @@ template <class ISA>
 using elementwise_op_ptr = std::shared_ptr<elementwise_operation<ISA>>;
 
 template <class ISA>
-using loop_tree_node_ptr = std::shared_ptr<loop_tree_node<ISA>>;
+using node_ptr = std::shared_ptr<node<ISA>>;
+
+// Note: add classes from dabun/arithmetic_operations.hpp
+// as needed
+enum class arithmetic_op_kind
+{
+    plus,
+    multiplies,
+    max,
+    min
+};
 
 } // namespace loop_tree
 } // namespace dabun

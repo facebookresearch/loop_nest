@@ -473,7 +473,7 @@ int main()
                                   B.data(), CN.data());
 
         fn(CJ.data(), A.data(), B.data(), dabun::skip_postop);
-        // apply_relu(CN.data(), CN.data() + CN.size());
+        apply_relu(CN.data(), CN.data() + CN.size());
 
         std::cout << "MAXABSDIFF: "
                   << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc,

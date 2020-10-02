@@ -54,9 +54,9 @@ int main()
        ----------> Definition
        */
 
-        int ArCr = 100;
+        int ArCr = 1;
         int AcBr = 100;
-        int BcCc = 100;
+        int BcCc = 2;
 
         std::map<std::string, int> sizes = {
             {"ArCr", ArCr}, {"AcBr", AcBr}, {"BcCc", BcCc}};
@@ -75,7 +75,8 @@ int main()
         // C[ArCr, BcCc] += A[ArCr, AcBr] * B2[BcCc, AcBr] (with zero init)
         auto mm = make_compute_node<DABUN_ISA>(
             {"A", "B2"}, "C", mm_strides, arithmetic_op_kind::plus,
-            arithmetic_op_kind::multiplies, 0, 100);
+            arithmetic_op_kind::multiplies, 0, 100, nullptr, {},
+            elementwise_relu<DABUN_ISA>);
 
         /*
         for ArCr:
@@ -123,6 +124,7 @@ int main()
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
                     B1.data(), CN.data(), 0);
+        apply_relu(CN.data(), CN.data() + ArCr * BcCc);
 
         std::map<std::string, float*> tensors = {{"C", CJ.data()},
                                                  {"A", A.data()},
@@ -132,12 +134,12 @@ int main()
         fn(tensors);
 
         std::cout << "MAXABSDIFF: "
-                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc,
+                  << max_abs_difference_verbose(CJ.data(), CJ.data() + ArCr * BcCc,
                                         CN.data())
                   << "\n";
     }
 
-    // return 0;
+    return 0;
 
     {
         /*
