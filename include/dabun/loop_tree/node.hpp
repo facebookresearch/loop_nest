@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "dabun/loop_tree/report.hpp"
 #include "dabun/loop_tree/types.hpp"
 #include "dabun/loop_tree/utility.hpp"
 
@@ -86,10 +87,10 @@ public:
     node_kind kind() const { return kind_; }
 
     // tensor positions, dimension sizes, and tensor formulas
-    virtual loop_tree_fn_type get_fn(std::map<std::string, int> const&,
-                                     std::map<std::string, int> const&,
-                                     std::map<std::string, int> const&,
-                                     formulas_map_type const&) const = 0;
+    virtual std::pair<loop_tree_fn_type, report_vector>
+    get_fn(std::map<std::string, int> const&, std::map<std::string, int> const&,
+           std::map<std::string, int> const&,
+           formulas_map_type const&) const = 0;
 
     virtual std::set<std::string> get_tensors_used() const = 0;
 
@@ -266,7 +267,7 @@ public:
         return {output};
     }
 
-    loop_tree_fn_type
+    std::pair<loop_tree_fn_type, report_vector>
     get_fn(std::map<std::string, int> const& tensors_idx,
            std::map<std::string, int> const& sizes,
            std::map<std::string, int> const& /* iteration_depths */,
@@ -288,22 +289,26 @@ public:
                                         "pre/post op with followed tensors");
         }
 
-        return
-            [inputs = this->inputs, output = this->output, alpha = this->alpha,
-             input_idx_0 = tensors_idx.at(inputs[0]),
-             input_idx_1 = tensors_idx.at(inputs[1]),
-             output_idx  = tensors_idx.at(output)](
-                std::vector<float*>& tensors, std::vector<int>& alpha_offsets) {
-                float* A = tensors[input_idx_0];
-                float* B = tensors[input_idx_1];
-                float* C = tensors[output_idx];
-                if ((alpha + alpha_offsets[output_idx]) == 0)
-                {
-                    C[0] = 0.0;
-                }
+        report_vector report = {
+            std::make_shared<node_report>(compute_node_info{})};
 
-                C[0] += A[0] * B[0];
-            };
+        return {[inputs = this->inputs, output = this->output,
+                 alpha = this->alpha, input_idx_0 = tensors_idx.at(inputs[0]),
+                 input_idx_1 = tensors_idx.at(inputs[1]),
+                 output_idx =
+                     tensors_idx.at(output)](std::vector<float*>& tensors,
+                                             std::vector<int>& alpha_offsets) {
+                    float* A = tensors[input_idx_0];
+                    float* B = tensors[input_idx_1];
+                    float* C = tensors[output_idx];
+                    if ((alpha + alpha_offsets[output_idx]) == 0)
+                    {
+                        C[0] = 0.0;
+                    }
+
+                    C[0] += A[0] * B[0];
+                },
+                report};
     }
 };
 
@@ -383,22 +388,26 @@ public:
         return strides;
     }
 
-    loop_tree_fn_type get_fn(std::map<std::string, int> const& tensors_idx,
-                             std::map<std::string, int> const&,
-                             std::map<std::string, int> const&,
-                             formulas_map_type const&) const override
+    std::pair<loop_tree_fn_type, report_vector>
+    get_fn(std::map<std::string, int> const& tensors_idx,
+           std::map<std::string, int> const&, std::map<std::string, int> const&,
+           formulas_map_type const&) const override
     {
-        return [input = this->input, output = this->output,
-                input_idx  = tensors_idx.at(input),
-                output_idx = tensors_idx.at(output)](
-                   std::vector<float*>& tensors, std::vector<int>&) {
-            strong_assert(tensors[input_idx]);
-            strong_assert(tensors[output_idx]);
+        report_vector report = {
+            std::make_shared<node_report>(transpose_node_info{})};
 
-            float* A = tensors[input_idx];
-            float* C = tensors[output_idx];
-            C[0]     = A[0];
-        };
+        return {[input = this->input, output = this->output,
+                 input_idx  = tensors_idx.at(input),
+                 output_idx = tensors_idx.at(output)](
+                    std::vector<float*>& tensors, std::vector<int>&) {
+                    strong_assert(tensors[input_idx]);
+                    strong_assert(tensors[output_idx]);
+
+                    float* A = tensors[input_idx];
+                    float* C = tensors[output_idx];
+                    C[0]     = A[0];
+                },
+                report};
     }
 };
 
@@ -535,10 +544,11 @@ public:
         return in_scope_tensor_strides;
     }
 
-    loop_tree_fn_type get_fn(std::map<std::string, int> const& tensors_idx,
-                             std::map<std::string, int> const& sizes,
-                             std::map<std::string, int> const& iteration_depths,
-                             formulas_map_type const& formulas) const override
+    std::pair<loop_tree_fn_type, report_vector>
+    get_fn(std::map<std::string, int> const& tensors_idx,
+           std::map<std::string, int> const& sizes,
+           std::map<std::string, int> const& iteration_depths,
+           formulas_map_type const&          formulas) const override
     {
         auto var      = this->var;
         auto delta    = this->delta;
@@ -549,6 +559,9 @@ public:
         int rest = limit % delta;
 
         std::vector<loop_tree_fn_type> full_fns, tail_fns;
+
+        report_vector report = {
+            std::make_shared<node_report>(for_loop_node_info{})};
 
         auto s           = sizes;
         auto iter_depths = iteration_depths;
@@ -562,16 +575,21 @@ public:
         {
             if (full)
             {
-                s[var] = delta;
-                full_fns.push_back(
-                    c->get_fn(tensors_idx, s, iter_depths, formulas));
+                s[var]   = delta;
+                auto sub = c->get_fn(tensors_idx, s, iter_depths, formulas);
+                full_fns.push_back(sub.first);
+                report[0]->children.insert(report[0]->children.end(),
+                                           sub.second.begin(),
+                                           sub.second.end());
             }
             if (rest)
             {
-                auto s = sizes;
-                s[var] = rest;
-                tail_fns.push_back(
-                    c->get_fn(tensors_idx, s, iter_depths, formulas));
+                auto s   = sizes;
+                s[var]   = rest;
+                auto sub = c->get_fn(tensors_idx, s, iter_depths, formulas);
+                tail_fns.push_back(sub.first);
+                report.insert(report.end(), sub.second.begin(),
+                              sub.second.end());
             }
         }
 
@@ -582,7 +600,7 @@ public:
         LN_LOG(DEBUG) << "loop_tree: Executing interpreted for(" << var << ","
                       << delta << ")\n";
 
-        return
+        return {
             [=](std::vector<float*>& tensors, std::vector<int>& alpha_offsets) {
                 for (int i = 0; i < full; ++i)
                 {
@@ -601,7 +619,8 @@ public:
 
                 advancer(tensors, -full);
                 alpha_offsets_adjuster(alpha_offsets, -full);
-            };
+            },
+            report};
     }
 };
 
@@ -726,10 +745,11 @@ public:
                      {for_node->get_var(), for_node->get_delta()});
     }
 
-    loop_tree_fn_type get_fn(std::map<std::string, int> const& tensors_idx,
-                             std::map<std::string, int> const& sizes,
-                             std::map<std::string, int> const& iteration_depths,
-                             formulas_map_type const& formulas) const override
+    std::pair<loop_tree_fn_type, report_vector>
+    get_fn(std::map<std::string, int> const& tensors_idx,
+           std::map<std::string, int> const& sizes,
+           std::map<std::string, int> const& iteration_depths,
+           formulas_map_type const&          formulas) const override
     {
         // contains followed tensors for pre/post ops
         std::vector<std::string> extra_tensors;
@@ -783,23 +803,25 @@ public:
 
         if (extra_tensors.size() == 0)
         {
-            return [aot_fn, alpha, last_iteration,
-                    input_idx_0 = tensors_idx.at(inputs[0]),
-                    input_idx_1 = tensors_idx.at(inputs[1]),
-                    output_idx  = tensors_idx.at(output)](
-                       std::vector<float*>& tensors,
-                       std::vector<int>&    alpha_offsets) {
+            return {[aot_fn, alpha, last_iteration,
+                     input_idx_0 = tensors_idx.at(inputs[0]),
+                     input_idx_1 = tensors_idx.at(inputs[1]),
+                     output_idx  = tensors_idx.at(output)](
+                        std::vector<float*>& tensors,
+                        std::vector<int>&    alpha_offsets) {
+                        auto last_iter_mask =
+                            alpha_offsets[output_idx] == last_iteration ? 0b0
+                                                                        : 0b10;
 
-                auto last_iter_mask =
-                    alpha_offsets[output_idx] == last_iteration ? 0b0 : 0b10;
+                        auto param_mask =
+                            ((alpha | alpha_offsets[output_idx]) ? 1 : 0) |
+                            last_iter_mask;
 
-                auto param_mask =
-                    ((alpha | alpha_offsets[output_idx]) ? 1 : 0) |
-                    last_iter_mask;
-
-                aot_fn(tensors[output_idx], tensors[input_idx_0],
-                       tensors[input_idx_1], param_mask);
-            };
+                        aot_fn(tensors[output_idx], tensors[input_idx_0],
+                               tensors[input_idx_1], param_mask);
+                    },
+                    {std::make_shared<node_report>(
+                        compiled_loop_nest_node_info{})}};
         }
         else if (extra_tensors.size() == 1)
         {
@@ -807,20 +829,24 @@ public:
                 aot_fn_cast<void(float*, float const*, float const*, int,
                                  float const*)>(std::move(aot_fn));
 
-            return [aot_casted, alpha, last_iteration,
-                    input_idx_0      = tensors_idx.at(inputs[0]),
-                    input_idx_1      = tensors_idx.at(inputs[1]),
-                    output_idx       = tensors_idx.at(output),
-                    extra_tensor_idx = tensors_idx.at(extra_tensors[0])](
-                       std::vector<float*>& tensors,
-                       std::vector<int>&    alpha_offsets) {
-                aot_casted(
-                    tensors[output_idx], tensors[input_idx_0],
-                    tensors[input_idx_1],
-                    ((alpha + alpha_offsets[output_idx]) ? 1 : 0) |
-                        (alpha_offsets[output_idx] == last_iteration ? 0 : 2),
-                    tensors[extra_tensor_idx]);
-            };
+            return {[aot_casted, alpha, last_iteration,
+                     input_idx_0      = tensors_idx.at(inputs[0]),
+                     input_idx_1      = tensors_idx.at(inputs[1]),
+                     output_idx       = tensors_idx.at(output),
+                     extra_tensor_idx = tensors_idx.at(extra_tensors[0])](
+                        std::vector<float*>& tensors,
+                        std::vector<int>&    alpha_offsets) {
+                        aot_casted(
+                            tensors[output_idx], tensors[input_idx_0],
+                            tensors[input_idx_1],
+                            ((alpha + alpha_offsets[output_idx]) ? 1 : 0) |
+                                (alpha_offsets[output_idx] == last_iteration
+                                     ? 0
+                                     : 2),
+                            tensors[extra_tensor_idx]);
+                    },
+                    {std::make_shared<node_report>(
+                        compiled_loop_nest_node_info{})}};
         }
         else if (extra_tensors.size() == 2)
         {
@@ -829,27 +855,32 @@ public:
                                  float const*, float const*)>(
                     std::move(aot_fn));
 
-            return [aot_casted, alpha, last_iteration,
-                    input_idx_0        = tensors_idx.at(inputs[0]),
-                    input_idx_1        = tensors_idx.at(inputs[1]),
-                    output_idx         = tensors_idx.at(output),
-                    extra_tensor_idx_0 = tensors_idx.at(extra_tensors[0]),
-                    extra_tensor_idx_1 = tensors_idx.at(extra_tensors[1])](
-                       std::vector<float*>& tensors,
-                       std::vector<int>&    alpha_offsets) {
-                aot_casted(
-                    tensors[output_idx], tensors[input_idx_0],
-                    tensors[input_idx_1],
-                    ((alpha + alpha_offsets[output_idx]) ? 1 : 0) |
-                        (alpha_offsets[output_idx] == last_iteration ? 0 : 2),
-                    tensors[extra_tensor_idx_0], tensors[extra_tensor_idx_1]);
-            };
+            return {[aot_casted, alpha, last_iteration,
+                     input_idx_0        = tensors_idx.at(inputs[0]),
+                     input_idx_1        = tensors_idx.at(inputs[1]),
+                     output_idx         = tensors_idx.at(output),
+                     extra_tensor_idx_0 = tensors_idx.at(extra_tensors[0]),
+                     extra_tensor_idx_1 = tensors_idx.at(extra_tensors[1])](
+                        std::vector<float*>& tensors,
+                        std::vector<int>&    alpha_offsets) {
+                        aot_casted(
+                            tensors[output_idx], tensors[input_idx_0],
+                            tensors[input_idx_1],
+                            ((alpha + alpha_offsets[output_idx]) ? 1 : 0) |
+                                (alpha_offsets[output_idx] == last_iteration
+                                     ? 0
+                                     : 2),
+                            tensors[extra_tensor_idx_0],
+                            tensors[extra_tensor_idx_1]);
+                    },
+                    {std::make_shared<node_report>(
+                        compiled_loop_nest_node_info{})}};
         }
         else
         {
             throw std::invalid_argument(
                 "loop_nest currently supports at most 2 followed tensors");
-            return loop_tree_fn_type();
+            return {loop_tree_fn_type(), report_vector{}};
         }
     }
 
@@ -938,10 +969,11 @@ public:
                      {for_node->get_var(), for_node->get_delta()});
     }
 
-    loop_tree_fn_type get_fn(std::map<std::string, int> const& tensors_idx,
-                             std::map<std::string, int> const& sizes,
-                             std::map<std::string, int> const&,
-                             formulas_map_type const& formulas) const override
+    std::pair<loop_tree_fn_type, report_vector>
+    get_fn(std::map<std::string, int> const& tensors_idx,
+           std::map<std::string, int> const& sizes,
+           std::map<std::string, int> const&,
+           formulas_map_type const& formulas) const override
     {
         auto aot_fn = transposer_code_generator<std::conditional_t<
             std::is_same_v<ISA, avx512>, avx2_plus, ISA>>(
@@ -949,11 +981,13 @@ public:
                           64 /* unroll_limit */)
                           .get_shared();
 
-        return [aot_fn, output_idx = tensors_idx.at(output),
-                input_idx = tensors_idx.at(input)](std::vector<float*>& tensors,
-                                                   std::vector<int>&) {
-            aot_fn(tensors[output_idx], tensors[input_idx]);
-        };
+        return {
+            [aot_fn, output_idx = tensors_idx.at(output),
+             input_idx = tensors_idx.at(input)](std::vector<float*>& tensors,
+                                                std::vector<int>&) {
+                aot_fn(tensors[output_idx], tensors[input_idx]);
+            },
+            {std::make_shared<node_report>(compiled_transpose_node_info{})}};
     }
 
     std::set<std::string> get_tensors_used() const override

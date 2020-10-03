@@ -26,6 +26,31 @@ namespace dabun
 namespace loop_tree
 {
 
+class program
+{
+private:
+    report_vector                                             report;
+    std::function<void(std::map<std::string, float*> const&)> fn;
+
+public:
+    program(){};
+    program(program const&) = default;
+    program(program&&)      = default;
+    program& operator=(program const&) = default;
+    program& operator=(program&&) = default;
+
+    template <class FN>
+    program(report_vector const& r, FN&& f)
+        : report(r)
+        , fn(f)
+    {
+    }
+
+    void operator()(std::map<std::string, float*> const& m) const { fn(m); }
+
+    report_vector const& get_report() const { return report; }
+};
+
 inline std::shared_ptr<operation_pair_base>
 get_operation_pair(arithmetic_op_kind plus_op, arithmetic_op_kind multiplies_op)
 {
@@ -316,7 +341,7 @@ public:
         return max_size;
     }
 
-    std::function<void(std::map<std::string, float*>)> get_fn() const
+    program get_fn() const
     {
         std::vector<loop_tree_fn_type> sub_functions;
         // added to alpha at runtime to handle tensor initialization
@@ -324,28 +349,33 @@ public:
 
         std::map<std::string, int> iteration_depths;
 
+        report_vector report;
+
         for (auto const& c : this->nodes)
         {
-            sub_functions.push_back(
-                c->get_fn(tensors_idx, sizes, iteration_depths, formulas));
+            auto sub =
+                c->get_fn(tensors_idx, sizes, iteration_depths, formulas);
+            sub_functions.push_back(sub.first);
+            report.insert(report.end(), sub.second.begin(), sub.second.end());
         }
 
-        return [sub_functions, alpha_offsets_size,
-                tensors_idx = this->tensors_idx](
-                   std::map<std::string, float*> const& tensors) {
-            std::vector<int>    alpha_offs(alpha_offsets_size);
-            std::vector<float*> tensors_vec(tensors_idx.size());
-            for (auto const& e : tensors)
-            {
-                int idx          = tensors_idx.at(e.first);
-                tensors_vec[idx] = e.second;
-            }
+        return program(report,
+                       [sub_functions, alpha_offsets_size,
+                        tensors_idx = this->tensors_idx](
+                           std::map<std::string, float*> const& tensors) {
+                           std::vector<int>    alpha_offs(alpha_offsets_size);
+                           std::vector<float*> tensors_vec(tensors_idx.size());
+                           for (auto const& e : tensors)
+                           {
+                               int idx          = tensors_idx.at(e.first);
+                               tensors_vec[idx] = e.second;
+                           }
 
-            for (auto const& f : sub_functions)
-            {
-                f(tensors_vec, alpha_offs);
-            }
-        };
+                           for (auto const& f : sub_functions)
+                           {
+                               f(tensors_vec, alpha_offs);
+                           }
+                       });
     }
 };
 

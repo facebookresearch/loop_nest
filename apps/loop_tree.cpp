@@ -112,6 +112,8 @@ int main()
 
         auto fn = tree->get_fn();
 
+        std::cout << print_report(fn.get_report());
+
         /*
        ----------> Execution
        */
