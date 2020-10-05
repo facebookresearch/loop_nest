@@ -24,6 +24,20 @@ enum access_kind
     VECTOR_STRIDED
 };
 
+inline std::string to_string(access_kind akind)
+{
+    switch (akind)
+    {
+    case SCALAR:
+        return "scalar";
+    case VECTOR_PACKED:
+        return "vector_packed";
+    case VECTOR_STRIDED:
+        return "vector_strided";
+    }
+    return "unknown";
+}
+
 struct loop_descriptor
 {
     std::string var;

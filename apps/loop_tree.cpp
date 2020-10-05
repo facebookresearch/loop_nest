@@ -136,7 +136,7 @@ int main()
         fn(tensors);
 
         std::cout << "MAXABSDIFF: "
-                  << max_abs_difference_verbose(CJ.data(), CJ.data() + ArCr * BcCc,
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc,
                                         CN.data())
                   << "\n";
     }

@@ -781,7 +781,7 @@ public:
                 order, sizes, formulas.at(output), formulas.at(inputs[0]),
                 formulas.at(inputs[1]), strides.at(output),
                 strides.at(inputs[0]), strides.at(inputs[1]),
-                get_operation_pair(plus, multiplies), unroll_limit,
+                utility::get_operation_pair(plus, multiplies), unroll_limit,
                 elementwise_preop, preop_strides, elementwise_postop,
                 postop_strides, optim_config)
                 .get_shared();

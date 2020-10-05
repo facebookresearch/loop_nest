@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "dabun/loop_tree/types.hpp"
+#include "dabun/arithmetic_operation.hpp"
 
 namespace dabun
 {
@@ -16,6 +17,31 @@ namespace loop_tree
 {
 namespace utility
 {
+
+inline std::shared_ptr<operation_pair_base>
+get_operation_pair(arithmetic_op_kind plus_op, arithmetic_op_kind multiplies_op)
+{
+
+    std::map<std::pair<arithmetic_op_kind, arithmetic_op_kind>,
+             std::shared_ptr<operation_pair_base>>
+#ifndef LOOP_NEST_ARM
+        op_map = {
+            {{arithmetic_op_kind::plus, arithmetic_op_kind::multiplies},
+             std::make_shared<
+                 operation_pair<op::basic_plus, op::basic_multiplies>>()},
+            {{arithmetic_op_kind::max, arithmetic_op_kind::multiplies},
+             std::make_shared<operation_pair<op::max, op::basic_multiplies>>()},
+            {{arithmetic_op_kind::min, arithmetic_op_kind::multiplies},
+             std::make_shared<operation_pair<op::min, op::basic_multiplies>>()},
+            {{arithmetic_op_kind::max, arithmetic_op_kind::plus},
+             std::make_shared<operation_pair<op::max, op::basic_plus>>()}};
+#else
+        op_map = {{{arithmetic_op_kind::plus, arithmetic_op_kind::multiplies},
+                   std::make_shared<operation_pair_base>()}};
+#endif
+
+    return op_map.at({plus_op, multiplies_op});
+}
 
 inline std::string dump_strides(strides_map_type const& strides,
                                 std::string const&      indent)

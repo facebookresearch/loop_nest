@@ -3638,6 +3638,10 @@ public:
 
     std::int64_t get_total_memory() const { return total_memory_; }
 
+    access_kind get_A_access_kind() const { return A_traits.access; }
+    access_kind get_B_access_kind() const { return B_traits.access; }
+    access_kind get_C_access_kind() const { return C_traits.access; }
+
 public:
     loop_nest_code_generator(
         std::vector<std::pair<std::string, int>> const& _order,

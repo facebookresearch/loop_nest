@@ -29,7 +29,7 @@ namespace loop_tree
 class program
 {
 private:
-    report_vector                                             report;
+    std::shared_ptr<node_report>                              report;
     std::function<void(std::map<std::string, float*> const&)> fn;
 
 public:
@@ -40,7 +40,7 @@ public:
     program& operator=(program&&) = default;
 
     template <class FN>
-    program(report_vector const& r, FN&& f)
+    program(std::shared_ptr<node_report> const& r, FN&& f)
         : report(r)
         , fn(f)
     {
@@ -48,33 +48,8 @@ public:
 
     void operator()(std::map<std::string, float*> const& m) const { fn(m); }
 
-    report_vector const& get_report() const { return report; }
+    std::shared_ptr<node_report> const& get_report() const { return report; }
 };
-
-inline std::shared_ptr<operation_pair_base>
-get_operation_pair(arithmetic_op_kind plus_op, arithmetic_op_kind multiplies_op)
-{
-
-    std::map<std::pair<arithmetic_op_kind, arithmetic_op_kind>,
-             std::shared_ptr<operation_pair_base>>
-#ifndef LOOP_NEST_ARM
-        op_map = {
-            {{arithmetic_op_kind::plus, arithmetic_op_kind::multiplies},
-             std::make_shared<
-                 operation_pair<op::basic_plus, op::basic_multiplies>>()},
-            {{arithmetic_op_kind::max, arithmetic_op_kind::multiplies},
-             std::make_shared<operation_pair<op::max, op::basic_multiplies>>()},
-            {{arithmetic_op_kind::min, arithmetic_op_kind::multiplies},
-             std::make_shared<operation_pair<op::min, op::basic_multiplies>>()},
-            {{arithmetic_op_kind::max, arithmetic_op_kind::plus},
-             std::make_shared<operation_pair<op::max, op::basic_plus>>()}};
-#else
-        op_map = {{{arithmetic_op_kind::plus, arithmetic_op_kind::multiplies},
-                   std::make_shared<operation_pair_base>()}};
-#endif
-
-    return op_map.at({plus_op, multiplies_op});
-}
 
 template <class ISA>
 node_ptr<ISA> merge_loop_into_compiler(
@@ -359,7 +334,8 @@ public:
             report.insert(report.end(), sub.second.begin(), sub.second.end());
         }
 
-        return program(report,
+        return program(std::make_shared<node_report>(program_node_info{0, 0},
+                                                     std::move(report)),
                        [sub_functions, alpha_offsets_size,
                         tensors_idx = this->tensors_idx](
                            std::map<std::string, float*> const& tensors) {
