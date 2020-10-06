@@ -150,7 +150,8 @@ private:
     std::map<std::string, int>                        sizes;
     std::map<std::string, std::set<std::string>>      formulas;
     std::map<std::string, std::map<std::string, int>> strides;
-    // assumes FMA
+
+    // assumes FMAs
     std::optional<int> user_unroll_limit;
     // assumes no pre/post-ops for now
     // these are kind of janky in the halide translator...

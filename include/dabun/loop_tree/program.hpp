@@ -316,7 +316,7 @@ public:
         return max_size;
     }
 
-    program get_fn() const
+    program get_fn(bool spit_asm = true) const
     {
         std::vector<loop_tree_fn_type> sub_functions;
         // added to alpha at runtime to handle tensor initialization
@@ -328,8 +328,8 @@ public:
 
         for (auto const& c : this->nodes)
         {
-            auto sub =
-                c->get_fn(tensors_idx, sizes, iteration_depths, formulas);
+            auto sub = c->get_fn(tensors_idx, sizes, iteration_depths, formulas,
+                                 spit_asm);
             sub_functions.push_back(sub.first);
             report.insert(report.end(), sub.second.begin(), sub.second.end());
         }

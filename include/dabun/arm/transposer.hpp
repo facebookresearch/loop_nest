@@ -489,10 +489,6 @@ private:
         }
     }
 
-    // Collects all (unrolled) FMAs below a certain loop in the nest.
-    // Assumes that the limits are correctly set for the current loop
-    // in the execution tree of the loop nest.  This is to correctly
-    // handle the tail cases.
     std::vector<move_operation> collect_unrolled_moves_below(int depth)
     {
         std::vector<move_operation> ret;

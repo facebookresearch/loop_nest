@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "dabun/detail/tmp_file_name.hpp"
 #include "dabun/loop_tree/report.hpp"
 #include "dabun/loop_tree/types.hpp"
 #include "dabun/loop_tree/utility.hpp"
@@ -89,8 +90,8 @@ public:
     // tensor positions, dimension sizes, and tensor formulas
     virtual std::pair<loop_tree_fn_type, report_vector>
     get_fn(std::map<std::string, int> const&, std::map<std::string, int> const&,
-           std::map<std::string, int> const&,
-           formulas_map_type const&) const = 0;
+           std::map<std::string, int> const&, formulas_map_type const&,
+           bool) const = 0;
 
     virtual std::set<std::string> get_tensors_used() const = 0;
 
@@ -271,7 +272,7 @@ public:
     get_fn(std::map<std::string, int> const& tensors_idx,
            std::map<std::string, int> const& sizes,
            std::map<std::string, int> const& /* iteration_depths */,
-           formulas_map_type const&) const override
+           formulas_map_type const&, bool) const override
     {
         // TODO(j): if we want to support more ops, extend here otherwise only
         // supported through loop nest
@@ -391,7 +392,7 @@ public:
     std::pair<loop_tree_fn_type, report_vector>
     get_fn(std::map<std::string, int> const& tensors_idx,
            std::map<std::string, int> const&, std::map<std::string, int> const&,
-           formulas_map_type const&) const override
+           formulas_map_type const&, bool) const override
     {
         report_vector report = {
             std::make_shared<node_report>(transpose_node_info{})};
@@ -548,7 +549,7 @@ public:
     get_fn(std::map<std::string, int> const& tensors_idx,
            std::map<std::string, int> const& sizes,
            std::map<std::string, int> const& iteration_depths,
-           formulas_map_type const&          formulas) const override
+           formulas_map_type const& formulas, bool spit_asm) const override
     {
         auto var      = this->var;
         auto delta    = this->delta;
@@ -575,8 +576,9 @@ public:
         {
             if (full)
             {
-                s[var]   = delta;
-                auto sub = c->get_fn(tensors_idx, s, iter_depths, formulas);
+                s[var] = delta;
+                auto sub =
+                    c->get_fn(tensors_idx, s, iter_depths, formulas, spit_asm);
                 full_fns.push_back(sub.first);
                 report[0]->children.insert(report[0]->children.end(),
                                            sub.second.begin(),
@@ -584,9 +586,10 @@ public:
             }
             if (rest)
             {
-                auto s   = sizes;
-                s[var]   = rest;
-                auto sub = c->get_fn(tensors_idx, s, iter_depths, formulas);
+                auto s = sizes;
+                s[var] = rest;
+                auto sub =
+                    c->get_fn(tensors_idx, s, iter_depths, formulas, spit_asm);
                 tail_fns.push_back(sub.first);
                 report.insert(report.end(), sub.second.begin(),
                               sub.second.end());
@@ -749,7 +752,7 @@ public:
     get_fn(std::map<std::string, int> const& tensors_idx,
            std::map<std::string, int> const& sizes,
            std::map<std::string, int> const& iteration_depths,
-           formulas_map_type const&          formulas) const override
+           formulas_map_type const& formulas, bool spit_asm) const override
     {
         // contains followed tensors for pre/post ops
         std::vector<std::string> extra_tensors;
@@ -776,15 +779,35 @@ public:
                               strides.at(inputs[1]), unroll_limit);
 #endif
 
-        auto aot_fn =
-            loop_nest_code_generator<ISA>(
-                order, sizes, formulas.at(output), formulas.at(inputs[0]),
-                formulas.at(inputs[1]), strides.at(output),
-                strides.at(inputs[0]), strides.at(inputs[1]),
-                utility::get_operation_pair(plus, multiplies), unroll_limit,
-                elementwise_preop, preop_strides, elementwise_postop,
-                postop_strides, optim_config)
-                .get_shared();
+        loop_nest_code_generator<ISA> generated(
+            order, sizes, formulas.at(output), formulas.at(inputs[0]),
+            formulas.at(inputs[1]), strides.at(output), strides.at(inputs[0]),
+            strides.at(inputs[1]),
+            utility::get_operation_pair(plus, multiplies), unroll_limit,
+            elementwise_preop, preop_strides, elementwise_postop,
+            postop_strides, optim_config);
+
+        std::string asm_dump = "n/a";
+
+        if (spit_asm)
+        {
+            asm_dump = ::dabun::detail::get_temporary_file_name(".asm");
+        }
+
+        compiled_loop_nest_node_info info{generated.get_effective_flops() +
+                                              generated.get_masked_out_flops(),
+                                          generated.get_effective_flops(),
+                                          asm_dump,
+                                          generated.get_A_access_kind(),
+                                          generated.get_B_access_kind(),
+                                          generated.get_C_access_kind()};
+
+        auto aot_fn = std::move(generated).get_shared();
+
+        if (spit_asm)
+        {
+            aot_fn.save_to_file(asm_dump);
+        }
 
         auto output = this->output;
         auto inputs = this->inputs;
@@ -820,8 +843,7 @@ public:
                         aot_fn(tensors[output_idx], tensors[input_idx_0],
                                tensors[input_idx_1], param_mask);
                     },
-                    {std::make_shared<node_report>(
-                        compiled_loop_nest_node_info{})}};
+                    {std::make_shared<node_report>(info)}};
         }
         else if (extra_tensors.size() == 1)
         {
@@ -845,8 +867,7 @@ public:
                                      : 2),
                             tensors[extra_tensor_idx]);
                     },
-                    {std::make_shared<node_report>(
-                        compiled_loop_nest_node_info{})}};
+                    {std::make_shared<node_report>(info)}};
         }
         else if (extra_tensors.size() == 2)
         {
@@ -873,8 +894,7 @@ public:
                             tensors[extra_tensor_idx_0],
                             tensors[extra_tensor_idx_1]);
                     },
-                    {std::make_shared<node_report>(
-                        compiled_loop_nest_node_info{})}};
+                    {std::make_shared<node_report>(info)}};
         }
         else
         {
@@ -972,14 +992,22 @@ public:
     std::pair<loop_tree_fn_type, report_vector>
     get_fn(std::map<std::string, int> const& tensors_idx,
            std::map<std::string, int> const& sizes,
-           std::map<std::string, int> const&,
-           formulas_map_type const& formulas) const override
+           std::map<std::string, int> const&, formulas_map_type const& formulas,
+           bool spit_asm) const override
     {
         auto aot_fn = transposer_code_generator<std::conditional_t<
             std::is_same_v<ISA, avx512>, avx2_plus, ISA>>(
                           order, sizes, strides.at(output), strides.at(input),
                           64 /* unroll_limit */)
                           .get_shared();
+
+        std::string asm_dump = "n/a";
+
+        if (spit_asm)
+        {
+            asm_dump = ::dabun::detail::get_temporary_file_name(".asm");
+            aot_fn.save_to_file(asm_dump);
+        }
 
         return {
             [aot_fn, output_idx = tensors_idx.at(output),
