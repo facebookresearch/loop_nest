@@ -8,8 +8,8 @@
 #include <utility>
 #include <vector>
 
-#include "dabun/loop_tree/types.hpp"
 #include "dabun/arithmetic_operation.hpp"
+#include "dabun/loop_tree/types.hpp"
 
 namespace dabun
 {

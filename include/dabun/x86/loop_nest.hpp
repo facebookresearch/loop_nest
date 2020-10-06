@@ -185,7 +185,7 @@ private:
 
     using memory_argument = memory_argument_type<vector_size>;
 
-    struct inner_operation
+    struct fma_operation
     {
         memory_argument            dest, src1, src2;
         std::map<std::string, int> coordinates;
@@ -193,7 +193,7 @@ private:
 
 private:
     // Here we put some default unroll limit.
-    static constexpr int default_max_operations_unrolled = 320;
+    static constexpr int default_max_fmas_unrolled = 320;
 
 private:
     std::vector<std::pair<std::string, int>> order;
@@ -220,7 +220,7 @@ private:
     int nest_depth;
 
     // Which can be overriten by the caller.
-    int max_operations_unrolled;
+    int max_fmas_unrolled;
 
     // Tensors are vectorized if they are looped over in the innermost
     // loop and if the appropriate strides are 1.
@@ -468,9 +468,8 @@ private:
         return ret;
     }
 
-    void
-    collect_unrolled_operations_below_helper(std::vector<inner_operation>& ret,
-                                             int depth)
+    void collect_unrolled_FMAs_below_helper(std::vector<fma_operation>& ret,
+                                            int                         depth)
     {
         auto const& loop             = loops[depth];
         auto        saved_coordinate = current_coordinate_cursor[loop.var];
@@ -514,7 +513,7 @@ private:
             for (int i = 0; i < limits[loop.var].back() / loop.delta; ++i)
             {
                 limits[loop.var].push_back(loop.delta);
-                collect_unrolled_operations_below_helper(ret, depth + 1);
+                collect_unrolled_FMAs_below_helper(ret, depth + 1);
                 limits[loop.var].pop_back();
                 current_coordinate_cursor[loop.var] += loop.delta;
             }
@@ -524,7 +523,7 @@ private:
             if (tail)
             {
                 limits[loop.var].push_back(tail);
-                collect_unrolled_operations_below_helper(ret, depth + 1);
+                collect_unrolled_FMAs_below_helper(ret, depth + 1);
                 limits[loop.var].pop_back();
             }
 
@@ -532,44 +531,44 @@ private:
         }
     }
 
-    // Collects all (unrolled) operations below a certain loop in the nest.
+    // Collects all (unrolled) FMAs below a certain loop in the nest.
     // Assumes that the limits are correctly set for the current loop
     // in the execution tree of the loop nest.  This is to correctly
     // handle the tail cases.
-    std::vector<inner_operation> collect_unrolled_operations_below(int depth)
+    std::vector<fma_operation> collect_unrolled_FMAs_below(int depth)
     {
-        std::vector<inner_operation> ret;
-        collect_unrolled_operations_below_helper(ret, depth);
+        std::vector<fma_operation> ret;
+        collect_unrolled_FMAs_below_helper(ret, depth);
         return ret;
     }
 
-    void collect_default_unrolled_operations_at_helper(
-        std::vector<inner_operation>& ret, int cur_depth, int req_depth)
+    void
+    collect_default_unrolled_FMAs_at_helper(std::vector<fma_operation>& ret,
+                                            int cur_depth, int req_depth)
     {
         if (cur_depth == req_depth)
         {
-            collect_unrolled_operations_below_helper(ret, cur_depth);
+            collect_unrolled_FMAs_below_helper(ret, cur_depth);
         }
         else
         {
             auto const& loop = loops[cur_depth];
             limits[loop.var].push_back(loop.delta);
-            collect_default_unrolled_operations_at_helper(ret, cur_depth + 1,
-                                                          req_depth);
+            collect_default_unrolled_FMAs_at_helper(ret, cur_depth + 1,
+                                                    req_depth);
             limits[loop.var].pop_back();
         }
     }
 
-    // Collect all (unrolled) operations below the first instance of the
+    // Collect all (unrolled) FMAs below the first instance of the
     // loop of given depth in the execution tree.  Each other instance
     // of the loop in the tree at the same depth will contain a subset
-    // of the collected operations as it will be in a tail of at least one
+    // of the collected FMAs as it will be in a tail of at least one
     // loop.
-    std::vector<inner_operation>
-    collect_default_unrolled_operations_at(int depth)
+    std::vector<fma_operation> collect_default_unrolled_FMAs_at(int depth)
     {
-        std::vector<inner_operation> ret;
-        collect_default_unrolled_operations_at_helper(ret, 0, depth);
+        std::vector<fma_operation> ret;
+        collect_default_unrolled_FMAs_at_helper(ret, 0, depth);
         return ret;
     }
 
@@ -1322,7 +1321,7 @@ private:
         issue_C_stores(stores, tail_mask, max_alpha, issue_max_alpha_logic);
     }
 
-    void issue_unrolled_operations_scalar_vector(
+    void issue_unrolled_fmas_scalar_vector(
         std::map<int, std::shared_ptr<address_packer>> const& addressers)
     {
 
@@ -1418,8 +1417,8 @@ private:
 
     template <class R = ISA>
     std::enable_if_t<std::is_same_v<R, avx512> || std::is_same_v<R, avx2_plus>>
-    issue_unrolled_operations(
-        std::vector<inner_operation>                          operations,
+    issue_unrolled_fmas(
+        std::vector<fma_operation>                            fmas,
         std::map<int, std::shared_ptr<address_packer>> const& addressers,
         std::optional<int>                                    tail_mask)
 
@@ -1430,7 +1429,7 @@ private:
             (A_traits.access == VECTOR_PACKED &&
              B_traits.access == VECTOR_PACKED && C_traits.access != SCALAR))
         {
-            issue_unrolled_operations_scalar_vector(addressers);
+            issue_unrolled_fmas_scalar_vector(addressers);
             return;
         }
 
@@ -1493,7 +1492,7 @@ private:
             p.second->loop_prologue();
         }
 
-        for (auto const& inst : operations)
+        for (auto const& inst : fmas)
         {
             // Ensures no instructions are added to the unrolled
             // loop tails
@@ -1596,9 +1595,9 @@ private:
                 break;
             }
 
-            std::vector<inner_operation> delayed_inner_operations;
+            std::vector<fma_operation> delayed_fma_operations;
 
-            for (auto it = operations.begin(); it != operations.end();)
+            for (auto it = fmas.begin(); it != fmas.end();)
             {
                 if (it->src1 == addr || it->src2 == addr)
                 {
@@ -1611,12 +1610,12 @@ private:
 
                     queue.dec(src2);
 
-                    delayed_inner_operations.push_back(*it);
+                    delayed_fma_operations.push_back(*it);
 
                     LN_LOG(INFO) << tabs.back() << it->dest.readable()
                                  << " += " << it->src1.readable() << " * "
                                  << it->src2.readable() << "\n";
-                    it = operations.erase(it);
+                    it = fmas.erase(it);
                 }
                 else
                 {
@@ -1625,14 +1624,14 @@ private:
             }
 
             issue_delayed_ops[current % cycle] = [arg1_reg, addr,
-                                                  delayed_inner_operations,
+                                                  delayed_fma_operations,
                                                   &addressers, temp_k_mask,
                                                   full_k_mask, tail_k_mask,
                                                   this, &ensure_initalized_mask,
                                                   arg2_register,
                                                   &tensor_strides]() {
                 bool first = true;
-                for (auto const& op : delayed_inner_operations)
+                for (auto const& op : delayed_fma_operations)
                 {
                     auto src1 = op.src1;
                     auto src2 = op.src2;
@@ -1740,8 +1739,8 @@ private:
     }
 
     template <class R = ISA>
-    std::enable_if_t<std::is_same_v<R, avx2>> issue_unrolled_operations(
-        std::vector<inner_operation>                          operations,
+    std::enable_if_t<std::is_same_v<R, avx2>> issue_unrolled_fmas(
+        std::vector<fma_operation>                            fmas,
         std::map<int, std::shared_ptr<address_packer>> const& addressers,
         std::optional<int>                                    tail_mask)
 
@@ -1751,7 +1750,7 @@ private:
             (A_traits.access == VECTOR_PACKED &&
              B_traits.access == VECTOR_PACKED && C_traits.access != SCALAR))
         {
-            issue_unrolled_operations_scalar_vector(addressers);
+            issue_unrolled_fmas_scalar_vector(addressers);
             return;
         }
 
@@ -1819,7 +1818,7 @@ private:
             p.second->loop_prologue();
         }
 
-        for (auto const& inst : operations)
+        for (auto const& inst : fmas)
         {
             strong_assert(is_inside_current_limits(inst.coordinates));
             queue.inc(inst.src1);
@@ -1940,9 +1939,9 @@ private:
                 break;
             }
 
-            std::vector<inner_operation> delayed_inner_operations;
+            std::vector<fma_operation> delayed_fma_operations;
 
-            for (auto it = operations.begin(); it != operations.end();)
+            for (auto it = fmas.begin(); it != fmas.end();)
             {
                 if (is_inside_current_limits(it->coordinates) &&
                     (it->src1 == addr || it->src2 == addr))
@@ -1956,12 +1955,12 @@ private:
 
                     queue.dec(src2);
 
-                    delayed_inner_operations.push_back(*it);
+                    delayed_fma_operations.push_back(*it);
 
                     LN_LOG(INFO) << tabs.back() << it->dest.readable()
                                  << " += " << it->src1.readable() << " * "
                                  << it->src2.readable() << "\n";
-                    it = operations.erase(it);
+                    it = fmas.erase(it);
                 }
                 else
                 {
@@ -1970,7 +1969,7 @@ private:
             }
 
             issue_delayed_ops[current % cycle] = [arg1_reg, addr,
-                                                  delayed_inner_operations,
+                                                  delayed_fma_operations,
                                                   &addressers,
                                                   ymm_temp_register,
                                                   ymm_tail_mask, ymm_full_mask,
@@ -1978,7 +1977,7 @@ private:
                                                   arg2_register,
                                                   &tensor_strides]() {
                 bool first = true;
-                for (auto const& op : delayed_inner_operations)
+                for (auto const& op : delayed_fma_operations)
                 {
                     auto src1 = op.src1;
                     auto src2 = op.src2;
@@ -2087,8 +2086,8 @@ private:
         }
     }
 
-    void issue_unrolled_operations(
-        std::vector<inner_operation>                          operations,
+    void issue_unrolled_fmas(
+        std::vector<fma_operation>                            fmas,
         std::map<int, std::shared_ptr<address_packer>> const& addressers)
     {
         std::optional<int> tail_mask;
@@ -2101,13 +2100,13 @@ private:
             }
         };
 
-        for (auto const& operation : operations)
+        for (auto const& fma : fmas)
         {
-            update_tail_mask(operation.src1.mask);
-            update_tail_mask(operation.src2.mask);
+            update_tail_mask(fma.src1.mask);
+            update_tail_mask(fma.src2.mask);
         }
 
-        issue_unrolled_operations(operations, addressers, tail_mask);
+        issue_unrolled_fmas(fmas, addressers, tail_mask);
     }
 
     void issue_embedded_constants()
@@ -2468,7 +2467,7 @@ private:
                             }) /
             C_traits.access_len;
 
-        std::int64_t total_required_inner_operations =
+        std::int64_t total_required_fma_operations =
             std::accumulate(padded_sizes.begin(), padded_sizes.end(),
                             (std::int64_t)1,
                             [&](std::int64_t v, auto const& s) {
@@ -2482,8 +2481,7 @@ private:
             vector_size;
 
         LN_LOG(DEBUG) << "REGS REQUIRED: " << registers_required
-                      << " OPERATIONS: " << total_required_inner_operations
-                      << "\n";
+                      << " FMAS: " << total_required_fma_operations << "\n";
 
         int first_loop_that_can_hold_C = 0;
 
@@ -2515,22 +2513,21 @@ private:
 
             if (it->first == vectorized_var)
             {
-                total_required_inner_operations /=
+                total_required_fma_operations /=
                     ceil_div(ranges[it->first].back(), vector_size);
-                total_required_inner_operations *= (it->second / vector_size);
+                total_required_fma_operations *= (it->second / vector_size);
             }
             else
             {
-                total_required_inner_operations /= ranges[it->first].back();
-                total_required_inner_operations *= it->second;
+                total_required_fma_operations /= ranges[it->first].back();
+                total_required_fma_operations *= it->second;
             }
 
             ++first_loop_that_can_hold_C;
 
             LN_LOG(DEBUG) << "    AT LOOP " << first_loop_that_can_hold_C
                           << " REGS REQUIRED: " << registers_required
-                          << " OPERATIONS: " << total_required_inner_operations
-                          << "\n";
+                          << " FMAS: " << total_required_fma_operations << "\n";
 
             ranges[it->first].push_back(it->second);
         }
@@ -2547,15 +2544,14 @@ private:
 
                 if (it->first == vectorized_var)
                 {
-                    total_required_inner_operations /=
-                        (it->second / vector_size);
-                    total_required_inner_operations *=
+                    total_required_fma_operations /= (it->second / vector_size);
+                    total_required_fma_operations *=
                         ceil_div(ranges[it->first].back(), vector_size);
                 }
                 else
                 {
-                    total_required_inner_operations /= it->second;
-                    total_required_inner_operations *= ranges[it->first].back();
+                    total_required_fma_operations /= it->second;
+                    total_required_fma_operations *= ranges[it->first].back();
                 }
 
                 --it;
@@ -2567,11 +2563,10 @@ private:
             auto pair = *it;
 
             int register_limit =
-                (it == it_end
-                     ? std::min(available_registers, max_operations_unrolled)
-                     : available_registers);
+                (it == it_end ? std::min(available_registers, max_fmas_unrolled)
+                              : available_registers);
 
-            // TODO(zi) MAYBE - increase max_operations_unrolled to
+            // TODO(zi) MAYBE - increase max_fmas_unrolled to
             // available_registers?  There's probably never need
             // to request smaller unroll amount than the number of
             // available registers.
@@ -2588,22 +2583,21 @@ private:
 
             if (it->first == vectorized_var)
             {
-                total_required_inner_operations /=
+                total_required_fma_operations /=
                     ceil_div(ranges[it->first].back(), vector_size);
-                total_required_inner_operations *= (it->second / vector_size);
+                total_required_fma_operations *= (it->second / vector_size);
             }
             else
             {
-                total_required_inner_operations /= ranges[it->first].back();
-                total_required_inner_operations *= it->second;
+                total_required_fma_operations /= ranges[it->first].back();
+                total_required_fma_operations *= it->second;
             }
 
             ++first_loop_that_can_hold_C;
 
             LN_LOG(DEBUG) << "REVISED AT LOOP " << first_loop_that_can_hold_C
                           << " REGS REQUIRED: " << registers_required
-                          << " OPERATIONS: " << total_required_inner_operations
-                          << "\n";
+                          << " FMAS: " << total_required_fma_operations << "\n";
 
             ranges[it->first].push_back(it->second);
 
@@ -2614,37 +2608,36 @@ private:
 
         it_end = --(order.end());
 
-        for (; total_required_inner_operations > max_operations_unrolled &&
-               it != it_end;
+        for (;
+             total_required_fma_operations > max_fmas_unrolled && it != it_end;
              ++it)
         {
             if (it->first == vectorized_var)
             {
-                total_required_inner_operations /=
+                total_required_fma_operations /=
                     ceil_div(ranges[it->first].back(), vector_size);
-                total_required_inner_operations *= (it->second / vector_size);
+                total_required_fma_operations *= (it->second / vector_size);
             }
             else
             {
-                total_required_inner_operations /= ranges[it->first].back();
-                total_required_inner_operations *= it->second;
+                total_required_fma_operations /= ranges[it->first].back();
+                total_required_fma_operations *= it->second;
             }
 
             ++first_unrolled_loop;
 
             LN_LOG(DEBUG) << "   AT LOOP " << first_unrolled_loop
-                          << " OPERATIONS: " << total_required_inner_operations
-                          << "\n";
+                          << " FMAS: " << total_required_fma_operations << "\n";
 
             ranges[it->first].push_back(it->second);
         }
 
-        if (total_required_inner_operations > max_operations_unrolled)
+        if (total_required_fma_operations > max_fmas_unrolled)
         {
             auto pair = *it;
 
-            pair.second = max_operations_unrolled * vector_size;
-            total_required_inner_operations = max_operations_unrolled;
+            pair.second                   = max_fmas_unrolled * vector_size;
+            total_required_fma_operations = max_fmas_unrolled;
             ++first_unrolled_loop;
 
             LN_LOG(DEBUG) << "INJECTING A LOOP (for unroll): " << pair.first
@@ -2654,11 +2647,11 @@ private:
         }
 
         return {first_loop_that_can_hold_C, first_unrolled_loop,
-                total_required_inner_operations};
+                total_required_fma_operations};
     }
 
     int assign_vmm_registers(int depth_for_register_blocked_C,
-                             int inner_operations)
+                             int inner_fma_operations)
     {
         auto collected_load_store =
             collect_default_loads_and_stores_at(depth_for_register_blocked_C);
@@ -2670,7 +2663,8 @@ private:
             int per_register = 1;
 
             if (collected_load_store.size() < available_registers &&
-                inner_operations > 48 && optim_config.split_vector_registers())
+                inner_fma_operations > 48 &&
+                optim_config.split_vector_registers())
             {
                 per_register =
                     available_registers / collected_load_store.size();
@@ -2732,7 +2726,7 @@ private:
     }
 
     std::tuple<int, int> lower_register_blocked_loop(int first_unrolled_loop,
-                                                     int inner_operations)
+                                                     int inner_fma_operations)
     {
         int first_loop_that_can_hold_C = first_unrolled_loop;
         while (first_loop_that_can_hold_C > 0 &&
@@ -2742,15 +2736,15 @@ private:
             // TODO(zi) check math
             auto const& loop      = loops[first_loop_that_can_hold_C];
             int         expansion = loop.end / loop.delta;
-            inner_operations *= expansion;
+            inner_fma_operations *= expansion;
         }
 
         LN_LOG(DEBUG) << "LOAD/STORE C MOVED TO LOOP: "
                       << first_loop_that_can_hold_C << " OVER "
                       << loops[first_loop_that_can_hold_C].var << " WITH "
-                      << inner_operations << " INNER operations\n";
+                      << inner_fma_operations << " INNER FMAs\n";
 
-        return {first_loop_that_can_hold_C, inner_operations};
+        return {first_loop_that_can_hold_C, inner_fma_operations};
     }
 
     std::map<int, std::shared_ptr<address_packer>> create_null_addressers()
@@ -2768,7 +2762,7 @@ private:
     }
 
     std::map<int, std::shared_ptr<address_packer>>
-    create_addressers(std::vector<inner_operation> unrolled_operations)
+    create_addressers(std::vector<fma_operation> unrolled_fmas)
     {
         if (!optim_config.use_address_packer())
         {
@@ -2794,9 +2788,9 @@ private:
         std::map<int, std::shared_ptr<address_packer>>      addressers;
         dabun::detail::most_frequent_queue<memory_argument> queue;
 
-        auto unrolled_operations_copy = unrolled_operations;
+        auto unrolled_fmas_copy = unrolled_fmas;
 
-        for (auto const& inst : unrolled_operations)
+        for (auto const& inst : unrolled_fmas)
         {
             queue.inc(inst.src1);
             queue.inc(inst.src2);
@@ -2808,8 +2802,8 @@ private:
 
             std::vector<address_load> addresses;
 
-            for (auto it = unrolled_operations_copy.begin();
-                 it != unrolled_operations_copy.end();)
+            for (auto it = unrolled_fmas_copy.begin();
+                 it != unrolled_fmas_copy.end();)
             {
                 if (it->src1 == addr || it->src2 == addr)
                 {
@@ -2826,7 +2820,7 @@ private:
                                          src2.traits->access_len,
                                          src2.traits->reg});
 
-                    it = unrolled_operations_copy.erase(it);
+                    it = unrolled_fmas_copy.erase(it);
                 }
                 else
                 {
@@ -2904,7 +2898,7 @@ private:
     }
 
     std::map<int, std::shared_ptr<address_packer>>
-    create_better_addressers(std::vector<inner_operation> unrolled_operations)
+    create_better_addressers(std::vector<fma_operation> unrolled_fmas)
     {
         if (!optim_config.use_address_packer())
         {
@@ -2915,25 +2909,21 @@ private:
 
         std::map<int, int> ranges;
 
-        for (auto const& operation : unrolled_operations)
+        for (auto const& fma : unrolled_fmas)
         {
-            ranges[operation.src1.traits->reg.getIdx()] =
-                std::max(ranges[operation.src1.traits->reg.getIdx()],
-                         operation.src1.offset * 4);
-            ranges[operation.src2.traits->reg.getIdx()] =
-                std::max(ranges[operation.src2.traits->reg.getIdx()],
-                         operation.src2.offset * 4);
+            ranges[fma.src1.traits->reg.getIdx()] = std::max(
+                ranges[fma.src1.traits->reg.getIdx()], fma.src1.offset * 4);
+            ranges[fma.src2.traits->reg.getIdx()] = std::max(
+                ranges[fma.src2.traits->reg.getIdx()], fma.src2.offset * 4);
         }
 
-        int  r1 = unrolled_operations[0].src1.traits->reg.getIdx();
-        bool is_r1_scalar =
-            unrolled_operations[0].src1.traits->access == SCALAR;
+        int  r1           = unrolled_fmas[0].src1.traits->reg.getIdx();
+        bool is_r1_scalar = unrolled_fmas[0].src1.traits->access == SCALAR;
 
         int r1_delta = is_r1_scalar ? 0x400 : 0x4000;
 
-        int  r2 = unrolled_operations[0].src2.traits->reg.getIdx();
-        bool is_r2_scalar =
-            unrolled_operations[0].src2.traits->access == SCALAR;
+        int  r2           = unrolled_fmas[0].src2.traits->reg.getIdx();
+        bool is_r2_scalar = unrolled_fmas[0].src2.traits->access == SCALAR;
 
         addressers[r1] = std::make_shared<null_address_packer>(this, Reg64(r1));
         addressers[r2] = std::make_shared<null_address_packer>(this, Reg64(r2));
@@ -2941,7 +2931,7 @@ private:
         int r2_delta = is_r2_scalar ? 0x400 : 0x4000;
 
         std::vector<Reg64> a1_regs{r8, r9, r10, r11};
-        std::vector<Reg64> a2_regs{r13, r14, r15, rbx};
+        std::vector<Reg64> a2_regs{r13, r14, r15};
 
         int r1_n = ((ranges[r1] - r1_delta / 2) / r1_delta);
         int r2_n = ((ranges[r2] - r2_delta / 2) / r2_delta);
@@ -2986,8 +2976,8 @@ private:
         LN_LOG(INFO) << tabs.back() << "// DEPTH: " << depth
                      << " MAX_ALPHA: " << max_alpha << "\n";
 
-        std::vector<inner_operation> unrolled_operations;
-        std::set<memory_argument>    collected_load_store;
+        std::vector<fma_operation> unrolled_fmas;
+        std::set<memory_argument>  collected_load_store;
 
         if (depth == depth_for_register_blocked_C)
         {
@@ -2997,8 +2987,8 @@ private:
 
         if (depth == unroll_stage)
         {
-            unrolled_operations = collect_unrolled_operations_below(depth);
-            issue_unrolled_operations(unrolled_operations, addressers);
+            unrolled_fmas = collect_unrolled_FMAs_below(depth);
+            issue_unrolled_fmas(unrolled_fmas, addressers);
         }
         else
         {
@@ -3080,6 +3070,8 @@ private:
             }
             else if (full_iterations == 1)
             {
+                std::cout << "HERHERHEREHREHR----------------------------------"
+                             "--------------------\n";
                 // --------------------------------------------------
                 // RECURSION
                 if (tail && depth < depth_for_register_blocked_C &&
@@ -3179,23 +3171,20 @@ private:
                           unroll_stage, addressers, true, 1, true);
     }
 
-    void
-    issue_unrolled_operations_dry_run(std::vector<inner_operation> operations,
-                                      int num_iterations)
+    void issue_unrolled_fmas_dry_run(std::vector<fma_operation> fmas,
+                                     int                        num_iterations)
     {
         // List of usages
 
-        int src1_reg = operations[0].src1.traits->reg.getIdx();
-        int src2_reg = operations[0].src2.traits->reg.getIdx();
+        int src1_reg = fmas[0].src1.traits->reg.getIdx();
+        int src2_reg = fmas[0].src2.traits->reg.getIdx();
 
         std::map<tensor_location_t, std::deque<int>> remaining_usages;
 
-        for (int i = 0; i < operations.size(); ++i)
+        for (int i = 0; i < fmas.size(); ++i)
         {
-            remaining_usages[{src1_reg, operations[i].src1.offset * 4}]
-                .push_back(i);
-            remaining_usages[{src2_reg, operations[i].src2.offset * 4}]
-                .push_back(i);
+            remaining_usages[{src1_reg, fmas[i].src1.offset * 4}].push_back(i);
+            remaining_usages[{src2_reg, fmas[i].src2.offset * 4}].push_back(i);
         }
 
         auto num_regs =
@@ -3349,12 +3338,10 @@ private:
             }
         };
 
-        for (int i = 0; i < operations.size(); ++i)
+        for (int i = 0; i < fmas.size(); ++i)
         {
-            tensor_location_t left_loc  = {src1_reg,
-                                          operations[i].src1.offset * 4};
-            tensor_location_t right_loc = {src2_reg,
-                                           operations[i].src2.offset * 4};
+            tensor_location_t left_loc  = {src1_reg, fmas[i].src1.offset * 4};
+            tensor_location_t right_loc = {src2_reg, fmas[i].src2.offset * 4};
 
             int needs_free_regs = 0;
 
@@ -3362,11 +3349,11 @@ private:
                 it == tensor_location_index.end() &&
                 remaining_usages[left_loc].size() == 1)
             {
-                if (operations[i].src1.traits->access != SCALAR ||
+                if (fmas[i].src1.traits->access != SCALAR ||
                     !std::is_same_v<ISA, avx2>)
                 {
                     std::swap(left_loc, right_loc);
-                    std::swap(operations[i].src1, operations[i].src2);
+                    std::swap(fmas[i].src1, fmas[i].src2);
                 }
             }
 
@@ -3384,9 +3371,9 @@ private:
                 }
             }
 
-            if (auto r = needs_a_reg(
-                    right_loc, operations[i].src2.traits->access != SCALAR ||
-                                   !std::is_same_v<ISA, avx2>);
+            if (auto r = needs_a_reg(right_loc,
+                                     fmas[i].src2.traits->access != SCALAR ||
+                                         !std::is_same_v<ISA, avx2>);
                 r.first)
             {
                 ++needs_free_regs;
@@ -3404,11 +3391,10 @@ private:
                 free_regs.push_back(free_a_register(to_avoid));
             }
 
-            maybe_issue_load(
-                left_loc, operations[i].src1.traits->access == SCALAR, false);
-            maybe_issue_load(right_loc,
-                             operations[i].src2.traits->access == SCALAR,
-                             operations[i].src2.traits->access != SCALAR ||
+            maybe_issue_load(left_loc, fmas[i].src1.traits->access == SCALAR,
+                             false);
+            maybe_issue_load(right_loc, fmas[i].src2.traits->access == SCALAR,
+                             fmas[i].src2.traits->access != SCALAR ||
                                  !std::is_same_v<ISA, avx2>);
 
             auto left_it  = tensor_location_index.find(left_loc);
@@ -3420,17 +3406,16 @@ private:
 
             if (right_it != tensor_location_index.end())
             {
-                instructions.push_back(fmla_instruction{
-                    (int)((C_VMMs[operations[i].dest]++).getIdx()),
-                    left_it->vmm_idx, right_it->vmm_idx});
+                instructions.push_back(
+                    fmla_instruction{(int)((C_VMMs[fmas[i].dest]++).getIdx()),
+                                     left_it->vmm_idx, right_it->vmm_idx});
             }
             else
             {
                 instructions.push_back(fmla_instruction{
-                    (int)((C_VMMs[operations[i].dest]++).getIdx()),
-                    left_it->vmm_idx,
+                    (int)((C_VMMs[fmas[i].dest]++).getIdx()), left_it->vmm_idx,
                     memory_src{right_loc.idx, right_loc.offset,
-                               operations[i].src2.traits->access == SCALAR}});
+                               fmas[i].src2.traits->access == SCALAR}});
             }
 
             mark_usage(left_loc);
@@ -3458,13 +3443,12 @@ private:
                     if (std::holds_alternative<fmla_instruction>(
                             instructions[pos - 1]))
                     {
-                        auto operation =
+                        auto fma =
                             std::get<fmla_instruction>(instructions[pos - 1]);
-                        if (load.vmm_idx != operation.left_src &&
+                        if (load.vmm_idx != fma.left_src &&
                             (std::holds_alternative<memory_src>(
-                                 operation.right_src) ||
-                             (std::get<int>(operation.right_src) !=
-                              load.vmm_idx)))
+                                 fma.right_src) ||
+                             (std::get<int>(fma.right_src) != load.vmm_idx)))
                         {
                             std::swap(instructions[pos], instructions[pos - 1]);
                         }
@@ -3491,13 +3475,12 @@ private:
     {
         LN_LOG(INFO) << tabs.back() << "// DRY_RUN DEPTH: " << depth << "\n";
 
-        std::vector<inner_operation> unrolled_operations;
+        std::vector<fma_operation> unrolled_fmas;
 
         if (depth == unroll_stage)
         {
-            unrolled_operations = collect_unrolled_operations_below(depth);
-            issue_unrolled_operations_dry_run(unrolled_operations,
-                                              num_iterations);
+            unrolled_fmas = collect_unrolled_FMAs_below(depth);
+            issue_unrolled_fmas_dry_run(unrolled_fmas, num_iterations);
         }
         else
         {
@@ -3670,7 +3653,7 @@ public:
         std::map<std::string, int> const&               A_strides,
         std::map<std::string, int> const&               B_strides,
         std::shared_ptr<operation_pair_base>            op_pair,
-        std::optional<int> user_operation_unroll_limit = std::nullopt,
+        std::optional<int> user_fma_unroll_limit = std::nullopt,
         std::shared_ptr<elementwise_operation<ISA>> elementwise_preop = nullptr,
         std::vector<std::map<std::string, int>> const&
                                                     elementwise_preop_strides = {},
@@ -3693,9 +3676,8 @@ public:
         , elementwise_preop_strides(elementwise_preop_strides)
         , elementwise_postop_strides(elementwise_postop_strides)
         , nest_depth(_order.size())
-        , max_operations_unrolled(user_operation_unroll_limit
-                                      ? *user_operation_unroll_limit
-                                      : default_max_operations_unrolled)
+        , max_fmas_unrolled(user_fma_unroll_limit ? *user_fma_unroll_limit
+                                                  : default_max_fmas_unrolled)
         , is_C_vectorized(C_strides.count(order.back().first) == 1)
         , is_A_vectorized(A_strides.count(order.back().first) == 1)
         , is_B_vectorized(B_strides.count(order.back().first) == 1)
@@ -3745,34 +3727,33 @@ public:
         initialize_elementwise_ops();
 
         int first_loop_that_can_hold_C, unroll_stage,
-            total_required_inner_operations;
+            total_required_fma_operations;
 
         std::tie(first_loop_that_can_hold_C, unroll_stage,
-                 total_required_inner_operations) = possibly_inject_a_loop();
+                 total_required_fma_operations) = possibly_inject_a_loop();
 
         initialize_loops_data();
 
         strong_assert(unroll_stage < loops.size());
 
         int depth_for_register_blocked_C = first_loop_that_can_hold_C;
-        int inner_operations             = total_required_inner_operations;
+        int inner_fma_operations         = total_required_fma_operations;
 
         if (first_loop_that_can_hold_C < unroll_stage)
         {
-            std::tie(depth_for_register_blocked_C, inner_operations) =
-                lower_register_blocked_loop(unroll_stage, inner_operations);
+            std::tie(depth_for_register_blocked_C, inner_fma_operations) =
+                lower_register_blocked_loop(unroll_stage, inner_fma_operations);
         }
 
-        first_unused_vmm_register =
-            assign_vmm_registers(first_loop_that_can_hold_C, inner_operations);
+        first_unused_vmm_register = assign_vmm_registers(
+            first_loop_that_can_hold_C, inner_fma_operations);
 
         //
 
-        std::vector<inner_operation> unrolled_operations =
-            collect_default_unrolled_operations_at(unroll_stage);
+        std::vector<fma_operation> unrolled_fmas =
+            collect_default_unrolled_FMAs_at(unroll_stage);
 
-        strong_assert(unrolled_operations.size() ==
-                      total_required_inner_operations);
+        strong_assert(unrolled_fmas.size() == total_required_fma_operations);
 
         std::map<int, std::shared_ptr<address_packer>> addressers;
 
@@ -3781,12 +3762,11 @@ public:
             (A_traits.access == VECTOR_PACKED &&
              B_traits.access == VECTOR_PACKED && C_traits.access != SCALAR))
         {
-            addressers =
-                create_better_addressers(std::move(unrolled_operations));
+            addressers = create_better_addressers(std::move(unrolled_fmas));
         }
         else
         {
-            addressers = create_addressers(std::move(unrolled_operations));
+            addressers = create_addressers(std::move(unrolled_fmas));
         }
 
         push({r15, r14, r13, r12, rbx});

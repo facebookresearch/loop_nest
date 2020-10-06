@@ -562,7 +562,8 @@ public:
         std::vector<loop_tree_fn_type> full_fns, tail_fns;
 
         report_vector report = {
-            std::make_shared<node_report>(for_loop_node_info{})};
+            std::make_shared<node_report>(for_loop_node_info{
+                1, 1, var, full + (rest ? 1 : 0), delta, limit})};
 
         auto s           = sizes;
         auto iter_depths = iteration_depths;
@@ -803,6 +804,7 @@ public:
                                           generated.get_C_access_kind()};
 
         auto aot_fn = std::move(generated).get_shared();
+        aot_fn.save_to_file("loop_nest.asm");
 
         if (spit_asm)
         {
@@ -813,12 +815,16 @@ public:
         auto inputs = this->inputs;
         auto alpha  = this->alpha;
 
-        int         last_iteration = 0;
-        auto const& output_strides = strides.at(output);
+        int         last_iteration  = 0;
+        auto const& output_strides  = strides.at(output);
+        auto const& input_0_strides = strides.at(inputs.at(0));
+        auto const& input_1_strides = strides.at(inputs.at(1));
 
         for (auto const& p : iteration_depths)
         {
-            if (output_strides.count(p.first) == 0)
+            if (output_strides.count(p.first) == 0 &&
+                (input_0_strides.count(p.first) &&
+                 input_1_strides.count(p.first)))
             {
                 last_iteration += p.second;
             }
@@ -835,7 +841,6 @@ public:
                         auto last_iter_mask =
                             alpha_offsets[output_idx] == last_iteration ? 0b0
                                                                         : 0b10;
-
                         auto param_mask =
                             ((alpha | alpha_offsets[output_idx]) ? 1 : 0) |
                             last_iter_mask;
@@ -1000,6 +1005,7 @@ public:
                           order, sizes, strides.at(output), strides.at(input),
                           64 /* unroll_limit */)
                           .get_shared();
+        aot_fn.save_to_file("transpose.asm");
 
         std::string asm_dump = "n/a";
 

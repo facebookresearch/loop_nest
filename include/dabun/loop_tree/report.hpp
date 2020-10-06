@@ -81,13 +81,15 @@ struct for_loop_node_info
     std::string const  var_name = "";
     std::int64_t const steps    = 0;
     std::int64_t const delta    = 0;
+    std::int64_t const size     = 0;
 
     std::string to_string() const
     {
         return std::string("for_loop - FLOPs: ") + std::to_string(flops) +
                ", effective FLOPs: " + std::to_string(effective_flops) +
-               ", var" + var_name + ", steps: " + std::to_string(steps) +
-               ", delta: " + std::to_string(delta);
+               ", var: " + var_name + ", steps: " + std::to_string(steps) +
+               ", delta: " + std::to_string(delta) +
+               ", size: " + std::to_string(size);
     }
 };
 
