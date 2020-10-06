@@ -293,8 +293,7 @@ public:
         report_vector report = {
             std::make_shared<node_report>(compute_node_info{})};
 
-        return {[inputs = this->inputs, output = this->output,
-                 alpha = this->alpha, input_idx_0 = tensors_idx.at(inputs[0]),
+        return {[alpha = this->alpha, input_idx_0 = tensors_idx.at(inputs[0]),
                  input_idx_1 = tensors_idx.at(inputs[1]),
                  output_idx =
                      tensors_idx.at(output)](std::vector<float*>& tensors,
@@ -479,8 +478,11 @@ private:
             {
                 std::int64_t offset =
                     in_scope_tensor_strides.at(name).at(var) * delta;
-                int idx = tensors_idx.at(name);
-                to_advance.push_back({idx, offset});
+                if (offset != 0)
+                {
+                    int idx = tensors_idx.at(name);
+                    to_advance.push_back({idx, offset});
+                }
             }
         }
 
@@ -559,11 +561,11 @@ public:
         int full = limit / delta;
         int rest = limit % delta;
 
-        std::vector<loop_tree_fn_type> full_fns, tail_fns;
-
         report_vector report = {
             std::make_shared<node_report>(for_loop_node_info{
                 1, 1, var, full + (rest ? 1 : 0), delta, limit})};
+
+        std::vector<loop_tree_fn_type> full_fns, tail_fns;
 
         auto s           = sizes;
         auto iter_depths = iteration_depths;
@@ -604,27 +606,28 @@ public:
         LN_LOG(DEBUG) << "loop_tree: Executing interpreted for(" << var << ","
                       << delta << ")\n";
 
-        return {
-            [=](std::vector<float*>& tensors, std::vector<int>& alpha_offsets) {
-                for (int i = 0; i < full; ++i)
-                {
-                    for (auto const& fn : full_fns)
+        return {[full, full_fns, advancer, alpha_offsets_adjuster,
+                 tail_fns](std::vector<float*>& tensors,
+                           std::vector<int>&    alpha_offsets) {
+                    for (int i = 0; i < full; ++i)
+                    {
+                        for (auto const& fn : full_fns)
+                        {
+                            fn(tensors, alpha_offsets);
+                        }
+                        advancer(tensors, 1);
+                        alpha_offsets_adjuster(alpha_offsets, 1);
+                    }
+
+                    for (auto const& fn : tail_fns)
                     {
                         fn(tensors, alpha_offsets);
                     }
-                    advancer(tensors, 1);
-                    alpha_offsets_adjuster(alpha_offsets, 1);
-                }
 
-                for (auto const& fn : tail_fns)
-                {
-                    fn(tensors, alpha_offsets);
-                }
-
-                advancer(tensors, -full);
-                alpha_offsets_adjuster(alpha_offsets, -full);
-            },
-            report};
+                    advancer(tensors, -full);
+                    alpha_offsets_adjuster(alpha_offsets, -full);
+                },
+                report};
     }
 };
 
@@ -795,14 +798,6 @@ public:
             asm_dump = ::dabun::detail::get_temporary_file_name(".asm");
         }
 
-        compiled_loop_nest_node_info info{generated.get_effective_flops() +
-                                              generated.get_masked_out_flops(),
-                                          generated.get_effective_flops(),
-                                          asm_dump,
-                                          generated.get_A_access_kind(),
-                                          generated.get_B_access_kind(),
-                                          generated.get_C_access_kind()};
-
         auto aot_fn = std::move(generated).get_shared();
         aot_fn.save_to_file("loop_nest.asm");
 
@@ -829,6 +824,22 @@ public:
                 last_iteration += p.second;
             }
         }
+
+        std::string extra_string =
+            std::string("alpha: ") + std::to_string(alpha) +
+            ", last_iteration: " + std::to_string(last_iteration) +
+            ", input_idx_0: " + std::to_string(tensors_idx.at(inputs[0])) +
+            ", input_idx_1: " + std::to_string(tensors_idx.at(inputs[1])) +
+            ", outut_idx: " + std::to_string(tensors_idx.at(output));
+
+        compiled_loop_nest_node_info info{generated.get_effective_flops() +
+                                              generated.get_masked_out_flops(),
+                                          generated.get_effective_flops(),
+                                          asm_dump,
+                                          generated.get_A_access_kind(),
+                                          generated.get_B_access_kind(),
+                                          generated.get_C_access_kind(),
+                                          extra_string};
 
         if (extra_tensors.size() == 0)
         {
@@ -1015,13 +1026,19 @@ public:
             aot_fn.save_to_file(asm_dump);
         }
 
-        return {
-            [aot_fn, output_idx = tensors_idx.at(output),
-             input_idx = tensors_idx.at(input)](std::vector<float*>& tensors,
-                                                std::vector<int>&) {
-                aot_fn(tensors[output_idx], tensors[input_idx]);
-            },
-            {std::make_shared<node_report>(compiled_transpose_node_info{})}};
+        std::string extra_string =
+            std::string("output_idx: ") +
+            std::to_string(tensors_idx.at(output)) +
+            ", input_idx: " + std::to_string(tensors_idx.at(input));
+
+        compiled_transpose_node_info info{0, 0, extra_string};
+
+        return {[aot_fn, output_idx = tensors_idx.at(output),
+                 input_idx = tensors_idx.at(input)](
+                    std::vector<float*>& tensors, std::vector<int>&) {
+                    aot_fn(tensors[output_idx], tensors[input_idx]);
+                },
+                {std::make_shared<node_report>(info)}};
     }
 
     std::set<std::string> get_tensors_used() const override
