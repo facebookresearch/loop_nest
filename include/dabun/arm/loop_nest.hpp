@@ -501,6 +501,7 @@ private:
                 if (to_skip_loads >= 0)
                 {
                     instructions.push_back(insn);
+                    continue;
                 }
             }
             if (std::holds_alternative<load_instruction>(insn))
