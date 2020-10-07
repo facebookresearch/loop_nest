@@ -3070,8 +3070,8 @@ private:
             }
             else if (full_iterations == 1)
             {
-                std::cout << "HERHERHEREHREHR----------------------------------"
-                             "--------------------\n";
+                // std::cout << "HERHERHEREHREHR----------------------------------"
+                //              "--------------------\n";
                 // --------------------------------------------------
                 // RECURSION
                 if (tail && depth < depth_for_register_blocked_C &&

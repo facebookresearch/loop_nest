@@ -111,8 +111,8 @@ private:
         {
             if (o.first == vectorized_var)
             {
-                std::cout << "VEK VAR: " << vectorized_var
-                          << " ----------------- " << o.second << "\n";
+                // std::cout << "VEK VAR: " << vectorized_var
+                //           << " ----------------- " << o.second << "\n";
                 assert(o.second == 1 || (o.second % vector_size == 0));
             }
         }
