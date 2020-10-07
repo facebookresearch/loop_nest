@@ -55,9 +55,9 @@ public:
     static double do_bench(int iterations = 10000000)
     {
         auto  fn = test(iterations).get_shared();
-        float data;
+        float data[1] = {0};
 
-        auto secs = measure_fastest([&]() { fn(&data); }, 100);
+        auto secs = measure_fastest([&]() { fn(data); }, 100);
 
         double gflops = 2.0 * iterations * 10 * (num_vector_regs - 2) *
                         vector_size / 1000000000;
