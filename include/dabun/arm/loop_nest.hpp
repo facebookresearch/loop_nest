@@ -460,30 +460,39 @@ private:
         }
     }
 
+    // The to_skip_loads can be used to possibly optimize for older ARMs, which
+    // need to issue parallel loads to W/X registers for higher load throighput
     std::vector<instruction_t>
-    cortex_a5X_optimized(std::vector<instruction_t> instructions_in)
+    reorder_instructions(std::vector<instruction_t> instructions_in,
+                         int                        to_skip_loads = 1000000000)
     {
-        for (auto& insn : instructions_in)
+        if constexpr (compiled_in_debug_mode)
         {
-            if (std::holds_alternative<load_instruction>(insn))
+            for (auto& insn : instructions_in)
             {
-                auto& load = std::get<load_instruction>(insn);
-                strong_assert(load.vreg > -1 && load.vreg < 32);
+                if (std::holds_alternative<load_instruction>(insn))
+                {
+                    auto& load = std::get<load_instruction>(insn);
+                    assert(load.vreg > -1 && load.vreg < 32);
+                }
             }
         }
+
         pair_loads(instructions_in);
-        for (auto& insn : instructions_in)
+
+        if constexpr (compiled_in_debug_mode)
         {
-            if (std::holds_alternative<load_instruction>(insn))
+            for (auto& insn : instructions_in)
             {
-                auto& load = std::get<load_instruction>(insn);
-                strong_assert(load.vreg > -1 && load.vreg < 32);
+                if (std::holds_alternative<load_instruction>(insn))
+                {
+                    auto& load = std::get<load_instruction>(insn);
+                    assert(load.vreg > -1 && load.vreg < 32);
+                }
             }
         }
 
         std::vector<instruction_t> instructions;
-
-        int to_skip_loads = 10000000;
 
         for (auto& insn : instructions_in)
         {
@@ -540,12 +549,15 @@ private:
             }
         }
 
-        for (auto& insn : instructions)
+        if constexpr (compiled_in_debug_mode)
         {
-            if (std::holds_alternative<load_instruction>(insn))
+            for (auto& insn : instructions)
             {
-                auto& load = std::get<load_instruction>(insn);
-                strong_assert(load.vreg > -1 && load.vreg < 32);
+                if (std::holds_alternative<load_instruction>(insn))
+                {
+                    auto& load = std::get<load_instruction>(insn);
+                    assert(load.vreg > -1 && load.vreg < 32);
+                }
             }
         }
 
@@ -3323,7 +3335,7 @@ private:
         // move_loads(instructions);
         // pair_loads(instructions);
 
-        instructions = cortex_a5X_optimized(std::move(instructions));
+        instructions = reorder_instructions(std::move(instructions));
 
         print_instructions(instructions);
 

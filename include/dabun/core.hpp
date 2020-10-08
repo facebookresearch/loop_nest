@@ -17,6 +17,12 @@
 namespace dabun
 {
 
+#ifndef NDEBUG
+inline constexpr bool compiled_in_debug_mode = true;
+#else
+inline constexpr bool compiled_in_debug_mode = false;
+#endif
+
 // FROM: https://en.cppreference.com/w/cpp/utility/variant/visit
 
 template <class... Ts>
