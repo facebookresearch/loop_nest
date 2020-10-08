@@ -473,7 +473,7 @@ private:
                 if (std::holds_alternative<load_instruction>(insn))
                 {
                     auto& load = std::get<load_instruction>(insn);
-                    assert(load.vreg > -1 && load.vreg < 32);
+                    strong_assert(load.vreg > -1 && load.vreg < 32);
                 }
             }
         }
@@ -487,7 +487,7 @@ private:
                 if (std::holds_alternative<load_instruction>(insn))
                 {
                     auto& load = std::get<load_instruction>(insn);
-                    assert(load.vreg > -1 && load.vreg < 32);
+                    strong_assert(load.vreg > -1 && load.vreg < 32);
                 }
             }
         }
@@ -556,7 +556,7 @@ private:
                 if (std::holds_alternative<load_instruction>(insn))
                 {
                     auto& load = std::get<load_instruction>(insn);
-                    assert(load.vreg > -1 && load.vreg < 32);
+                    strong_assert(load.vreg > -1 && load.vreg < 32);
                 }
             }
         }
@@ -1912,7 +1912,8 @@ private:
     }
 
     void issue_unrolled_operations_vector_vector(
-        std::vector<operation_operation> operations)
+        std::vector<operation_operation> operations,
+        std::function<void()> const&     epilogue_fn)
     {
         auto instructions = std::move(instruction_IRs.front());
         instruction_IRs.pop_front();
@@ -2110,10 +2111,13 @@ private:
         {
             sadd_imm(XReg(offs.first), -offs.second);
         }
+
+        epilogue_fn();
     }
 
     void issue_unrolled_operations_scalar_scalar(
-        std::vector<operation_operation> operations)
+        std::vector<operation_operation> operations,
+        std::function<void()> const&     epilogue_fn)
     {
         auto instructions = std::move(instruction_IRs.front());
         instruction_IRs.pop_front();
@@ -2181,10 +2185,13 @@ private:
         {
             sadd_imm(XReg(offs.first), -offs.second);
         }
+
+        epilogue_fn();
     }
 
     void issue_unrolled_operations_scalar_vector(
-        std::vector<operation_operation> operations)
+        std::vector<operation_operation> /* operations */,
+        std::function<void()> const& epilogue_fn)
     {
 
         auto instructions = std::move(instruction_IRs.front());
@@ -2195,8 +2202,36 @@ private:
         mov(tmpBReg_, BReg_);
         mov(tmpAReg_, AReg_);
 
+        int till_epilogue = static_cast<int>(instructions.size());
+
+        while (till_epilogue > 0 && (std::holds_alternative<fmla_instruction>(
+                                         instructions[till_epilogue - 1]) ||
+                                     std::holds_alternative<std::monostate>(
+                                         instructions[till_epilogue - 1])))
+        {
+            --till_epilogue;
+        }
+
+        auto full_epilogue = [&]() {
+            for (auto const& offs : tensor_offsets)
+            {
+                if (offs.first == BReg_.getIdx() ||
+                    offs.first == AReg_.getIdx())
+                {
+                    sadd_imm(XReg(offs.first), -offs.second);
+                }
+            }
+
+            epilogue_fn();
+        };
+
         for (auto const& insn : instructions)
         {
+            if (till_epilogue-- == 0)
+            {
+                full_epilogue();
+            }
+
             std::visit(
                 overloaded{
                     [&](load_pair_instruction const& i) {
@@ -2370,25 +2405,24 @@ private:
                 insn);
         }
 
-        print_instructions(instructions);
-
-        for (auto const& offs : tensor_offsets)
+        if (till_epilogue == 0)
         {
-            if (offs.first == BReg_.getIdx() || offs.first == AReg_.getIdx())
-            {
-                sadd_imm(XReg(offs.first), -offs.second);
-            }
+            full_epilogue();
         }
+
+        print_instructions(instructions);
     }
 
-    void issue_unrolled_operations(std::vector<operation_operation> operations)
+    void issue_unrolled_operations(std::vector<operation_operation> operations,
+                                   std::function<void()> const&     epilogue_fn)
     {
         if (operations.size())
         {
             if (operations[0].src1.traits->access == SCALAR &&
                 operations[0].src2.traits->access == VECTOR_PACKED)
             {
-                issue_unrolled_operations_scalar_vector(std::move(operations));
+                issue_unrolled_operations_scalar_vector(std::move(operations),
+                                                        epilogue_fn);
                 return;
             }
             else if (operations[0].src1.traits->access == VECTOR_PACKED &&
@@ -2398,18 +2432,21 @@ private:
                 {
                     std::swap(f.src1, f.src2);
                 }
-                issue_unrolled_operations_scalar_vector(std::move(operations));
+                issue_unrolled_operations_scalar_vector(std::move(operations),
+                                                        epilogue_fn);
                 return;
             }
             else if (operations[0].src1.traits->access == VECTOR_PACKED &&
                      operations[0].src2.traits->access == VECTOR_PACKED)
             {
-                issue_unrolled_operations_vector_vector(std::move(operations));
+                issue_unrolled_operations_vector_vector(std::move(operations),
+                                                        epilogue_fn);
                 return;
             }
             else
             {
-                issue_unrolled_operations_scalar_scalar(std::move(operations));
+                issue_unrolled_operations_scalar_scalar(std::move(operations),
+                                                        epilogue_fn);
                 return;
             }
         }
@@ -2819,10 +2856,11 @@ private:
         return {first_loop_that_can_hold_C, innermost_operations};
     }
 
-    void issue_loop_helper(int depth, bool save_loop, bool save_ptrs,
-                           int depth_for_register_blocked_C, int unroll_stage,
-                           bool issue_first_alpha_logic, int max_alpha,
-                           bool issue_max_alpha_logic)
+    void issue_loop_helper(
+        int depth, bool save_loop, bool save_ptrs,
+        int depth_for_register_blocked_C, int unroll_stage,
+        bool issue_first_alpha_logic, int max_alpha, bool issue_max_alpha_logic,
+        std::function<void()> epilogue_fn = []() {})
     {
         LN_LOG(INFO) << tabs.back() << "// DEPTH: " << depth
                      << " MAX_ALPHA: " << max_alpha << "\n";
@@ -2839,7 +2877,16 @@ private:
         if (depth == unroll_stage)
         {
             unrolled_operations = collect_unrolled_operations_below(depth);
-            issue_unrolled_operations(unrolled_operations);
+
+            if (depth != depth_for_register_blocked_C)
+            {
+                issue_unrolled_operations(unrolled_operations, epilogue_fn);
+                epilogue_fn = []() {};
+            }
+            else
+            {
+                issue_unrolled_operations(unrolled_operations, []() {});
+            }
         }
         else
         {
@@ -2903,29 +2950,34 @@ private:
                     new_max_alpha += (full_iterations - 1 + (tail ? 1 : 0)) * 2;
                 }
 
+                auto next_epilogue_fn = [&]() {
+                    advance_pointers(loop.var, loop.delta);
+
+                    if (depth < depth_for_register_blocked_C &&
+                        C_formula.count(loop.var) == 0)
+                    {
+                        add_imm(alpha_reg_, 2);
+                    }
+
+                    sub_imm(loop_reg, 1);
+                    cmp(loop_reg, 0);
+                };
+
                 limits[loop.var].push_back(loop.delta);
                 tabs.push_back(tabs.back() + "    ");
-                issue_loop_helper(depth + 1, true, true,
-                                  depth_for_register_blocked_C, unroll_stage,
-                                  issue_first_alpha_logic, new_max_alpha,
-                                  recursive_issue_max_alpha_logic);
+                issue_loop_helper(
+                    depth + 1, true, true, depth_for_register_blocked_C,
+                    unroll_stage, issue_first_alpha_logic, new_max_alpha,
+                    recursive_issue_max_alpha_logic /*, next_epilogue_fn*/);
                 tabs.pop_back();
                 limits[loop.var].pop_back();
                 // --------------------------------------------------
                 // RECURSION
 
-                advance_pointers(loop.var, loop.delta);
+                next_epilogue_fn();
 
-                if (depth < depth_for_register_blocked_C &&
-                    C_formula.count(loop.var) == 0)
-                {
-                    add_imm(alpha_reg_, 2);
-                }
-
-                Label doneLabel;
-
-                sub_imm(loop_reg, 1);
-                cbnz(loop_reg, *loopLabel);
+                // cbnz(loop_reg, *loopLabel);
+                b(Xbyak::NE, *loopLabel);
             }
             else if (full_iterations == 1)
             {
@@ -3015,6 +3067,8 @@ private:
             {
                 pop_pointers(loop.var);
             }
+
+            epilogue_fn();
         }
 
         if (depth == depth_for_register_blocked_C)
@@ -3022,6 +3076,8 @@ private:
             issue_C_stores(collected_load_store, max_alpha,
                            issue_max_alpha_logic);
         }
+
+        epilogue_fn();
     }
 
     void issue_loops(int depth_for_register_blocked_C, int unroll_stage)
