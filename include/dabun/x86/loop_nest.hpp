@@ -3070,7 +3070,8 @@ private:
             }
             else if (full_iterations == 1)
             {
-                // std::cout << "HERHERHEREHREHR----------------------------------"
+                // std::cout <<
+                // "HERHERHEREHREHR----------------------------------"
                 //              "--------------------\n";
                 // --------------------------------------------------
                 // RECURSION
@@ -3172,7 +3173,7 @@ private:
     }
 
     void issue_unrolled_fmas_dry_run(std::vector<fma_operation> fmas,
-                                     int                        num_iterations)
+                                     int /* num_iterations */)
     {
         // List of usages
 

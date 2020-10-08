@@ -126,9 +126,9 @@ private:
     std::optional<OptimizationConfiguration> optim_config;
 
 public:
-    std::string dump(formulas_map_type const&          formulas,
-                     std::map<std::string, int> const& sizes,
-                     std::string const&                indent) const override
+    std::string dump(formulas_map_type const& formulas,
+                     std::map<std::string, int> const& /* sizes */,
+                     std::string const& indent) const override
     {
         std::ostringstream ss;
         ss << indent << "Interpreted Compute Node" << std::endl;
@@ -270,7 +270,7 @@ public:
 
     std::pair<loop_tree_fn_type, report_vector>
     get_fn(std::map<std::string, int> const& tensors_idx,
-           std::map<std::string, int> const& sizes,
+           std::map<std::string, int> const& /* sizes */,
            std::map<std::string, int> const& /* iteration_depths */,
            formulas_map_type const&, bool) const override
     {
@@ -343,9 +343,9 @@ private:
     std::optional<int> unroll_limit;
 
 public:
-    std::string dump(formulas_map_type const&          formulas,
-                     std::map<std::string, int> const& sizes,
-                     std::string const&                indent) const override
+    std::string dump(formulas_map_type const& /* formulas */,
+                     std::map<std::string, int> const& /* sizes */,
+                     std::string const& indent) const override
     {
         std::ostringstream ss;
         ss << indent << "Interpreted transpose" << std::endl;
@@ -435,9 +435,9 @@ private:
     strides_map_type      in_scope_tensor_strides;
 
 public:
-    std::string dump(formulas_map_type const&          formulas,
-                     std::map<std::string, int> const& sizes,
-                     std::string const&                indent) const override
+    std::string dump(formulas_map_type const& /* formulas */,
+                     std::map<std::string, int> const& /* sizes */,
+                     std::string const& indent) const override
     {
         std::ostringstream ss;
         ss << indent << "Interpreted For Node" << std::endl;
@@ -951,7 +951,7 @@ private:
     std::optional<int>                       unroll_limit;
 
 public:
-    std::string dump(formulas_map_type const&          formulas,
+    std::string dump(formulas_map_type const& /* formulas */,
                      std::map<std::string, int> const& sizes,
                      std::string const&                indent) const override
     {
@@ -1008,7 +1008,8 @@ public:
     std::pair<loop_tree_fn_type, report_vector>
     get_fn(std::map<std::string, int> const& tensors_idx,
            std::map<std::string, int> const& sizes,
-           std::map<std::string, int> const&, formulas_map_type const& formulas,
+           std::map<std::string, int> const&,
+           formulas_map_type const& /* formulas */,
            bool spit_asm) const override
     {
         auto aot_fn = transposer_code_generator<std::conditional_t<

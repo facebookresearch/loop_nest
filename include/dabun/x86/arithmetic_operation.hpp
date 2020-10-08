@@ -5,6 +5,7 @@
 #include "dabun/x86/xbyak.hpp"
 
 #include "dabun/common.hpp"
+#include "dabun/core.hpp"
 #include "dabun/isa.hpp"
 
 #include <cstdint>
@@ -19,7 +20,7 @@ namespace x86
 class basic_plus
 {
 public:
-    void issue_epilogue(Xbyak::CodeGenerator& cg)
+    void issue_epilogue(Xbyak::CodeGenerator& /* cg */)
     {
         // do nothing
     }
@@ -42,7 +43,7 @@ public:
 class duplicate_base_plus
 {
 public:
-    void issue_epilogue(Xbyak::CodeGenerator& cg)
+    void issue_epilogue(Xbyak::CodeGenerator& /* cg */)
     {
         // do nothing
     }
@@ -205,10 +206,10 @@ private:
     }
 
     template <class RegType>
-    void fuse_(Xbyak::CodeGenerator& cg, const RegType& dest,
-               const RegType& op1, const Xbyak::Operand& op2) const
+    void fuse_(Xbyak::CodeGenerator& /* cg */, const RegType& /* dest */,
+               const RegType& /* op1 */, const Xbyak::Operand& /* op2 */) const
     {
-        assert(false);
+        strong_assert(false);
     }
 
 public:

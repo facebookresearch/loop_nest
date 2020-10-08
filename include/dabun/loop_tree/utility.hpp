@@ -87,7 +87,7 @@ inline std::string dump_tensors(std::vector<std::string> const& tensors,
     std::ostringstream ss;
     for (auto const& i : tensors)
     {
-        ss << i << " ";
+        ss << indent << i << " ";
     }
     ss << std::endl;
     return ss.str();

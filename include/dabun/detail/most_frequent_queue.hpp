@@ -74,7 +74,7 @@ private:
         (*where)[s].insert(v);
     }
 
-    void pop_or_skip(map_t* where) {}
+    void pop_or_skip(map_t* /* where */) {}
 
 public:
     std::size_t size() const { return sorted_.size(); }

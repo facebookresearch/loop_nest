@@ -352,8 +352,8 @@ private:
     std::map<std::string, int> const&        sizes;
 
     std::set<std::string> const& C_formula;
-    std::set<std::string> const& A_formula;
-    std::set<std::string> const& B_formula;
+    // std::set<std::string> const& A_formula;
+    // std::set<std::string> const& B_formula;
 
     std::map<std::string, int> C_strides;
     std::map<std::string, int> A_strides;
@@ -633,6 +633,7 @@ private:
 
         int pattern_idx = 0;
 
+        // TODO, what should this eyeballed var be?
         constexpr int load_delay = 16;
 
         std::map<int, std::vector<std::function<void()>>> to_enqueue;
@@ -1054,18 +1055,6 @@ private:
                 process(std::get<load_wreg_instruction>(insn));
             }
         }
-    }
-
-    bool
-    is_inside_current_limits(std::map<std::string, int> const& coordinate) const
-    {
-        bool is_inside = true;
-        for (auto const& [var, val] : coordinate)
-        {
-            is_inside =
-                is_inside && limits.count(var) && (val < limits.at(var).back());
-        }
-        return is_inside;
     }
 
     int get_cursor_offset(std::map<std::string, int> const& strides)
@@ -1705,7 +1694,7 @@ private:
         }
     }
 
-    void issue_C_elementwise_preop(std::set<memory_argument> const& loads)
+    void issue_C_elementwise_preop(std::set<memory_argument> const& /* loads */)
     {
         switch (C_traits.access)
         {
@@ -1752,8 +1741,8 @@ private:
     }
 
     void issue_C_stores(std::set<memory_argument> const& stores,
-                        std::optional<int> tail_mask, int max_alpha,
-                        bool issue_max_alpha_logic)
+                        std::optional<int> /* tail_mask */, int max_alpha,
+                        bool /* issue_max_alpha_logic */)
     {
         std::vector<memory_argument> ordered_stores;
 
@@ -1912,15 +1901,37 @@ private:
     }
 
     void issue_unrolled_operations_vector_vector(
-        std::vector<operation_operation> operations)
+        std::vector<operation_operation> const& /* operations */,
+        std::function<void()> const& update_fn = std::function<void()>())
     {
         auto instructions = std::move(instruction_IRs.front());
         instruction_IRs.pop_front();
 
         std::map<int, int> tensor_offsets;
 
+        int until_update = instructions.size();
+        while ((until_update > 0) && (std::holds_alternative<fmla_instruction>(
+                                          instructions[until_update - 1]) ||
+                                      std::holds_alternative<std::monostate>(
+                                          instructions[until_update - 1])))
+        {
+            --until_update;
+        }
+
         for (auto const& insn : instructions)
         {
+            if (until_update-- == 0)
+            {
+                for (auto const& offs : tensor_offsets)
+                {
+                    sadd_imm(XReg(offs.first), -offs.second);
+                }
+                if (update_fn)
+                {
+                    update_fn();
+                }
+            }
+
             std::visit(
                 overloaded{
                     [&](load_pair_instruction const& i) {
@@ -2106,22 +2117,51 @@ private:
 
         print_instructions(instructions);
 
-        for (auto const& offs : tensor_offsets)
+        if (until_update == 0)
         {
-            sadd_imm(XReg(offs.first), -offs.second);
+            for (auto const& offs : tensor_offsets)
+            {
+                sadd_imm(XReg(offs.first), -offs.second);
+            }
+            if (update_fn)
+            {
+                update_fn();
+            }
         }
     }
 
     void issue_unrolled_operations_scalar_scalar(
-        std::vector<operation_operation> operations)
+        std::vector<operation_operation> const& /* operations */,
+        std::function<void()> const& update_fn = std::function<void()>())
     {
         auto instructions = std::move(instruction_IRs.front());
         instruction_IRs.pop_front();
 
         std::map<int, int> tensor_offsets;
 
+        int until_update = instructions.size();
+        while ((until_update > 0) && (std::holds_alternative<fmla_instruction>(
+                                          instructions[until_update - 1]) ||
+                                      std::holds_alternative<std::monostate>(
+                                          instructions[until_update - 1])))
+        {
+            --until_update;
+        }
+
         for (auto const& insn : instructions)
         {
+            if (until_update-- == 0)
+            {
+                for (auto const& offs : tensor_offsets)
+                {
+                    sadd_imm(XReg(offs.first), -offs.second);
+                }
+                if (update_fn)
+                {
+                    update_fn();
+                }
+            }
+
             std::visit(
                 overloaded{
                     [&](load_pair_instruction const& i) {
@@ -2177,14 +2217,22 @@ private:
 
         print_instructions(instructions);
 
-        for (auto const& offs : tensor_offsets)
+        if (until_update == 0)
         {
-            sadd_imm(XReg(offs.first), -offs.second);
+            for (auto const& offs : tensor_offsets)
+            {
+                sadd_imm(XReg(offs.first), -offs.second);
+            }
+            if (update_fn)
+            {
+                update_fn();
+            }
         }
     }
 
     void issue_unrolled_operations_scalar_vector(
-        std::vector<operation_operation> operations)
+        std::vector<operation_operation> const& /* operations */,
+        std::function<void()> const& update_fn = std::function<void()>())
     {
 
         auto instructions = std::move(instruction_IRs.front());
@@ -2195,8 +2243,33 @@ private:
         mov(tmpBReg_, BReg_);
         mov(tmpAReg_, AReg_);
 
+        int until_update = instructions.size();
+        while ((until_update > 0) && (std::holds_alternative<fmla_instruction>(
+                                          instructions[until_update - 1]) ||
+                                      std::holds_alternative<std::monostate>(
+                                          instructions[until_update - 1])))
+        {
+            --until_update;
+        }
+
         for (auto const& insn : instructions)
         {
+            if (until_update-- == 0)
+            {
+                for (auto const& offs : tensor_offsets)
+                {
+                    if (offs.first == BReg_.getIdx() ||
+                        offs.first == AReg_.getIdx())
+                    {
+                        sadd_imm(XReg(offs.first), -offs.second);
+                    }
+                }
+                if (update_fn)
+                {
+                    update_fn();
+                }
+            }
+
             std::visit(
                 overloaded{
                     [&](load_pair_instruction const& i) {
@@ -2372,23 +2445,34 @@ private:
 
         print_instructions(instructions);
 
-        for (auto const& offs : tensor_offsets)
+        if (until_update == 0)
         {
-            if (offs.first == BReg_.getIdx() || offs.first == AReg_.getIdx())
+            for (auto const& offs : tensor_offsets)
             {
-                sadd_imm(XReg(offs.first), -offs.second);
+                if (offs.first == BReg_.getIdx() ||
+                    offs.first == AReg_.getIdx())
+                {
+                    sadd_imm(XReg(offs.first), -offs.second);
+                }
+            }
+            if (update_fn)
+            {
+                update_fn();
             }
         }
     }
 
-    void issue_unrolled_operations(std::vector<operation_operation> operations)
+    void issue_unrolled_operations(
+        std::vector<operation_operation> operations,
+        std::function<void()> const&     update_fn = std::function<void()>())
     {
         if (operations.size())
         {
             if (operations[0].src1.traits->access == SCALAR &&
                 operations[0].src2.traits->access == VECTOR_PACKED)
             {
-                issue_unrolled_operations_scalar_vector(std::move(operations));
+                issue_unrolled_operations_scalar_vector(std::move(operations),
+                                                        update_fn);
                 return;
             }
             else if (operations[0].src1.traits->access == VECTOR_PACKED &&
@@ -2398,18 +2482,21 @@ private:
                 {
                     std::swap(f.src1, f.src2);
                 }
-                issue_unrolled_operations_scalar_vector(std::move(operations));
+                issue_unrolled_operations_scalar_vector(std::move(operations),
+                                                        update_fn);
                 return;
             }
             else if (operations[0].src1.traits->access == VECTOR_PACKED &&
                      operations[0].src2.traits->access == VECTOR_PACKED)
             {
-                issue_unrolled_operations_vector_vector(std::move(operations));
+                issue_unrolled_operations_vector_vector(std::move(operations),
+                                                        update_fn);
                 return;
             }
             else
             {
-                issue_unrolled_operations_scalar_scalar(std::move(operations));
+                issue_unrolled_operations_scalar_scalar(std::move(operations),
+                                                        update_fn);
                 return;
             }
         }
@@ -2819,10 +2906,11 @@ private:
         return {first_loop_that_can_hold_C, innermost_operations};
     }
 
-    void issue_loop_helper(int depth, bool save_loop, bool save_ptrs,
-                           int depth_for_register_blocked_C, int unroll_stage,
-                           bool issue_first_alpha_logic, int max_alpha,
-                           bool issue_max_alpha_logic)
+    void issue_loop_helper(
+        int depth, bool save_loop, bool save_ptrs,
+        int depth_for_register_blocked_C, int unroll_stage,
+        bool issue_first_alpha_logic, int max_alpha, bool issue_max_alpha_logic,
+        std::function<void()> const& update_fn = std::function<void()>())
     {
         LN_LOG(INFO) << tabs.back() << "// DEPTH: " << depth
                      << " MAX_ALPHA: " << max_alpha << "\n";
@@ -2839,7 +2927,7 @@ private:
         if (depth == unroll_stage)
         {
             unrolled_operations = collect_unrolled_operations_below(depth);
-            issue_unrolled_operations(unrolled_operations);
+            issue_unrolled_operations(unrolled_operations, update_fn);
         }
         else
         {
@@ -2895,6 +2983,19 @@ private:
                 auto loopLabel = make_label();
                 L_aarch64(*loopLabel);
 
+                auto to_perfrom_at_tail = [&]() {
+                    advance_pointers(loop.var, loop.delta);
+
+                    if (depth < depth_for_register_blocked_C &&
+                        C_formula.count(loop.var) == 0)
+                    {
+                        add_imm(alpha_reg_, 2);
+                    }
+
+                    sub_imm(loop_reg, 1);
+                    cmp(loop_reg, 0);
+                };
+
                 // --------------------------------------------------
                 // RECURSION
                 if (depth < depth_for_register_blocked_C &&
@@ -2905,27 +3006,16 @@ private:
 
                 limits[loop.var].push_back(loop.delta);
                 tabs.push_back(tabs.back() + "    ");
-                issue_loop_helper(depth + 1, true, true,
-                                  depth_for_register_blocked_C, unroll_stage,
-                                  issue_first_alpha_logic, new_max_alpha,
-                                  recursive_issue_max_alpha_logic);
+                issue_loop_helper(
+                    depth + 1, true, true, depth_for_register_blocked_C,
+                    unroll_stage, issue_first_alpha_logic, new_max_alpha,
+                    recursive_issue_max_alpha_logic, to_perfrom_at_tail);
                 tabs.pop_back();
                 limits[loop.var].pop_back();
                 // --------------------------------------------------
                 // RECURSION
 
-                advance_pointers(loop.var, loop.delta);
-
-                if (depth < depth_for_register_blocked_C &&
-                    C_formula.count(loop.var) == 0)
-                {
-                    add_imm(alpha_reg_, 2);
-                }
-
-                Label doneLabel;
-
-                sub_imm(loop_reg, 1);
-                cbnz(loop_reg, *loopLabel);
+                b(Xbyak::NE, *loopLabel);
             }
             else if (full_iterations == 1)
             {
@@ -3014,6 +3104,11 @@ private:
             if (multiple_iterations && save_ptrs)
             {
                 pop_pointers(loop.var);
+            }
+
+            if (update_fn)
+            {
+                update_fn();
             }
         }
 
@@ -3776,11 +3871,11 @@ public:
         std::vector<std::pair<std::string, int>> const& _order,
         std::map<std::string, int> const&               sizes,
         std::set<std::string> const&                    C_formula,
-        std::set<std::string> const&                    A_formula,
-        std::set<std::string> const&                    B_formula,
-        std::map<std::string, int> const&               C_strides,
-        std::map<std::string, int> const&               A_strides,
-        std::map<std::string, int> const&               B_strides,
+        std::set<std::string> const& /* A_formula */,
+        std::set<std::string> const& /* B_formula */,
+        std::map<std::string, int> const& C_strides,
+        std::map<std::string, int> const& A_strides,
+        std::map<std::string, int> const& B_strides,
         std::shared_ptr<operation_pair_base> /*op_pair */,
         std::optional<int> user_operation_unroll_limit = std::nullopt,
         std::shared_ptr<elementwise_operation<aarch64>> /* elementwise_preop
@@ -3799,8 +3894,8 @@ public:
         : order(_order)
         , sizes(sizes)
         , C_formula(C_formula)
-        , A_formula(A_formula)
-        , B_formula(B_formula)
+        // , A_formula(A_formula)
+        // , B_formula(B_formula)
         , C_strides(C_strides)
         , A_strides(A_strides)
         , B_strides(B_strides)
