@@ -11,10 +11,10 @@ namespace arm
 {
 
 template <class ISA>
-struct gflops_benchmark;
+struct bench_gflops;
 
 template <>
-struct gflops_benchmark<aarch64>
+struct bench_gflops<aarch64>
 {
 private:
     static constexpr int vector_size = isa_traits<aarch64>::vector_size;
@@ -60,7 +60,7 @@ public:
     {
         auto fn = test().get_shared();
 
-        auto secs = measure_fastest([&]() { fn(&data); }, 100);
+        auto secs = measure_fastest([&]() { fn(iterations); }, 100);
 
         double gflops =
             2.0 * iterations * 10 * (16 + 6) * vector_size / 1000000000;
