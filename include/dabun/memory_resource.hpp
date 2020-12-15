@@ -83,11 +83,11 @@ public:
         std::size_t const aligned_mask = ALIGN_PAGE_SIZE - 1;
         size                           = (size + aligned_mask) & ~aligned_mask;
 
-#ifdef DABUN_POSSIBLY_USE_MAP_JIT
-        int const mojave_cersion = 18;
+#if defined(__APPLE__)
         int const mode =
             MAP_PRIVATE | MAP_ANONYMOUS |
-            (detail::get_macOS_version() >= mojaveVersion ? MAP_JIT : 0);
+            ((detail::get_macOS_version() >= detail::mojave_version ? MAP_JIT
+                                                                    : 0));
 #else
         int const mode = MAP_PRIVATE | MAP_ANONYMOUS;
 #endif
@@ -160,17 +160,16 @@ inline memory_resource* memory_resource::default_resource()
 {
     static malloc_memory_resource malloc_resource;
 
-#ifdef DABUN_POSSIBLY_USE_MAP_JIT
+#if defined(__APPLE__)
+    static mmap_memory_resource mmap_resource;
+    if (detail::get_macOS_version() >= detail::mojave_version)
+    {
 
-    static malloc_memory_resource mmap_resource;
-    return (detail::get_macOS_version() >= mojaveVersion) ? &mmap_resource
-                                                          : &malloc_resource;
-
-#else
+        return &mmap_resource;
+    }
+#endif
 
     return &malloc_resource;
-
-#endif
 }
 
 } // namespace dabun
