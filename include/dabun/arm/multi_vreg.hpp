@@ -110,6 +110,7 @@ public:
         assert(size_ == 1);
         if (mask == 3)
         {
+            // x4/w4 is zero reg by convention in the loop_nest.hpp
             code_generator.ins(VReg(first_).s4[3], code_generator.w4);
         }
         if (mask > 2)

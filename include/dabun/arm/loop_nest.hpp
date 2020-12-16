@@ -1637,11 +1637,6 @@ private:
 
     void issue_C_loads(std::set<memory_argument> const& loads)
     {
-        for (auto& CVmm : C_VMMs)
-        {
-            CVmm.second.reset();
-        }
-
         std::vector<memory_argument> ordered_loads;
         for (auto const& c : loads)
         {
@@ -1722,6 +1717,11 @@ private:
     void issue_C_loads(std::set<memory_argument> const& loads,
                        bool                             issue_first_alpha_logic)
     {
+        for (auto& CVmm : C_VMMs)
+        {
+            CVmm.second.reset();
+        }
+
         if (issue_first_alpha_logic)
         {
             auto loadDataLabel = make_label();
@@ -1785,7 +1785,11 @@ private:
 
         for (auto const& c : ordered_stores)
         {
-            LN_LOG(INFO) << tabs.back() << "STORE " << c.readable() << "\n";
+            LN_LOG(INFO) << tabs.back() << "STORE " << c.readable() << " [["
+                         << C_VMMs[c][0].getIdx() << "-"
+                         << C_VMMs[c][0].getIdx() + C_VMMs[c].size() - 1
+                         << "]]\n";
+
             C_VMMs[c].reduce(*this);
         }
         for (auto const& c : ordered_stores)
@@ -2773,16 +2777,14 @@ private:
             int next         = auxiliary_registers;
             int per_register = 1;
 
-            if (collected_load_store.size() < available_registers &&
-                innermost_operations > 100)
+            int target_regs_for_C = 16;
+
+            if (collected_load_store.size() < target_regs_for_C &&
+                innermost_operations > 6 * collected_load_store.size())
             {
                 per_register =
-                    available_registers / collected_load_store.size();
-                per_register = std::min(per_register, 3);
+                    target_regs_for_C / collected_load_store.size();
             }
-
-            // TODO(ZI) REMOVE
-            per_register = 1;
 
             for (auto const& c : collected_load_store)
             {
