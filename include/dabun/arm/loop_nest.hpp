@@ -59,7 +59,7 @@ private:
     using base =
         code_generator<void(float* C, float const* A, float const* B, int)>;
     using Vmm         = VReg;
-    using multi_vregs = multi_vreg<Vmm>;
+    using multi_vregs = multi_vreg<Vmm, Xbyak_aarch64::HReg>;
 
     static constexpr int vector_size = isa_traits<aarch64>::vector_size;
 
@@ -1790,13 +1790,13 @@ private:
                          << C_VMMs[c][0].getIdx() + C_VMMs[c].size() - 1
                          << "]]\n";
 
-            C_VMMs[c].reduce(*this);
+            C_VMMs[c].reduce<float>(*this);
         }
         for (auto const& c : ordered_stores)
         {
             if (C_traits.access == SCALAR && vectorized_var != "NONE")
             {
-                C_VMMs[c].full_reduce(*this, 4);
+                C_VMMs[c].full_reduce<float>(*this, 4);
             }
         }
 

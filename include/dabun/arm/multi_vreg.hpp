@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cassert>
+#include <type_traits>
 
 namespace dabun
 {
@@ -13,7 +14,7 @@ namespace arm
 // which are reduced to a single one at the end.  Each of the size_
 // registers is independent of all the other ones.
 
-template <class VReg>
+template <class VReg, class HReg>
 class multi_vreg
 {
 private:
@@ -81,47 +82,104 @@ public:
 
     VReg first() const { return VReg(first_); }
 
-    template <class Code_Generator>
+    template <class Float, class Code_Generator>
     void half(Code_Generator& code_generator)
     {
+        static_assert(std::is_same_v<Float, float> ||
+                      std::is_same_v<Float, fp16>);
+
         int h = (size_ + 1) / 2;
         for (int i = 0; i + h < size_; ++i)
         {
-            code_generator.fadd(VReg(first_ + i).s4, VReg(first_ + i).s4,
-                                VReg(first_ + i + h).s4);
+            if constexpr (std::is_same_v<Float, float>)
+            {
+                code_generator.fadd(VReg(first_ + i).s4, VReg(first_ + i).s4,
+                                    VReg(first_ + i + h).s4);
+            }
+            else if constexpr (std::is_same_v<Float, fp16>)
+            {
+                code_generator.fadd(VReg(first_ + i).h8, VReg(first_ + i).h8,
+                                    VReg(first_ + i + h).h8);
+            }
         }
         size_    = h;
         current_ = 0;
     }
 
-    template <class Code_Generator>
+    template <class Float, class Code_Generator>
     void reduce(Code_Generator& code_generator)
     {
+        static_assert(std::is_same_v<Float, float> ||
+                      std::is_same_v<Float, fp16>);
+
         while (size_ > 1)
         {
-            half(code_generator);
+            half<Float>(code_generator);
         }
     }
 
-    template <class Code_Generator>
-    void full_reduce(Code_Generator& code_generator, int mask = 4)
+    template <class Float, class Code_Generator>
+    void full_reduce(Code_Generator& code_generator, int mask = 4,
+                     int zero_vector = 0)
     {
-        reduce(code_generator);
+        static_assert(std::is_same_v<Float, float> ||
+                      std::is_same_v<Float, fp16>);
+
+        reduce<Float>(code_generator);
         assert(size_ == 1);
-        if (mask == 3)
+
+        if constexpr (std::is_same_v<Float, float>)
         {
-            // x4/w4 is zero reg by convention in the loop_nest.hpp
-            code_generator.ins(VReg(first_).s4[3], code_generator.w4);
+            if (mask == 3)
+            {
+                // x4/w4 is zero reg by convention in the loop_nest.hpp
+                code_generator.ins(VReg(first_).s4[3], code_generator.w4);
+            }
+            if (mask > 2)
+            {
+                code_generator.faddp(VReg(first_).s4, VReg(first_).s4,
+                                     VReg(first_).s4);
+            }
+            if (mask > 1)
+            {
+                code_generator.faddp(VReg(first_).s2, VReg(first_).s2,
+                                     VReg(first_).s2);
+            }
         }
-        if (mask > 2)
+        else if constexpr (std::is_same_v<Float, fp16>)
         {
-            code_generator.faddp(VReg(first_).s4, VReg(first_).s4,
-                                 VReg(first_).s4);
-        }
-        if (mask > 1)
-        {
-            code_generator.faddp(VReg(first_).s2, VReg(first_).s2,
-                                 VReg(first_).s2);
+            switch (mask)
+            {
+            case 3:
+                code_generator.ins(VReg(first_).h8[3], VReg(zero_vector).h8[3]);
+                break;
+            case 5:
+                code_generator.ins(VReg(first_).h8[5], VReg(zero_vector).h8[5]);
+                // fallthrough
+            case 6:
+                code_generator.ins(VReg(first_).s4[3], code_generator.w4);
+                break;
+            case 7:
+                code_generator.ins(VReg(first_).h8[7], VReg(zero_vector).h8[7]);
+                break;
+            default:
+                break;
+            }
+
+            if (mask > 4)
+            {
+                code_generator.faddp(VReg(first_).h8, VReg(first_).h8,
+                                     VReg(first_).h8);
+            }
+            if (mask > 2)
+            {
+                code_generator.faddp(VReg(first_).h4, VReg(first_).h4,
+                                     VReg(first_).h4);
+            }
+            if (mask > 1)
+            {
+                code_generator.faddp(HReg(first_), VReg(first_).h2);
+            }
         }
     }
 };
