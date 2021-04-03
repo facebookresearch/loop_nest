@@ -9,8 +9,6 @@
 
 namespace dabun
 {
-namespace amx
-{
 
 template <bool IsSigned>
 class qvec4
@@ -110,5 +108,17 @@ using uint8x4_t = qvec4<false>;
 static_assert(sizeof(int8x4_t) == 4);
 static_assert(sizeof(uint8x4_t) == 4);
 
-} // namespace amx
+template <class>
+struct is_qvec4 : std::false_type
+{
+};
+
+template <bool IsSigned>
+struct is_qvec4<qvec4<IsSigned>> : std::true_type
+{
+};
+
+template <class T>
+inline constexpr bool is_qvec4_v = is_qvec4<T>::value;
+
 } // namespace dabun
