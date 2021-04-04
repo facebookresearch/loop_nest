@@ -5,6 +5,7 @@
 #include "dabun/code_generator.hpp"
 
 #include <cstddef>
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <set>
@@ -32,12 +33,12 @@ namespace x86
 
 template <class AType, class BType = AType>
 class amx_loop_nest_code_generator_impl
-    : public code_generator<void(void* C, void const* A, void const* B,
-                                 int alpha)>
+    : public code_generator<void(std::int32_t* C, AType const* A,
+                                 BType const* B, int alpha)>
 {
 private:
-    using base =
-        code_generator<void(float* C, float const* A, float const* B, int)>;
+    using base = code_generator<void(std::int32_t* C, AType const* A,
+                                     BType const* B, int alpha)>;
 
 public:
     amx_loop_nest_code_generator_impl(

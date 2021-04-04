@@ -1,3 +1,5 @@
+// Copyright 2004-present Facebook. All Rights Reserved.
+
 #pragma once
 
 #include <array>
@@ -11,7 +13,7 @@ namespace dabun
 {
 
 template <bool IsSigned>
-class qvec4
+class alignas(std::int32_t) qvec4
 {
 public:
     using value_type = std::conditional_t<IsSigned, std::int8_t, std::uint8_t>;

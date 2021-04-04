@@ -1,7 +1,7 @@
-#include "dabun/bf16x2.hpp"
 #include "dabun/code_generator.hpp"
 #include "dabun/isa.hpp"
 #include "dabun/qvec4.hpp"
+#include "dabun/bf16x2.hpp"
 
 #include "dabun/random_vector.hpp"
 
@@ -36,8 +36,7 @@ inline void print_tile_config(tile_config_t const& tc)
     }
 }
 
-class test
-    : public dabun::code_generator<void(void*, void*, void*, void*, void*)>
+class test : public dabun::code_generator<void(void*, void*, void*, void*, void*)>
 {
 public:
     test()
@@ -51,7 +50,7 @@ public:
         tileloadd(tmm1, ptr[rsi + rax * 1]);
         tileloadd(tmm2, ptr[rdx + rax * 1]);
 
-        tdpbuud(tmm0, tmm1, tmm2);
+        tdpbf16ps(tmm0, tmm1, tmm2);
 
         // ldtilecfg(ptr[r8]);
 
@@ -78,12 +77,12 @@ int main()
 
     std::cout << l << "\n";
 
-    auto t = test().get_shared();
+    auto          t = test().get_shared();
 
-    auto A  = dabun::get_random_vector<dabun::uint8x4_t>(16 * 16);
-    auto B  = dabun::get_random_vector<dabun::uint8x4_t>(16 * 16);
-    auto CJ = dabun::get_zero_vector<std::int32_t>(16 * 16);
-    auto CN = dabun::get_zero_vector<std::int32_t>(16 * 16);
+    auto A  = dabun::get_random_vector<dabun::bf16x2_t>(16 * 16);
+    auto B  = dabun::get_random_vector<dabun::bf16x2_t>(16 * 16);
+    auto CJ = dabun::get_zero_vector<float>(16 * 16);
+    auto CN = dabun::get_zero_vector<float>(16 * 16);
 
     for (int m = 0; m < 16; ++m)
     {
