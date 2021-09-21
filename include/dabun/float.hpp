@@ -1,5 +1,7 @@
 #pragma once
 
+#include <type_traits>
+
 namespace dabun
 {
 
@@ -18,6 +20,11 @@ struct printable_fp<double>
     using type = float;
 };
 
+template <class>
+struct is_fp16_t : std::false_type
+{
+};
+
 #if defined(__aarch64__)
 
 using fp16 = _Float16;
@@ -28,7 +35,15 @@ struct printable_fp<fp16>
     using type = float;
 };
 
+template <>
+struct is_fp16_t<fp16> : std::true_type
+{
+};
+
 #endif
+
+template <class T>
+inline constexpr bool is_fp16_v = is_fp16_t<T>::value;
 
 template <class Float>
 using printable_fp_t = typename printable_fp<Float>::type;

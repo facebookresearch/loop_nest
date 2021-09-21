@@ -88,7 +88,7 @@ public:
 
 static_assert(sizeof(bf16x2_t) == 4);
 
-inline constexpr float fma(bf16x2_t left, bf16x2_t right, float v)
+inline constexpr float fmadd(bf16x2_t left, bf16x2_t right, float v)
 {
     for (std::size_t i = 0; i < 2; ++i)
     {
@@ -99,7 +99,7 @@ inline constexpr float fma(bf16x2_t left, bf16x2_t right, float v)
 
 inline constexpr float dot(bf16x2_t left, bf16x2_t right)
 {
-    return fma(left, right, 0.f);
+    return fmadd(left, right, 0.f);
 }
 
 template <class CharT, class Traits>
