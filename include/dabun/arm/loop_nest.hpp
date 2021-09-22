@@ -1,3 +1,5 @@
+// Copyright 2004-present Facebook. All Rights Reserved.
+
 #pragma once
 
 #include "dabun/arm/arithmetic_operation.hpp"
@@ -382,6 +384,8 @@ private:
     tensor_traits A_traits;
     tensor_traits B_traits;
 
+    std::shared_ptr<elementwise_operation<aarch64>> postop;
+
     // The name of the variable in the innermost loop (along which the
     // vectorization is performed)
     std::string vectorized_var;
@@ -516,7 +520,7 @@ private:
             if (std::holds_alternative<load_instruction>(insn))
             {
                 auto& load = std::get<load_instruction>(insn);
-                if (load.num_lanes == 3)
+                if (load.num_lanes < vector_size)
                 {
                     load.num_lanes = 2;
                     instructions.push_back(load);
@@ -796,6 +800,10 @@ private:
         }
     }
 
+    // We have available instructions that can load two vectors at the
+    // same time, given that they are consecutive in memory. On newer
+    // ARM processors, this operations are optimized - so we can merge
+    // loads of consecutive vectors
     static void
     pair_loads(std::vector<instruction_t>& instructions,
                int max_total_paired = std::numeric_limits<int>::max())
@@ -842,7 +850,7 @@ private:
                                     next_load.vreg != load.vreg &&
                                     next_load.tensor_location.offset ==
                                         load.tensor_location.offset +
-                                            load.num_lanes * 4)
+                                            load.num_lanes * vector_size)
                                 {
                                     mappings.erase(m.first);
                                     ++num_possibly_paired;
@@ -910,7 +918,7 @@ private:
                                     next_load.vreg != load.vreg &&
                                     next_load.tensor_location.offset ==
                                         load.tensor_location.offset +
-                                            load.num_lanes * 4)
+                                            load.num_lanes * vector_size)
                                 {
                                     if (cur_pos++ > to_skip)
                                     {
@@ -1388,7 +1396,7 @@ private:
                 LN_LOG(INFO)
                     << tabs.back() << ptr.name << "(X" << ptr.reg.getIdx()
                     << ") += " << delta << " * " << ptr.strides.at(dim) << "\n";
-                add_imm(ptr.reg, ptr.strides.at(dim) * delta * 4);
+                add_imm(ptr.reg, ptr.strides.at(dim) * delta * vector_size);
             }
         }
     };
@@ -1438,36 +1446,6 @@ private:
         else
         {
             str(SReg(vreg.s4.getIdx()), ptr(base));
-        }
-
-        if (offset)
-        {
-            sub_imm(base, offset);
-        }
-        if (increment)
-        {
-            add_imm(base, increment);
-        }
-    }
-
-    void broadcast_scalar(VReg const& vreg, Reg64 const& base, int offset,
-                          int mask = vector_size, int increment = 0)
-    {
-        if (offset)
-        {
-            add_imm(base, offset);
-        }
-
-        if (mask == 4)
-        {
-            ld1r(vreg.s4, ptr(base));
-        }
-        else
-        {
-            for (int i = 0; i < mask; ++i)
-            {
-                ld1(vreg.s[i], ptr(base));
-            }
         }
 
         if (offset)
@@ -1662,7 +1640,7 @@ private:
 
         mov(tmpCReg_, CReg_);
         strong_assert(ordered_loads.size());
-        add_imm(tmpCReg_, ordered_loads.front().offset * 4);
+        add_imm(tmpCReg_, ordered_loads.front().offset * vector_size);
 
         for (auto const& c : ordered_loads)
         {
@@ -1672,7 +1650,7 @@ private:
             auto incr = 0;
             if (incrs.size())
             {
-                incr = incrs.front() * 4;
+                incr = incrs.front() * vector_size;
                 incrs.erase(incrs.begin());
             }
 
@@ -1688,7 +1666,7 @@ private:
 
             case VECTOR_STRIDED:
                 gather_vector(C_VMMs[c][0], tmpCReg_, 0, c.mask,
-                              C_traits.innermost_stride * 4, incr);
+                              C_traits.innermost_stride * vector_size, incr);
                 break;
             }
 
@@ -1781,7 +1759,7 @@ private:
 
         mov(tmpCReg_, CReg_);
         strong_assert(ordered_stores.size());
-        add_imm(tmpCReg_, ordered_stores.front().offset * 4);
+        add_imm(tmpCReg_, ordered_stores.front().offset * vector_size);
 
         for (auto const& c : ordered_stores)
         {
@@ -1845,7 +1823,7 @@ private:
                 auto incr = 0;
                 if (incrs.size())
                 {
-                    incr = incrs.front() * 4;
+                    incr = incrs.front() * vector_size;
                     incrs.erase(incrs.begin());
                 }
 
@@ -1861,7 +1839,8 @@ private:
 
                 case VECTOR_STRIDED:
                     scatter_vector(C_VMMs[c][0], tmpCReg_, 0, c.mask,
-                                   C_traits.innermost_stride * 4, incr);
+                                   C_traits.innermost_stride * vector_size,
+                                   incr);
                     break;
                 }
             }
@@ -1875,7 +1854,7 @@ private:
                 auto incr = 0;
                 if (incrs.size())
                 {
-                    incr = incrs.front() * 4;
+                    incr = incrs.front() * vector_size;
                     incrs.erase(incrs.begin());
                 }
 
@@ -1891,7 +1870,8 @@ private:
 
                 case VECTOR_STRIDED:
                     scatter_vector(C_VMMs[c][0], tmpCReg_, 0, c.mask,
-                                   C_traits.innermost_stride * 4, incr);
+                                   C_traits.innermost_stride * vector_size,
+                                   incr);
                     break;
                 }
             }
@@ -1950,10 +1930,16 @@ private:
                             switch (i.num_lanes)
                             {
                             case 1:
+                                strong_assert(
+                                    false && "Num of lanes not supported here");
+
                                 ldp(SReg(i.vreg1), SReg(i.vreg2),
                                     post_ptr(XReg(ptr_reg_idx), delta));
                                 break;
                             case 2:
+                                strong_assert(
+                                    false && "Num of lanes not supported here");
+
                                 ldp(DReg(i.vreg1), DReg(i.vreg2),
                                     post_ptr(XReg(ptr_reg_idx), delta));
                                 break;
@@ -2782,8 +2768,7 @@ private:
             if (collected_load_store.size() < target_regs_for_C &&
                 innermost_operations > 6 * collected_load_store.size())
             {
-                per_register =
-                    target_regs_for_C / collected_load_store.size();
+                per_register = target_regs_for_C / collected_load_store.size();
             }
 
             for (auto const& c : collected_load_store)
@@ -3124,9 +3109,11 @@ private:
 
         for (int i = 0; i < operations.size(); ++i)
         {
-            remaining_usages[{src1_reg, operations[i].src1.offset * 4}]
+            remaining_usages[{src1_reg,
+                              operations[i].src1.offset * vector_size}]
                 .push_back(i);
-            remaining_usages[{src2_reg, operations[i].src2.offset * 4}]
+            remaining_usages[{src2_reg,
+                              operations[i].src2.offset * vector_size}]
                 .push_back(i);
         }
 
@@ -3267,10 +3254,10 @@ private:
 
         for (int i = 0; i < operations.size(); ++i)
         {
-            tensor_location_t scalar_loc = {src1_reg,
-                                            operations[i].src1.offset * 4};
-            tensor_location_t vector_loc = {src2_reg,
-                                            operations[i].src2.offset * 4};
+            tensor_location_t scalar_loc = {
+                src1_reg, operations[i].src1.offset * vector_size};
+            tensor_location_t vector_loc = {
+                src2_reg, operations[i].src2.offset * vector_size};
 
             int           needs_free_regs = 0;
             std::set<int> to_avoid;
@@ -3304,7 +3291,7 @@ private:
                 it == tensor_location_index.end())
             {
                 load_scalar(free_regs.front(), src1_reg,
-                            operations[i].src1.offset * 4);
+                            operations[i].src1.offset * vector_size);
                 free_regs.pop_front();
 
                 strong_assert(tensor_location_index.find(scalar_loc) !=
@@ -3315,7 +3302,7 @@ private:
                 it == tensor_location_index.end())
             {
                 load_vector(free_regs.front(), src2_reg,
-                            operations[i].src2.offset * 4);
+                            operations[i].src2.offset * vector_size);
                 free_regs.pop_front();
 
                 strong_assert(tensor_location_index.find(vector_loc) !=
@@ -3412,9 +3399,11 @@ private:
 
         for (int i = 0; i < operations.size(); ++i)
         {
-            remaining_usages[{src1_reg, operations[i].src1.offset * 4}]
+            remaining_usages[{src1_reg,
+                              operations[i].src1.offset * vector_size}]
                 .push_back(i);
-            remaining_usages[{src2_reg, operations[i].src2.offset * 4}]
+            remaining_usages[{src2_reg,
+                              operations[i].src2.offset * vector_size}]
                 .push_back(i);
         }
 
@@ -3538,10 +3527,10 @@ private:
 
         for (int i = 0; i < operations.size(); ++i)
         {
-            tensor_location_t first_loc  = {src1_reg,
-                                           operations[i].src1.offset * 4};
-            tensor_location_t second_loc = {src2_reg,
-                                            operations[i].src2.offset * 4};
+            tensor_location_t first_loc = {src1_reg, operations[i].src1.offset *
+                                                         vector_size};
+            tensor_location_t second_loc = {
+                src2_reg, operations[i].src2.offset * vector_size};
 
             int           needs_free_regs = 0;
             std::set<int> to_avoid;
@@ -3575,7 +3564,7 @@ private:
                 it == tensor_location_index.end())
             {
                 load_vector(free_regs.front(), src1_reg,
-                            operations[i].src1.offset * 4,
+                            operations[i].src1.offset * vector_size,
                             operations[i].src1.mask);
                 free_regs.pop_front();
 
@@ -3587,7 +3576,7 @@ private:
                 it == tensor_location_index.end())
             {
                 load_vector(free_regs.front(), src2_reg,
-                            operations[i].src2.offset * 4,
+                            operations[i].src2.offset * vector_size,
                             operations[i].src2.mask);
                 free_regs.pop_front();
 
@@ -3790,13 +3779,11 @@ private:
                 B_memory_approx += (s.second - 1) * B_strides.at(s.first);
         }
         // in bytes
-        C_memory_     = C_memory_approx * 4;
-        A_memory_     = A_memory_approx * 4;
-        B_memory_     = B_memory_approx * 4;
+        C_memory_     = C_memory_approx * vector_size;
+        A_memory_     = A_memory_approx * vector_size;
+        B_memory_     = B_memory_approx * vector_size;
         total_memory_ = C_memory_ + A_memory_ + B_memory_;
     }
-
-    std::shared_ptr<elementwise_operation<aarch64>> postop;
 
     std::vector<Reg64> prepare_loop_registers(int unroll_stage)
     {

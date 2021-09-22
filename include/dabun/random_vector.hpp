@@ -158,4 +158,18 @@ decltype(auto) get_zero_vector(unsigned size, unsigned extra_elements = 16)
                                                                 extra_elements);
 }
 
+template <class To, class From>
+auto aligned_vector_cast(aligned_vector<From> const& from)
+    -> std::enable_if_t<std::is_convertible_v<From, To>, aligned_vector<To>>
+{
+    aligned_vector<To> ret(from.size());
+
+    for (std::size_t i = 0; i < from.size(); ++i)
+    {
+        ret[i] = static_cast<To>(from[i]);
+    }
+
+    return ret;
+}
+
 } // namespace dabun

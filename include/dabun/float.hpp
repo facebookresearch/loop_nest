@@ -25,7 +25,8 @@ struct is_fp16_t : std::false_type
 {
 };
 
-#if defined(__aarch64__)
+#if defined(__aarch64__) // Should also somehow detect whether _Float16 is
+                         // available
 
 using fp16 = _Float16;
 

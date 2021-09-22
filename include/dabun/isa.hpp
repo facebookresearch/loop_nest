@@ -63,6 +63,7 @@ struct isa_traits<aarch64>
     static constexpr int total_vector_registers = 32;
     static constexpr int vector_register_mask   = 0;
     static constexpr int vector_size            = 4;
+    static constexpr int fp16_vector_size       = 2;
 };
 
 } // namespace dabun

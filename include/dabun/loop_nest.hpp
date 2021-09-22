@@ -6,6 +6,7 @@
 
 #if defined(DABUN_ARM)
 #include "dabun/arm/loop_nest.hpp"
+#include "dabun/arm/loop_nest_fp16.hpp"
 #else
 #include "dabun/x86/loop_nest.hpp"
 #endif
