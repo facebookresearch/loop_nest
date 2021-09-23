@@ -9,13 +9,40 @@ namespace dabun
 {
 
 template <class Float>
+void apply_relu(Float* Begin, Float* End)
+{
+    for (; Begin != End; ++Begin)
+    {
+        if constexpr (std::is_same_v<Float, fp16>)
+        {
+            *Begin = static_cast<fp16>(
+                std::max(static_cast<float>(0), static_cast<float>(*Begin)));
+        }
+        else
+        {
+            *Begin = std::max(static_cast<Float>(0), *Begin);
+        }
+    }
+}
+
+template <class Float>
 printable_fp_t<Float> max_abs_difference(Float const* LBegin, Float const* LEnd,
                                          Float const* RBegin)
 {
     Float res = 0;
     for (; LBegin != LEnd; ++LBegin, ++RBegin)
     {
-        res = std::max(res, std::abs(*LBegin - *RBegin));
+        if constexpr (std::is_same_v<Float, fp16>)
+        {
+            res = static_cast<fp16>(
+                std::max(static_cast<float>(res),
+                         std::abs(static_cast<float>(*LBegin) -
+                                  static_cast<float>(*RBegin))));
+        }
+        else
+        {
+            res = std::max(res, std::abs(*LBegin - *RBegin));
+        }
     }
     return printable(res);
 }

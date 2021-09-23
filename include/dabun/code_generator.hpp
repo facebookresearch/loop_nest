@@ -139,6 +139,7 @@ public:
     using Reg64 = Xbyak::XReg;
     using Label = Xbyak::LabelAArch64;
     using VReg  = Xbyak::VReg;
+    using HReg  = Xbyak::HReg;
     using SReg  = Xbyak::SReg;
     using DReg  = Xbyak::DReg;
     using QReg  = Xbyak::QReg;

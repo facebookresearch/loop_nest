@@ -63,6 +63,8 @@ private:
     using Vmm         = VReg;
     using multi_vregs = multi_vreg<Vmm, Xbyak_aarch64::HReg>;
 
+    static constexpr int bytes_per_float = 4;
+
     static constexpr int vector_size = isa_traits<aarch64>::vector_size;
 
     // https://stackoverflow.com/questions/27941220/push-lr-and-pop-lr-in-arm-arch64
@@ -850,7 +852,7 @@ private:
                                     next_load.vreg != load.vreg &&
                                     next_load.tensor_location.offset ==
                                         load.tensor_location.offset +
-                                            load.num_lanes * vector_size)
+                                            load.num_lanes * bytes_per_float)
                                 {
                                     mappings.erase(m.first);
                                     ++num_possibly_paired;
@@ -918,7 +920,7 @@ private:
                                     next_load.vreg != load.vreg &&
                                     next_load.tensor_location.offset ==
                                         load.tensor_location.offset +
-                                            load.num_lanes * vector_size)
+                                            load.num_lanes * bytes_per_float)
                                 {
                                     if (cur_pos++ > to_skip)
                                     {
@@ -1396,7 +1398,7 @@ private:
                 LN_LOG(INFO)
                     << tabs.back() << ptr.name << "(X" << ptr.reg.getIdx()
                     << ") += " << delta << " * " << ptr.strides.at(dim) << "\n";
-                add_imm(ptr.reg, ptr.strides.at(dim) * delta * vector_size);
+                add_imm(ptr.reg, ptr.strides.at(dim) * delta * bytes_per_float);
             }
         }
     };
@@ -1466,36 +1468,31 @@ private:
             add_imm(base, offset);
         }
 
-        if (mask == vector_size || mask == 3)
-        {
+        strong_assert(mask > 0 && mask <= vector_size);
+
+        auto issue_the_load_instruction = [&](auto const& r) {
             if (increment && increment < 256)
             {
-                ldr(QReg(vreg.s4.getIdx()), post_ptr(base, increment));
+                ldr(r, post_ptr(base, increment));
                 increment = 0;
             }
             else
             {
-                ldr(QReg(vreg.s4.getIdx()), ptr(base));
+                ldr(r, ptr(base));
             }
-        }
-        else if (mask == 2)
+        };
+
+        if (mask > 2)
         {
-            ldr(DReg(vreg.s4.getIdx()), ptr(base));
+            issue_the_load_instruction(QReg(vreg.s4.getIdx()));
         }
-        else if (mask == 1)
+        else if (mask > 1)
         {
-            ldr(SReg(vreg.s4.getIdx()), ptr(base));
+            issue_the_load_instruction(DReg(vreg.s4.getIdx()));
         }
-        else
+        else if (mask > 0)
         {
-            mov(vreg.b16, ZeroVector_.b16);
-            ld1(vreg.s4[0], ptr(base));
-            for (int i = 1; i < mask; ++i)
-            {
-                add_imm(base, 4);
-                offset += 4;
-                ld1(vreg.s4[i], ptr(base));
-            }
+            issue_the_load_instruction(SReg(vreg.s4.getIdx()));
         }
 
         if (offset)
@@ -1530,6 +1527,7 @@ private:
         }
         else
         {
+            // TODO(zi) BETTER
             st1(vreg.s4[0], ptr(base));
             for (int i = 1; i < mask; ++i)
             {
@@ -1640,7 +1638,7 @@ private:
 
         mov(tmpCReg_, CReg_);
         strong_assert(ordered_loads.size());
-        add_imm(tmpCReg_, ordered_loads.front().offset * vector_size);
+        add_imm(tmpCReg_, ordered_loads.front().offset * bytes_per_float);
 
         for (auto const& c : ordered_loads)
         {
@@ -1650,7 +1648,7 @@ private:
             auto incr = 0;
             if (incrs.size())
             {
-                incr = incrs.front() * vector_size;
+                incr = incrs.front() * bytes_per_float;
                 incrs.erase(incrs.begin());
             }
 
@@ -1666,7 +1664,8 @@ private:
 
             case VECTOR_STRIDED:
                 gather_vector(C_VMMs[c][0], tmpCReg_, 0, c.mask,
-                              C_traits.innermost_stride * vector_size, incr);
+                              C_traits.innermost_stride * bytes_per_float,
+                              incr);
                 break;
             }
 
@@ -1759,7 +1758,7 @@ private:
 
         mov(tmpCReg_, CReg_);
         strong_assert(ordered_stores.size());
-        add_imm(tmpCReg_, ordered_stores.front().offset * vector_size);
+        add_imm(tmpCReg_, ordered_stores.front().offset * bytes_per_float);
 
         for (auto const& c : ordered_stores)
         {
@@ -1823,7 +1822,7 @@ private:
                 auto incr = 0;
                 if (incrs.size())
                 {
-                    incr = incrs.front() * vector_size;
+                    incr = incrs.front() * bytes_per_float;
                     incrs.erase(incrs.begin());
                 }
 
@@ -1839,7 +1838,7 @@ private:
 
                 case VECTOR_STRIDED:
                     scatter_vector(C_VMMs[c][0], tmpCReg_, 0, c.mask,
-                                   C_traits.innermost_stride * vector_size,
+                                   C_traits.innermost_stride * bytes_per_float,
                                    incr);
                     break;
                 }
@@ -1854,7 +1853,7 @@ private:
                 auto incr = 0;
                 if (incrs.size())
                 {
-                    incr = incrs.front() * vector_size;
+                    incr = incrs.front() * bytes_per_float;
                     incrs.erase(incrs.begin());
                 }
 
@@ -1870,7 +1869,7 @@ private:
 
                 case VECTOR_STRIDED:
                     scatter_vector(C_VMMs[c][0], tmpCReg_, 0, c.mask,
-                                   C_traits.innermost_stride * vector_size,
+                                   C_traits.innermost_stride * bytes_per_float,
                                    incr);
                     break;
                 }
@@ -1925,7 +1924,8 @@ private:
                         if (delta && delta <= (i.num_lanes * 252) &&
                             delta >= (-256 * i.num_lanes))
                         {
-                            strong_assert(delta % (4 * i.num_lanes) == 0);
+                            strong_assert(
+                                delta % (bytes_per_float * i.num_lanes) == 0);
 
                             switch (i.num_lanes)
                             {
@@ -2234,9 +2234,10 @@ private:
 
                         if (delta && delta <= (i.num_lanes * 252) &&
                             delta >= (-256 * i.num_lanes) &&
-                            (delta % (4 * i.num_lanes) == 0))
+                            (delta % (bytes_per_float * i.num_lanes) == 0))
                         {
-                            // strong_assert(delta % (4 * i.num_lanes)
+                            // strong_assert(delta % (bytes_per_float *
+                            // i.num_lanes)
                             // == 0);
 
                             switch (i.num_lanes)
