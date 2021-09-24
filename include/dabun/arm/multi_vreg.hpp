@@ -14,7 +14,7 @@ namespace arm
 // which are reduced to a single one at the end.  Each of the size_
 // registers is independent of all the other ones.
 
-template <class VReg, class HReg>
+template <class VReg, class SReg, class HReg>
 class multi_vreg
 {
 private:
@@ -142,8 +142,7 @@ public:
             }
             if (mask > 1)
             {
-                code_generator.faddp(VReg(first_).s2, VReg(first_).s2,
-                                     VReg(first_).s2);
+                code_generator.faddp(SReg(first_), VReg(first_).s2);
             }
         }
         else if constexpr (std::is_same_v<Float, fp16>)
@@ -178,6 +177,7 @@ public:
             }
             if (mask > 1)
             {
+                // TO DO HERE.
                 code_generator.faddp(HReg(first_), VReg(first_).h2);
             }
         }

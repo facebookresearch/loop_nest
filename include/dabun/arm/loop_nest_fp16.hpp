@@ -1,3 +1,6 @@
+// TODO IMPORTANT VECTOR-VECTOR might be wrong because of horizontal
+// adds at the end, combined with the MLAs :(
+
 // Copyright 2004-present Facebook. All Rights Reserved.
 
 #pragma once
@@ -142,7 +145,7 @@ private:
     using base =
         code_generator<void(fp16* C, fp16 const* A, fp16 const* B, int)>;
     using Vmm         = VReg;
-    using multi_vregs = multi_vreg<Vmm, Xbyak_aarch64::HReg>;
+    using multi_vregs = multi_vreg<Vmm, SReg, HReg>;
 
     static constexpr int bytes_per_float = 2;
 
@@ -170,6 +173,7 @@ private:
     Reg64 alpha_reg_ = x3;
 
     Reg64 ZeroReg_  = x4;
+    WReg  ZeroWReg_ = w4;
     Reg64 xtmp1     = x5;
     Reg64 xtmp2     = x6;
     Reg64 loopReg_  = x7;
@@ -1159,8 +1163,8 @@ private:
             }
             else
             {
-                issue_unrolled_operations_dry_run_xx(std::move(operations),
-                                                     num_iterations);
+                issue_unrolled_operations_dry_run_ss_or_vv(
+                    std::move(operations), num_iterations);
                 return;
             }
         }
@@ -1484,7 +1488,7 @@ private:
         }
     }
 
-    void issue_unrolled_operations_dry_run_xx(
+    void issue_unrolled_operations_dry_run_ss_or_vv(
         std::vector<operation_operation> operations, int num_iterations)
     {
         int src1_reg = operations[0].src1.traits->reg.getIdx();
@@ -1510,9 +1514,12 @@ private:
         free_regs.push_back(1);
         free_regs.push_back(2);
 
-        for (auto i = 0; i < num_regs; ++i)
+        // TODO(important) allow more registers for non scalar-indexed on es
+        // ones
+        for (auto i = first_unused_vmm_register; i <= last_unused_vmm_register;
+             ++i)
         {
-            free_regs.push_back(first_unused_vmm_register + i);
+            free_regs.push_back(i);
         }
 
         struct table_entry
@@ -1875,7 +1882,9 @@ private:
                         strong_assert(false && "Load pair not expected");
                     },
                     [&](load_instruction load) {
-                        if (load.num_lanes == 3)
+                        if (load.num_lanes == 1 || load.num_lanes == 3 ||
+                            load.num_lanes == 5 || load.num_lanes == 6 ||
+                            load.num_lanes == 7)
                         {
                             return;
                         }
@@ -2369,12 +2378,12 @@ private:
 
         if (increment && increment < 256)
         {
-            str(HReg(vreg.s4.getIdx()), post_ptr(base, increment));
+            str(QReg(vreg.h8.getIdx()), post_ptr(base, increment));
             increment = 0;
         }
         else
         {
-            str(SReg(vreg.s4.getIdx()), ptr(base));
+            str(QReg(vreg.s4.getIdx()), ptr(base));
         }
 
         if (offset)
@@ -2806,7 +2815,7 @@ private:
 
                         tensor_offsets[ptr_reg_idx] += delta;
 
-                        if (i.num_lanes == 2)
+                        if (i.num_lanes <= 2)
                         {
                             if (delta && delta < 256 && delta >= -256)
                             {
@@ -2819,7 +2828,7 @@ private:
                                 sadd_imm(XReg(ptr_reg_idx), delta);
                             }
                         }
-                        else if (i.num_lanes == 4)
+                        else if (i.num_lanes <= 4)
                         {
                             if (delta && delta < 256 && delta >= -256)
                             {
@@ -2849,11 +2858,11 @@ private:
                     [&](fmla_instruction const& fml) {
                         if (fml.right_src.lane != vector_size)
                         {
-                            std::cout << "_____-> " << fml.dst.number << ' '
-                                       << fml.left_src.number << ' '
-                                       << fml.right_src.number << "    ";
-                             std::cout << "______-> " << fml.right_src.lane
-                                       << "\n";
+                            // std::cout << "_____-> " << fml.dst.number << ' '
+                            //            << fml.left_src.number << ' '
+                            //            << fml.right_src.number << "    ";
+                            //  std::cout << "______-> " << fml.right_src.lane
+                            //            << "\n";
                             fmla(VReg(fml.dst.number).h8,
                                  VReg(fml.left_src.number).h8,
                                  VReg(fml.right_src.number)
@@ -2878,6 +2887,276 @@ private:
         }
 
         print_instructions(instructions);
+    }
+
+    void issue_unrolled_operations_vector_vector(
+        std::vector<operation_operation> operations,
+        std::function<void()> const&     epilogue_fn)
+    {
+        auto instructions = std::move(instruction_IRs.front());
+        instruction_IRs.pop_front();
+
+        std::map<int, int> tensor_offsets;
+
+        for (auto const& insn : instructions)
+        {
+            std::visit(
+                overloaded{
+                    [&](load_pair_instruction const& i) {
+                        print_instruction(insn);
+                        std::cout << i.num_lanes << "\n";
+                        strong_assert(i.num_lanes != 1 && i.num_lanes != 3 &&
+                                      i.num_lanes != 5 && i.num_lanes != 6 &&
+                                      i.num_lanes != 7);
+
+                        int ptr_reg_idx = i.tensor_location.idx;
+                        int delta       = i.tensor_location.offset;
+
+                        tensor_offsets[ptr_reg_idx] += delta;
+
+                        if (C_traits.access == SCALAR)
+                        {
+                            if (i.num_lanes == 1)
+                            {
+                                ins(VReg(i.vreg1).h[1],
+                                    WReg(ZeroReg_.getIdx()));
+                                ins(VReg(i.vreg2).h[1],
+                                    WReg(ZeroReg_.getIdx()));
+                            }
+                        }
+
+                        if (delta && delta <= (i.num_lanes * 252) &&
+                            delta >= (-256 * i.num_lanes))
+                        {
+                            strong_assert(
+                                delta % (bytes_per_float * i.num_lanes) == 0);
+
+                            switch (i.num_lanes)
+                            {
+                            case 2:
+                                ldp(SReg(i.vreg1), SReg(i.vreg2),
+                                    post_ptr(XReg(ptr_reg_idx), delta));
+                                break;
+                            case 4:
+                                ldp(DReg(i.vreg1), DReg(i.vreg2),
+                                    post_ptr(XReg(ptr_reg_idx), delta));
+                                break;
+                            case 8:
+                                ldp(QReg(i.vreg1), QReg(i.vreg2),
+                                    post_ptr(XReg(ptr_reg_idx), delta));
+                                break;
+                            default:
+                                strong_assert(false &&
+                                              "Unknown number of lanes");
+                            }
+                        }
+                        else
+                        {
+                            switch (i.num_lanes)
+                            {
+                            case 2:
+                                ldp(SReg(i.vreg1), SReg(i.vreg2),
+                                    ptr(XReg(ptr_reg_idx)));
+                                break;
+                            case 4:
+                                ldp(DReg(i.vreg1), DReg(i.vreg2),
+                                    ptr(XReg(ptr_reg_idx)));
+                                break;
+                            case 8:
+                                ldp(QReg(i.vreg1), QReg(i.vreg2),
+                                    ptr(XReg(ptr_reg_idx)));
+                                break;
+                            default:
+                                strong_assert(false &&
+                                              "Unknown number of lanes");
+                            }
+                            sadd_imm(XReg(ptr_reg_idx), delta);
+                        }
+                    },
+                    [&](load_instruction const& i) {
+                        int ptr_reg_idx = i.tensor_location.idx;
+                        int delta       = i.tensor_location.offset;
+
+                        tensor_offsets[ptr_reg_idx] += delta;
+
+                        if (delta && delta < 256 && delta >= -256)
+                        {
+                            switch (i.num_lanes)
+                            {
+                            case 1:
+                                ldr(SReg(i.vreg),
+                                    post_ptr(XReg(ptr_reg_idx), delta));
+                                if (C_traits.access == SCALAR)
+                                {
+                                    ins(VReg(i.vreg).h[1], ZeroWReg_);
+                                    ins(VReg(i.vreg).s[1], ZeroWReg_);
+                                }
+                                break;
+                            case 2:
+                                ldr(SReg(i.vreg),
+                                    post_ptr(XReg(ptr_reg_idx), delta));
+                                if (C_traits.access == SCALAR)
+                                {
+                                    ins(VReg(i.vreg).s[1], ZeroWReg_);
+                                }
+                                break;
+                            case 3:
+                                ldr(DReg(i.vreg),
+                                    post_ptr(XReg(ptr_reg_idx), delta));
+                                if (C_traits.access == SCALAR)
+                                {
+                                    ins(VReg(i.vreg).h[3], ZeroWReg_);
+                                }
+                                break;
+                            case 4:
+                                ldr(DReg(i.vreg),
+                                    post_ptr(XReg(ptr_reg_idx), delta));
+                                break;
+                            case 5:
+                                ldr(QReg(i.vreg),
+                                    post_ptr(XReg(ptr_reg_idx), delta));
+                                if (C_traits.access == SCALAR)
+                                {
+                                    ins(VReg(i.vreg).h[5], ZeroWReg_);
+                                    ins(VReg(i.vreg).s[3], ZeroWReg_);
+                                }
+                                break;
+                            case 6:
+                                ldr(QReg(i.vreg),
+                                    post_ptr(XReg(ptr_reg_idx), delta));
+                                if (C_traits.access == SCALAR)
+                                {
+                                    ins(VReg(i.vreg).s[3], ZeroWReg_);
+                                }
+                                break;
+                            case 7:
+                                ldr(QReg(i.vreg),
+                                    post_ptr(XReg(ptr_reg_idx), delta));
+                                if (C_traits.access == SCALAR)
+                                {
+                                    ins(VReg(i.vreg).h[7], ZeroWReg_);
+                                }
+                                break;
+                            case 8:
+                                ldr(QReg(i.vreg),
+                                    post_ptr(XReg(ptr_reg_idx), delta));
+                                break;
+
+                            default:
+                                strong_assert(false &&
+                                              "Unknown number of lanes");
+                            }
+
+                            if (C_traits.access == SCALAR && i.num_lanes <= 4)
+                            {
+                                ins(VReg(i.vreg).d[1], ZeroReg_);
+                            }
+                        }
+                        else
+                        {
+                            switch (i.num_lanes)
+                            {
+                            case 1:
+                                ldr(SReg(i.vreg), ptr(XReg(ptr_reg_idx)));
+                                if (C_traits.access == SCALAR)
+                                {
+                                    ins(VReg(i.vreg).h[1], ZeroWReg_);
+                                    ins(VReg(i.vreg).s[1], ZeroWReg_);
+                                }
+                                break;
+                            case 2:
+                                ldr(SReg(i.vreg), ptr(XReg(ptr_reg_idx)));
+                                if (C_traits.access == SCALAR)
+                                {
+                                    ins(VReg(i.vreg).s[1], ZeroWReg_);
+                                }
+                                break;
+                            case 3:
+                                ldr(DReg(i.vreg), ptr(XReg(ptr_reg_idx)));
+                                if (C_traits.access == SCALAR)
+                                {
+                                    ins(VReg(i.vreg).h[3], ZeroWReg_);
+                                }
+                                break;
+                            case 4:
+                                ldr(DReg(i.vreg), ptr(XReg(ptr_reg_idx)));
+                                break;
+                            case 5:
+                                ldr(QReg(i.vreg), ptr(XReg(ptr_reg_idx)));
+                                if (C_traits.access == SCALAR)
+                                {
+                                    ins(VReg(i.vreg).h[5], ZeroWReg_);
+                                    ins(VReg(i.vreg).s[3], ZeroWReg_);
+                                }
+                                break;
+                            case 6:
+                                ldr(QReg(i.vreg), ptr(XReg(ptr_reg_idx)));
+                                if (C_traits.access == SCALAR)
+                                {
+                                    ins(VReg(i.vreg).s[3], ZeroWReg_);
+                                }
+                                break;
+                            case 7:
+                                ldr(QReg(i.vreg), ptr(XReg(ptr_reg_idx)));
+                                if (C_traits.access == SCALAR)
+                                {
+                                    ins(VReg(i.vreg).h[7], ZeroWReg_);
+                                }
+                                break;
+                            case 8:
+                                ldr(QReg(i.vreg), ptr(XReg(ptr_reg_idx)));
+                                break;
+
+                            default:
+                                strong_assert(false &&
+                                              "Unknown number of lanes");
+                            }
+
+                            if (C_traits.access == SCALAR && i.num_lanes <= 4)
+                            {
+                                ins(VReg(i.vreg).d[1], ZeroReg_);
+                            }
+
+                            sadd_imm(XReg(ptr_reg_idx), delta);
+                        }
+                    },
+                    [&](fmla_instruction const& fml) {
+                        switch (fml.left_src.lane)
+                        {
+                        case 1: // fallthrough
+                        case 2: // fallthrough
+                        case 3: // fallthrough
+                        case 4:
+                            // TODO(important) Figure out why .h4 is not
+                            // working!
+                            fmla(VReg(fml.dst.number).h8,
+                                 VReg(fml.left_src.number).h8,
+                                 VReg(fml.right_src.number).h8);
+                            break;
+                        case 5: // fallthrough
+                        case 6: // fallthrough
+                        case 7: // fallthrough
+                        case 8:
+                            fmla(VReg(fml.dst.number).h8,
+                                 VReg(fml.left_src.number).h8,
+                                 VReg(fml.right_src.number).h8);
+                            break;
+                        default:
+                            strong_assert(false && "Unknown number of lanes");
+                        }
+                    },
+                    [](std::monostate) {}},
+                insn);
+        }
+
+        print_instructions(instructions);
+
+        for (auto const& offs : tensor_offsets)
+        {
+            sadd_imm(XReg(offs.first), -offs.second);
+        }
+
+        epilogue_fn();
     }
 
     void issue_unrolled_operations(std::vector<operation_operation> operations,
@@ -2908,9 +3187,8 @@ private:
             else if (operations[0].src1.traits->access == VECTOR_PACKED &&
                      operations[0].src2.traits->access == VECTOR_PACKED)
             {
-                ////
-                /// issue_unrolled_operations_vector_vector(std::move(operations),
-                //// epilogue_fn);
+                issue_unrolled_operations_vector_vector(std::move(operations),
+                                                        epilogue_fn);
                 return;
             }
             else

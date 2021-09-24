@@ -29,6 +29,7 @@ int main()
 {
     using namespace dabun;
 
+    if (0)
     {
         int ArCr = 123;
         int AcBr = 123;
@@ -113,9 +114,11 @@ int main()
     }
 
     {
-        int ArCr = 123;
-        int AcBr = 123;
-        int BcCc = 62;
+        std::cout << "Benchmark: 10 (has horizontal add)" << std::endl;
+
+        int ArCr = 133;
+        int AcBr = 1; //26 + 3;
+        int BcCc = 256 + 3;
 
         auto gen_loop_nest = [&]() {
             return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
@@ -124,12 +127,13 @@ int main()
                        // has to divide the stride.  This is effectively the
                        // same as Halide's split into outer and inner
                        // variable, but can have arbitray number of splits.
-                       {{"ArCr", 6},
-                        {"BcCc", 32},
-                        {"AcBr", 6},
-                        {"AcBr", 1},
+                       {{"ArCr", 16}, // This and the next are for the
+                                      // register blocking of C - 30 vector
+                                      // registers of each holding 16 values
+                        {"BcCc", 16},
                         {"ArCr", 1},
-                        {"BcCc", 1}},
+                        {"BcCc", 1},
+                        {"AcBr", 1}},
                        // The second argument is a map of the dimension sizes
                        {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
                        // Vars of C (other variables are reduction variables)
@@ -150,7 +154,84 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", 1}, {"BcCc", AcBr}}, dabun::fma, 372, nullptr,
+                       {{"AcBr", 1}, {"BcCc", AcBr}}, dabun::fma, 1024, nullptr,
+                       {}, dabun::elementwise_relu<DABUN_ISA>)
+                .get_shared();
+        };
+
+        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        std::cout << "Compile: " << compile_secs << std::endl;
+
+        auto fn = gen_loop_nest();
+        fn.save_to_file("zi.asm");
+        // fn.register_perf("fn4");
+
+        auto A = get_random_vector<fp16>(AcBr * ArCr);
+        auto B = get_random_vector<fp16>(AcBr * BcCc);
+
+        auto CN = std::vector<fp16>(ArCr * BcCc);
+        auto CJ = std::vector<fp16>(ArCr * BcCc);
+
+        baseline_MM_row_col_major(ArCr, AcBr, BcCc, AcBr, AcBr, BcCc, A.data(),
+                                  B.data(), CN.data());
+
+        fn(CJ.data(), A.data(), B.data(), dabun::skip_postop);
+        // apply_relu(CN.data(), CN.data() + CN.size());
+
+        std::cout << "MAXABSDIFF: "
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc,
+                                        CN.data())
+                  << "\n";
+
+        auto secs =
+            measure_fastest([&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 1);
+
+        double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
+
+        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
+    }
+
+    return 0;
+
+    {
+        int ArCr = 123;
+        int AcBr = 123;
+        int BcCc = 62;
+
+        auto gen_loop_nest = [&]() {
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
+                       // The first argument is the loop order in the form of
+                       // {dimension, stride}.  For now the outer dimension
+                       // has to divide the stride.  This is effectively the
+                       // same as Halide's split into outer and inner
+                       // variable, but can have arbitray number of splits.
+                       {{"ArCr", 6},
+                        {"BcCc", 2},
+                        {"AcBr", 32},
+                        {"ArCr", 1},
+                        {"BcCc", 1},
+                        {"AcBr", 1}},
+                       // The second argument is a map of the dimension sizes
+                       {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
+                       // Vars of C (other variables are reduction variables)
+                       {"ArCr", "BcCc"},
+                       // Variables of A
+                       {"ArCr", "AcBr"},
+                       // Variables of B
+                       {"AcBr", "BcCc"},
+                       // C's strides for each variable.  Note that the
+                       // strides data is a superset of the previous argument
+                       // (variables of C).  I'm still deciding on the final
+                       // design, possibly allowing for null strides that
+                       // will just deduce them from the sizes, or some
+                       // special structs indicating the layout (ie
+                       // row-major, col-major).  In this case the vars have
+                       // to be ordered though... Many decisions to make...
+                       {{"ArCr", BcCc}, {"BcCc", 1}},
+                       // A's strides for each variable
+                       {{"ArCr", AcBr}, {"AcBr", 1}},
+                       // B's strides for each variable
+                       {{"AcBr", 1}, {"BcCc", ArCr}}, dabun::fma, 372, nullptr,
                        {}, dabun::elementwise_relu<DABUN_ISA>)
                 .get_shared();
         };
@@ -171,8 +252,8 @@ int main()
         auto CN = get_random_vector<fp16>(ArCr * BcCc);
         auto CJ = aligned_vector_cast<fp16>(CN);
 
-        baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, A.data(), B.data(),
-                    CN.data(), 1);
+        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, 1, ArCr, A.data(),
+                    B.data(), CN.data(), 1);
 
         apply_relu(CN.data(), CN.data() + CN.size());
 

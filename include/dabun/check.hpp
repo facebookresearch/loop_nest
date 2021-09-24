@@ -36,8 +36,7 @@ printable_fp_t<Float> max_abs_difference(Float const* LBegin, Float const* LEnd,
         {
             res = static_cast<fp16>(
                 std::max(static_cast<float>(res),
-                         std::abs(static_cast<float>(*LBegin) -
-                                  static_cast<float>(*RBegin))));
+                         std::abs(static_cast<float>(*LBegin) - *RBegin)));
         }
         else
         {
@@ -56,10 +55,25 @@ printable_fp_t<Float> max_abs_difference_verbose(Float const* LBegin,
     Float res = 0;
     for (; LBegin != LEnd; ++LBegin, ++RBegin)
     {
-        std::cout << off++ << " : " << printable(*LBegin) << " "
-                  << printable(*RBegin) << " "
-                  << printable(std::abs(*LBegin - *RBegin)) << "\n";
-        res = std::max(res, std::abs(*LBegin - *RBegin));
+        if constexpr (std::is_same_v<Float, fp16>)
+        {
+            std::cout << off++ << " : " << printable(*LBegin) << " "
+                      << printable(static_cast<float>(*RBegin)) << " "
+                      << printable(
+                             std::abs(static_cast<float>(*LBegin - *RBegin)))
+                      << "\n";
+            res = static_cast<fp16>(
+                std::max(static_cast<float>(res),
+                         std::abs(static_cast<float>(*LBegin) -
+                                  static_cast<float>(*RBegin))));
+        }
+        else
+        {
+            std::cout << off++ << " : " << printable(*LBegin) << " "
+                      << printable(*RBegin) << " "
+                      << printable(std::abs(*LBegin - *RBegin)) << "\n";
+            res = std::max(res, std::abs(*LBegin - *RBegin));
+        }
     }
     return printable(res);
 }

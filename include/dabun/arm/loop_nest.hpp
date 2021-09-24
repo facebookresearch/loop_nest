@@ -1,3 +1,6 @@
+// TODO IMPORTANT VECTOR-VECTOR might be wrong because of horizontal
+// adds at the end, combined with the MLAs :(
+
 // Copyright 2004-present Facebook. All Rights Reserved.
 
 #pragma once
@@ -61,7 +64,7 @@ private:
     using base =
         code_generator<void(float* C, float const* A, float const* B, int)>;
     using Vmm         = VReg;
-    using multi_vregs = multi_vreg<Vmm, Xbyak_aarch64::HReg>;
+    using multi_vregs = multi_vreg<Vmm, SReg, HReg>;
 
     static constexpr int bytes_per_float = 4;
 
@@ -1930,16 +1933,10 @@ private:
                             switch (i.num_lanes)
                             {
                             case 1:
-                                strong_assert(
-                                    false && "Num of lanes not supported here");
-
                                 ldp(SReg(i.vreg1), SReg(i.vreg2),
                                     post_ptr(XReg(ptr_reg_idx), delta));
                                 break;
                             case 2:
-                                strong_assert(
-                                    false && "Num of lanes not supported here");
-
                                 ldp(DReg(i.vreg1), DReg(i.vreg2),
                                     post_ptr(XReg(ptr_reg_idx), delta));
                                 break;
@@ -1989,25 +1986,6 @@ private:
 
                         tensor_offsets[ptr_reg_idx] += delta;
 
-                        if (C_traits.access == SCALAR)
-                        {
-                            switch (i.num_lanes)
-                            {
-                            case 1:
-                                ins(VReg(i.vreg).s[1], WReg(ZeroReg_.getIdx()));
-                                break;
-                            case 2:
-                                break;
-                            case 3:
-                                break;
-                            case 4:
-                                break;
-                            default:
-                                strong_assert(false &&
-                                              "Unknown number of lanes");
-                            }
-                        }
-
                         if (delta && delta < 256 && delta >= -256)
                         {
                             switch (i.num_lanes)
@@ -2015,6 +1993,12 @@ private:
                             case 1:
                                 ldr(SReg(i.vreg),
                                     post_ptr(XReg(ptr_reg_idx), delta));
+                                if (C_traits.access == SCALAR)
+                                {
+                                    ins(VReg(i.vreg).s[1],
+                                        WReg(ZeroReg_.getIdx()));
+                                }
+
                                 break;
                             case 2:
                                 ldr(DReg(i.vreg),
@@ -2044,6 +2028,12 @@ private:
                             {
                             case 1:
                                 ldr(SReg(i.vreg), ptr(XReg(ptr_reg_idx)));
+                                if (C_traits.access == SCALAR)
+                                {
+                                    ins(VReg(i.vreg).s[1],
+                                        WReg(ZeroReg_.getIdx()));
+                                }
+
                                 break;
                             case 2:
                                 ldr(DReg(i.vreg), ptr(XReg(ptr_reg_idx)));
@@ -3097,8 +3087,8 @@ private:
             }
             else
             {
-                issue_unrolled_operations_dry_run_xx(std::move(operations),
-                                                     num_iterations);
+                issue_unrolled_operations_dry_run_ss_or_vv(
+                    std::move(operations), num_iterations);
                 return;
             }
         }
@@ -3111,10 +3101,10 @@ private:
         for (int i = 0; i < operations.size(); ++i)
         {
             remaining_usages[{src1_reg,
-                              operations[i].src1.offset * vector_size}]
+                              operations[i].src1.offset * bytes_per_float}]
                 .push_back(i);
             remaining_usages[{src2_reg,
-                              operations[i].src2.offset * vector_size}]
+                              operations[i].src2.offset * bytes_per_float}]
                 .push_back(i);
         }
 
@@ -3199,6 +3189,7 @@ private:
                 }
             }
 
+            // TODO(zi) double check whether we need thbis
             // if (num_lanes == 3)
             // {
             //     num_lanes = 4;
@@ -3256,9 +3247,9 @@ private:
         for (int i = 0; i < operations.size(); ++i)
         {
             tensor_location_t scalar_loc = {
-                src1_reg, operations[i].src1.offset * vector_size};
+                src1_reg, operations[i].src1.offset * bytes_per_float};
             tensor_location_t vector_loc = {
-                src2_reg, operations[i].src2.offset * vector_size};
+                src2_reg, operations[i].src2.offset * bytes_per_float};
 
             int           needs_free_regs = 0;
             std::set<int> to_avoid;
@@ -3292,7 +3283,7 @@ private:
                 it == tensor_location_index.end())
             {
                 load_scalar(free_regs.front(), src1_reg,
-                            operations[i].src1.offset * vector_size);
+                            operations[i].src1.offset * bytes_per_float);
                 free_regs.pop_front();
 
                 strong_assert(tensor_location_index.find(scalar_loc) !=
@@ -3303,7 +3294,7 @@ private:
                 it == tensor_location_index.end())
             {
                 load_vector(free_regs.front(), src2_reg,
-                            operations[i].src2.offset * vector_size);
+                            operations[i].src2.offset * bytes_per_float);
                 free_regs.pop_front();
 
                 strong_assert(tensor_location_index.find(vector_loc) !=
@@ -3390,7 +3381,7 @@ private:
         instruction_IRs.push_back(std::move(instructions));
     }
 
-    void issue_unrolled_operations_dry_run_xx(
+    void issue_unrolled_operations_dry_run_ss_or_vv(
         std::vector<operation_operation> operations, int num_iterations)
     {
         int src1_reg = operations[0].src1.traits->reg.getIdx();
@@ -3401,10 +3392,10 @@ private:
         for (int i = 0; i < operations.size(); ++i)
         {
             remaining_usages[{src1_reg,
-                              operations[i].src1.offset * vector_size}]
+                              operations[i].src1.offset * bytes_per_float}]
                 .push_back(i);
             remaining_usages[{src2_reg,
-                              operations[i].src2.offset * vector_size}]
+                              operations[i].src2.offset * bytes_per_float}]
                 .push_back(i);
         }
 
@@ -3531,7 +3522,7 @@ private:
             tensor_location_t first_loc = {src1_reg, operations[i].src1.offset *
                                                          vector_size};
             tensor_location_t second_loc = {
-                src2_reg, operations[i].src2.offset * vector_size};
+                src2_reg, operations[i].src2.offset * bytes_per_float};
 
             int           needs_free_regs = 0;
             std::set<int> to_avoid;
@@ -3565,7 +3556,7 @@ private:
                 it == tensor_location_index.end())
             {
                 load_vector(free_regs.front(), src1_reg,
-                            operations[i].src1.offset * vector_size,
+                            operations[i].src1.offset * bytes_per_float,
                             operations[i].src1.mask);
                 free_regs.pop_front();
 
@@ -3577,7 +3568,7 @@ private:
                 it == tensor_location_index.end())
             {
                 load_vector(free_regs.front(), src2_reg,
-                            operations[i].src2.offset * vector_size,
+                            operations[i].src2.offset * bytes_per_float,
                             operations[i].src2.mask);
                 free_regs.pop_front();
 
@@ -3780,9 +3771,9 @@ private:
                 B_memory_approx += (s.second - 1) * B_strides.at(s.first);
         }
         // in bytes
-        C_memory_     = C_memory_approx * vector_size;
-        A_memory_     = A_memory_approx * vector_size;
-        B_memory_     = B_memory_approx * vector_size;
+        C_memory_     = C_memory_approx * bytes_per_float;
+        A_memory_     = A_memory_approx * bytes_per_float;
+        B_memory_     = B_memory_approx * bytes_per_float;
         total_memory_ = C_memory_ + A_memory_ + B_memory_;
     }
 
