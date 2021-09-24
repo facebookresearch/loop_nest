@@ -3206,9 +3206,9 @@ private:
                         }
                     },
                     [&](fmla_instruction const& fml) {
-                        fmla(VReg(fml.dst.number).h8,
-                             VReg(fml.left_src.number).h8,
-                             VReg(fml.right_src.number).h8);
+                        fmla(VReg(fml.dst.number).h4,
+                             VReg(fml.left_src.number).h4,
+                             VReg(fml.right_src.number).h4);
                     },
                     [](std::monostate) {}},
                 insn);
