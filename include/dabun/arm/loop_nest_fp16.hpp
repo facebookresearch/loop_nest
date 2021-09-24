@@ -1,3 +1,6 @@
+// TODO(important) WHEN LOADING C WITH SCALAR VALUES and compute is
+// VECTOR-VECTOR we need to zero out rest of the C_VMM vectors
+
 // TODO IMPORTANT VECTOR-VECTOR might be wrong because of horizontal
 // adds at the end, combined with the MLAs :(
 
@@ -2298,7 +2301,12 @@ private:
         }
 
         // TODO(zi) check if necessary
-        mov(vreg.b16, ZeroVector_.b16);
+
+        if (vectorized_var != "NONE")
+        {
+            mov(vreg.b16, ZeroVector_.b16);
+        }
+
         if (increment && increment < 256)
         {
             ldr(HReg(vreg.s4.getIdx()), post_ptr(base, increment));
@@ -2378,12 +2386,12 @@ private:
 
         if (increment && increment < 256)
         {
-            str(QReg(vreg.h8.getIdx()), post_ptr(base, increment));
+            str(HReg(vreg.h8.getIdx()), post_ptr(base, increment));
             increment = 0;
         }
         else
         {
-            str(QReg(vreg.s4.getIdx()), ptr(base));
+            str(HReg(vreg.s4.getIdx()), ptr(base));
         }
 
         if (offset)
@@ -2601,9 +2609,9 @@ private:
             {
                 if (C_traits.access == SCALAR)
                 {
-                    fmax(SReg(C_VMMs[c][0].getIdx()),
-                         SReg(C_VMMs[c][0].getIdx()),
-                         SReg(ZeroVector_.getIdx()));
+                    fmax(HReg(C_VMMs[c][0].getIdx()),
+                         HReg(C_VMMs[c][0].getIdx()),
+                         HReg(ZeroVector_.getIdx()));
                 }
                 else
                 {
@@ -3159,6 +3167,63 @@ private:
         epilogue_fn();
     }
 
+    void issue_unrolled_operations_scalar_scalar(
+        std::vector<operation_operation> operations,
+        std::function<void()> const&     epilogue_fn)
+    {
+        auto instructions = std::move(instruction_IRs.front());
+        instruction_IRs.pop_front();
+
+        std::map<int, int> tensor_offsets;
+
+        for (auto const& insn : instructions)
+        {
+            std::visit(
+                overloaded{
+                    [&](load_pair_instruction const& i) {
+                        strong_assert(
+                            false &&
+                            "No load pair instructions should be present");
+                    },
+                    [&](load_instruction const& i) {
+                        int ptr_reg_idx = i.tensor_location.idx;
+                        int delta       = i.tensor_location.offset;
+
+                        tensor_offsets[ptr_reg_idx] += delta;
+                        strong_assert(i.num_lanes == 1);
+
+                        // mov(VReg(i.vreg).b16, ZeroVector_.b16);
+
+                        if (delta && delta < 256 && delta >= -256)
+                        {
+                            ldr(HReg(i.vreg),
+                                post_ptr(XReg(ptr_reg_idx), delta));
+                        }
+                        else
+                        {
+                            ldr(HReg(i.vreg), ptr(XReg(ptr_reg_idx)));
+                            sadd_imm(XReg(ptr_reg_idx), delta);
+                        }
+                    },
+                    [&](fmla_instruction const& fml) {
+                        fmla(VReg(fml.dst.number).h8,
+                             VReg(fml.left_src.number).h8,
+                             VReg(fml.right_src.number).h8);
+                    },
+                    [](std::monostate) {}},
+                insn);
+        }
+
+        print_instructions(instructions);
+
+        for (auto const& offs : tensor_offsets)
+        {
+            sadd_imm(XReg(offs.first), -offs.second);
+        }
+
+        epilogue_fn();
+    }
+
     void issue_unrolled_operations(std::vector<operation_operation> operations,
                                    std::function<void()> const&     epilogue_fn)
     {
@@ -3193,9 +3258,9 @@ private:
             }
             else
             {
-                ////
-                /// issue_unrolled_operations_scalar_scalar(std::move(operations),
-                ////                                         epilogue_fn);
+                // strong_assert(false);
+                issue_unrolled_operations_scalar_scalar(std::move(operations),
+                                                        epilogue_fn);
                 return;
             }
         }

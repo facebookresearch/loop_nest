@@ -1,6 +1,9 @@
 // TODO IMPORTANT VECTOR-VECTOR might be wrong because of horizontal
 // adds at the end, combined with the MLAs :(
 
+// TODO(important) WHEN LOADING C WITH SCALAR VALUES and compute is
+// VECTOR-VECTOR we need to zero out rest of the C_VMM vectors
+
 // Copyright 2004-present Facebook. All Rights Reserved.
 
 #pragma once
@@ -1414,7 +1417,11 @@ private:
             add_imm(base, offset);
         }
 
-        mov(vreg.b16, ZeroVector_.b16);
+        if (vectorized_var != "NONE")
+        {
+            mov(vreg.b16, ZeroVector_.b16);
+        }
+
         if (increment && increment < 256)
         {
             ldr(SReg(vreg.s4.getIdx()), post_ptr(base, increment));
