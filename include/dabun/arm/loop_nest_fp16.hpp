@@ -1,10 +1,10 @@
+// Copyright 2004-present Facebook. All Rights Reserved.
+
 // TODO(important) WHEN LOADING C WITH SCALAR VALUES and compute is
 // VECTOR-VECTOR we need to zero out rest of the C_VMM vectors
 
 // TODO IMPORTANT VECTOR-VECTOR might be wrong because of horizontal
 // adds at the end, combined with the MLAs :(
-
-// Copyright 2004-present Facebook. All Rights Reserved.
 
 #pragma once
 
@@ -47,9 +47,13 @@ class loop_nest_fp16_code_generator;
 template <>
 class loop_nest_fp16_code_generator<aarch64>
     : public code_generator<void(fp16* C, fp16 const* A, fp16 const* B,
-                                 int alpha)>
+                                 int alpha)>,
+      public meta_mnemonics<loop_nest_code_generator<aarch64>>
+
 {
 private:
+    using meta_base = meta_mnemonics<loop_nest_code_generator<aarch64>>;
+
     struct tensor_location_t
     {
         int idx;
@@ -67,55 +71,6 @@ private:
     {
         LN_LOG(INFO) << "Loop over " << l.var << " from 0 to " << l.end
                      << " by " << l.delta << "\n";
-    }
-
-    // Utilities
-
-    template <class T>
-    void sub_imm(XReg const& srcdst, T imm)
-    {
-        if (imm == 0)
-            return;
-
-        base::sub_imm(srcdst, srcdst, imm, xtmp1);
-    }
-
-    template <class T>
-    void add_imm(XReg const& srcdst, T imm)
-    {
-        if (imm == 0)
-            return;
-
-        base::add_imm(srcdst, srcdst, imm, xtmp1);
-    }
-
-    template <class T>
-    void sadd_imm(XReg const& srcdst, T imm)
-    {
-        if (imm == 0)
-            return;
-
-        if (imm > 0)
-        {
-            add_imm(srcdst, imm);
-        }
-        else
-        {
-            sub_imm(srcdst, -imm);
-        }
-    }
-
-    void meta_cmp(XReg const& xreg, int imm)
-    {
-        if (imm >= -256 || imm < 256)
-        {
-            cmp(xreg, imm);
-        }
-        else
-        {
-            mov_imm(xtmp1, imm);
-            cmp(xreg, xtmp1);
-        }
     }
 
 private:
@@ -2192,47 +2147,6 @@ private:
         return to_save;
     }
 
-    void meta_push(XReg const& op) { str(op, post_ptr(stack_reg, 8)); }
-
-    void meta_pop(XReg const& op) { ldr(op, pre_ptr(stack_reg, -8)); }
-
-    void meta_push_pair(XReg const& op1, XReg const& op2)
-    {
-        stp(op1, op2, post_ptr(stack_reg, 16));
-    }
-
-    void meta_pop_pair(XReg const& op1, XReg const& op2)
-    {
-        ldp(op1, op2, pre_ptr(stack_reg, -16));
-    }
-
-    void meta_push(std::vector<XReg> const& regs)
-    {
-        for (int i = 1; i < regs.size(); i += 2)
-        {
-            meta_push_pair(regs[i - 1], regs[i]);
-        }
-
-        if (regs.size() % 2)
-        {
-            meta_push(regs.back());
-        }
-    }
-
-    void meta_pop(std::vector<XReg> const& regs)
-    {
-        if (regs.size() % 2)
-        {
-            meta_pop(regs.back());
-        }
-
-        for (int i = static_cast<int>(regs.size() - (regs.size() % 2) - 2);
-             i >= 0; i -= 2)
-        {
-            meta_pop_pair(regs[i], regs[i + 1]);
-        }
-    }
-
 private:
     // Pushes the "followed" pointers (C, A or B, and any extra ons
     // that will be used by the future arbitrary innermost operations)
@@ -2287,7 +2201,8 @@ private:
                 LN_LOG(INFO)
                     << tabs.back() << ptr.name << "(X" << ptr.reg.getIdx()
                     << ") += " << delta << " * " << ptr.strides.at(dim) << "\n";
-                add_imm(ptr.reg, ptr.strides.at(dim) * delta * bytes_per_float);
+                meta_add_imm(ptr.reg,
+                             ptr.strides.at(dim) * delta * bytes_per_float);
             }
         }
     };
@@ -2297,7 +2212,7 @@ private:
     {
         if (offset)
         {
-            add_imm(base, offset);
+            meta_add_imm(base, offset);
         }
 
         // TODO(zi) check if necessary
@@ -2319,11 +2234,11 @@ private:
 
         if (offset)
         {
-            sub_imm(base, offset);
+            meta_sub_imm(base, offset);
         }
         if (increment)
         {
-            add_imm(base, increment);
+            meta_add_imm(base, increment);
         }
     }
 
@@ -2332,7 +2247,7 @@ private:
     {
         if (offset)
         {
-            add_imm(base, offset);
+            meta_add_imm(base, offset);
         }
 
         strong_assert(mask > 0 && mask <= vector_size);
@@ -2368,11 +2283,11 @@ private:
 
         if (offset)
         {
-            sub_imm(base, offset);
+            meta_sub_imm(base, offset);
         }
         if (increment)
         {
-            add_imm(base, increment);
+            meta_add_imm(base, increment);
         }
     }
 
@@ -2381,7 +2296,7 @@ private:
     {
         if (offset)
         {
-            add_imm(base, offset);
+            meta_add_imm(base, offset);
         }
 
         if (increment && increment < 256)
@@ -2396,11 +2311,11 @@ private:
 
         if (offset)
         {
-            sub_imm(base, offset);
+            meta_sub_imm(base, offset);
         }
         if (increment)
         {
-            add_imm(base, increment);
+            meta_add_imm(base, increment);
         }
     }
 
@@ -2409,7 +2324,7 @@ private:
     {
         if (offset)
         {
-            add_imm(base, offset);
+            meta_add_imm(base, offset);
         }
 
         if (mask == vector_size)
@@ -2430,7 +2345,7 @@ private:
             st1(vreg.h4[0], ptr(base));
             for (int i = 1; i < mask; ++i)
             {
-                add_imm(base, 2);
+                meta_add_imm(base, 2);
                 offset += 2;
                 st1(vreg.h8[i], ptr(base));
             }
@@ -2438,11 +2353,11 @@ private:
 
         if (offset)
         {
-            sub_imm(base, offset);
+            meta_sub_imm(base, offset);
         }
         if (increment)
         {
-            add_imm(base, increment);
+            meta_add_imm(base, increment);
         }
     }
 
@@ -2473,7 +2388,7 @@ private:
 
         mov(tmpCReg_, CReg_);
         strong_assert(ordered_loads.size());
-        add_imm(tmpCReg_, ordered_loads.front().offset * bytes_per_float);
+        meta_add_imm(tmpCReg_, ordered_loads.front().offset * bytes_per_float);
 
         for (auto const& c : ordered_loads)
         {
@@ -2578,7 +2493,7 @@ private:
 
         mov(tmpCReg_, CReg_);
         strong_assert(ordered_stores.size());
-        add_imm(tmpCReg_, ordered_stores.front().offset * bytes_per_float);
+        meta_add_imm(tmpCReg_, ordered_stores.front().offset * bytes_per_float);
 
         for (auto const& c : ordered_stores)
         {
@@ -2745,7 +2660,7 @@ private:
                 if (offs.first == BReg_.getIdx() ||
                     offs.first == AReg_.getIdx())
                 {
-                    sadd_imm(XReg(offs.first), -offs.second);
+                    meta_add_imm(XReg(offs.first), -offs.second);
                 }
             }
 
@@ -2814,7 +2729,7 @@ private:
                                 strong_assert(false &&
                                               "Unknown number of lanes");
                             }
-                            sadd_imm(XReg(ptr_reg_idx), delta);
+                            meta_add_imm(XReg(ptr_reg_idx), delta);
                         }
                     },
                     [&](load_instruction const& i) {
@@ -2833,7 +2748,7 @@ private:
                             else
                             {
                                 ldr(SReg(i.vreg), ptr(XReg(ptr_reg_idx)));
-                                sadd_imm(XReg(ptr_reg_idx), delta);
+                                meta_add_imm(XReg(ptr_reg_idx), delta);
                             }
                         }
                         else if (i.num_lanes <= 4)
@@ -2846,7 +2761,7 @@ private:
                             else
                             {
                                 ldr(DReg(i.vreg), ptr(XReg(ptr_reg_idx)));
-                                sadd_imm(XReg(ptr_reg_idx), delta);
+                                meta_add_imm(XReg(ptr_reg_idx), delta);
                             }
                         }
                         else
@@ -2859,7 +2774,7 @@ private:
                             else
                             {
                                 ldr(QReg(i.vreg), ptr(XReg(ptr_reg_idx)));
-                                sadd_imm(XReg(ptr_reg_idx), delta);
+                                meta_add_imm(XReg(ptr_reg_idx), delta);
                             }
                         }
                     },
@@ -2978,7 +2893,7 @@ private:
                                 strong_assert(false &&
                                               "Unknown number of lanes");
                             }
-                            sadd_imm(XReg(ptr_reg_idx), delta);
+                            meta_add_imm(XReg(ptr_reg_idx), delta);
                         }
                     },
                     [&](load_instruction const& i) {
@@ -3125,7 +3040,7 @@ private:
                                 ins(VReg(i.vreg).d[1], ZeroReg_);
                             }
 
-                            sadd_imm(XReg(ptr_reg_idx), delta);
+                            meta_add_imm(XReg(ptr_reg_idx), delta);
                         }
                     },
                     [&](fmla_instruction const& fml) {
@@ -3161,7 +3076,7 @@ private:
 
         for (auto const& offs : tensor_offsets)
         {
-            sadd_imm(XReg(offs.first), -offs.second);
+            meta_add_imm(XReg(offs.first), -offs.second);
         }
 
         epilogue_fn();
@@ -3202,7 +3117,7 @@ private:
                         else
                         {
                             ldr(HReg(i.vreg), ptr(XReg(ptr_reg_idx)));
-                            sadd_imm(XReg(ptr_reg_idx), delta);
+                            meta_add_imm(XReg(ptr_reg_idx), delta);
                         }
                     },
                     [&](fmla_instruction const& fml) {
@@ -3218,7 +3133,7 @@ private:
 
         for (auto const& offs : tensor_offsets)
         {
-            sadd_imm(XReg(offs.first), -offs.second);
+            meta_add_imm(XReg(offs.first), -offs.second);
         }
 
         epilogue_fn();
@@ -3353,7 +3268,7 @@ private:
                                      ? loopReg_
                                      : Reg64(loop_registers[depth]);
 
-                mov_imm(loop_reg, full_iterations);
+                meta_mov_imm(loop_reg, full_iterations);
                 auto loopLabel = make_label();
                 L_aarch64(*loopLabel);
 
@@ -3371,10 +3286,10 @@ private:
                     if (depth < depth_for_register_blocked_C &&
                         C_formula.count(loop.var) == 0)
                     {
-                        add_imm(alpha_reg_, 2);
+                        meta_add_imm(alpha_reg_, 2);
                     }
 
-                    sub_imm(loop_reg, 1);
+                    meta_sub_imm(loop_reg, 1);
                     cmp(loop_reg, 0);
                 };
 
@@ -3420,7 +3335,7 @@ private:
                     if (depth < depth_for_register_blocked_C &&
                         C_formula.count(loop.var) == 0)
                     {
-                        add_imm(alpha_reg_, 2);
+                        meta_add_imm(alpha_reg_, 2);
                     }
 
                     advance_pointers(loop.var, loop.delta);
@@ -3467,7 +3382,7 @@ private:
             {
                 LN_LOG(INFO)
                     << tabs.back() << "SUB LOCKER: " << full_iterations << "\n";
-                sub_imm(alpha_reg_, full_iterations * 2);
+                meta_sub_imm(alpha_reg_, full_iterations * 2);
             }
 
             if (full_iterations > 1 && save_loop)
@@ -3526,7 +3441,8 @@ public:
         = {},
         std::optional<OptimizationConfiguration> /* optim_config */ =
             std::nullopt)
-        : order(_order)
+        : meta_base(x9, x5)
+        , order(_order)
         , sizes(sizes)
         , C_formula(C_formula)
         , A_formula(A_formula)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dabun/aot_fn.hpp"
+#include "dabun/core.hpp"
 #include "dabun/memory_resource.hpp"
 #include "dabun/xbyak.hpp"
 

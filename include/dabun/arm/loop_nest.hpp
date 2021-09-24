@@ -11,6 +11,7 @@
 #include "dabun/arm/arithmetic_operation.hpp"
 #include "dabun/arm/configuration.hpp"
 #include "dabun/arm/elementwise_operation.hpp"
+#include "dabun/arm/meta_mnemonics.hpp"
 #include "dabun/arm/multi_vreg.hpp"
 #include "dabun/code_generator.hpp"
 #include "dabun/common.hpp"
@@ -47,7 +48,8 @@ class loop_nest_code_generator;
 template <>
 class loop_nest_code_generator<aarch64>
     : public code_generator<void(float* C, float const* A, float const* B,
-                                 int alpha)>
+                                 int alpha)>,
+      public meta_mnemonics<loop_nest_code_generator<aarch64>>
 {
 private:
     struct tensor_location_t
@@ -66,55 +68,13 @@ private:
 private:
     using base =
         code_generator<void(float* C, float const* A, float const* B, int)>;
+    using meta_base   = meta_mnemonics<loop_nest_code_generator<aarch64>>;
     using Vmm         = VReg;
     using multi_vregs = multi_vreg<Vmm, SReg, HReg>;
 
     static constexpr int bytes_per_float = 4;
 
     static constexpr int vector_size = isa_traits<aarch64>::vector_size;
-
-    // https://stackoverflow.com/questions/27941220/push-lr-and-pop-lr-in-arm-arch64
-
-    void meta_push(XReg const& op) { str(op, post_ptr(stack_reg, 8)); }
-
-    void meta_pop(XReg const& op) { ldr(op, pre_ptr(stack_reg, -8)); }
-
-    void meta_push_pair(XReg const& op1, XReg const& op2)
-    {
-        stp(op1, op2, post_ptr(stack_reg, 16));
-    }
-
-    void meta_pop_pair(XReg const& op1, XReg const& op2)
-    {
-        ldp(op1, op2, pre_ptr(stack_reg, -16));
-    }
-
-    void meta_push(std::vector<XReg> const& regs)
-    {
-        for (int i = 1; i < regs.size(); i += 2)
-        {
-            meta_push_pair(regs[i - 1], regs[i]);
-        }
-
-        if (regs.size() % 2)
-        {
-            meta_push(regs.back());
-        }
-    }
-
-    void meta_pop(std::vector<XReg> const& regs)
-    {
-        if (regs.size() % 2)
-        {
-            meta_pop(regs.back());
-        }
-
-        for (int i = static_cast<int>(regs.size() - (regs.size() % 2) - 2);
-             i >= 0; i -= 2)
-        {
-            meta_pop_pair(regs[i], regs[i + 1]);
-        }
-    }
 
     void prepare_stack()
     {
@@ -135,51 +95,6 @@ private:
         ldp(q8, q9, pre_ptr(stack_reg, 64));
         add(sp, sp, 1024);
         add(sp, sp, 1024);
-    }
-
-    template <typename T>
-    void mov_imm(const XReg& dst, T imm, const XReg& tmp)
-    {
-        strong_assert(dst.getIdx() != tmp.getIdx());
-
-        int64_t  bit_ptn = static_cast<int64_t>(imm);
-        uint64_t mask    = 0xFFFF;
-        bool     flag    = false;
-
-        /* ADD(immediate) supports unsigned imm12 */
-        const uint64_t IMM12_MASK = ~uint64_t(0xfff);
-        if ((bit_ptn & IMM12_MASK) == 0)
-        { // <= 4095
-            mov(dst, static_cast<uint32_t>(imm & 0xfff));
-            return;
-        }
-
-        /* MOVZ allows shift amount = 0, 16, 32, 48 */
-        for (int i = 0; i < 64; i += 16)
-        {
-            uint64_t tmp_ptn = (bit_ptn & (mask << i)) >> i;
-            if (tmp_ptn)
-            {
-                if (!flag)
-                {
-                    movz(dst, static_cast<uint32_t>(tmp_ptn), i);
-                    flag = true;
-                }
-                else
-                {
-                    movz(tmp, static_cast<uint32_t>(tmp_ptn), i);
-                    add(dst, dst, tmp);
-                }
-            }
-        }
-
-        return;
-    }
-
-    template <typename T>
-    void mov_imm(const XReg& dst, T imm)
-    {
-        mov_imm(dst, imm, xtmp1);
     }
 
     struct instruction_register
@@ -314,7 +229,6 @@ private:
     Reg64 alpha_reg_       = x3;
     Reg64 ZeroReg_         = x4;
     Reg64 xtmp1            = x5;
-    Reg64 xtmp2            = x6;
     Reg64 loopReg_         = x7;
     Reg64 stack_reg        = x9;
     Reg64 tmpCReg_         = x10;
@@ -324,7 +238,7 @@ private:
 
     int insReg_ = 10;
 
-    std::vector<int> possible_loop_registers = {15, 19, 20, 21, 22, 23,
+    std::vector<int> possible_loop_registers = {6,  15, 19, 20, 21, 22, 23,
                                                 24, 25, 26, 27, 28, 29};
 
     std::vector<int> loop_registers;
@@ -1262,53 +1176,6 @@ private:
         }
     }
 
-    template <class T>
-    void sub_imm(XReg const& srcdst, T imm)
-    {
-        if (imm == 0)
-            return;
-
-        base::sub_imm(srcdst, srcdst, imm, xtmp1);
-    }
-
-    template <class T>
-    void add_imm(XReg const& srcdst, T imm)
-    {
-        if (imm == 0)
-            return;
-
-        base::add_imm(srcdst, srcdst, imm, xtmp1);
-    }
-
-    template <class T>
-    void sadd_imm(XReg const& srcdst, T imm)
-    {
-        if (imm == 0)
-            return;
-
-        if (imm > 0)
-        {
-            add_imm(srcdst, imm);
-        }
-        else
-        {
-            sub_imm(srcdst, -imm);
-        }
-    }
-
-    void meta_cmp(XReg const& xreg, int imm)
-    {
-        if (imm >= -256 || imm < 256)
-        {
-            cmp(xreg, imm);
-        }
-        else
-        {
-            mov_imm(xtmp1, imm);
-            cmp(xreg, xtmp1);
-        }
-    }
-
     // Collects all (unrolled) operations below a certain loop in the nest.
     // Assumes that the limits are correctly set for the current loop
     // in the execution tree of the loop nest.  This is to correctly
@@ -1404,7 +1271,8 @@ private:
                 LN_LOG(INFO)
                     << tabs.back() << ptr.name << "(X" << ptr.reg.getIdx()
                     << ") += " << delta << " * " << ptr.strides.at(dim) << "\n";
-                add_imm(ptr.reg, ptr.strides.at(dim) * delta * bytes_per_float);
+                meta_add_imm(ptr.reg,
+                             ptr.strides.at(dim) * delta * bytes_per_float);
             }
         }
     };
@@ -1414,7 +1282,7 @@ private:
     {
         if (offset)
         {
-            add_imm(base, offset);
+            meta_add_imm(base, offset);
         }
 
         if (vectorized_var != "NONE")
@@ -1434,11 +1302,11 @@ private:
 
         if (offset)
         {
-            sub_imm(base, offset);
+            meta_sub_imm(base, offset);
         }
         if (increment)
         {
-            add_imm(base, increment);
+            meta_add_imm(base, increment);
         }
     }
 
@@ -1447,7 +1315,7 @@ private:
     {
         if (offset)
         {
-            add_imm(base, offset);
+            meta_add_imm(base, offset);
         }
 
         if (increment && increment < 256)
@@ -1462,11 +1330,11 @@ private:
 
         if (offset)
         {
-            sub_imm(base, offset);
+            meta_sub_imm(base, offset);
         }
         if (increment)
         {
-            add_imm(base, increment);
+            meta_add_imm(base, increment);
         }
     }
 
@@ -1475,7 +1343,7 @@ private:
     {
         if (offset)
         {
-            add_imm(base, offset);
+            meta_add_imm(base, offset);
         }
 
         strong_assert(mask > 0 && mask <= vector_size);
@@ -1507,11 +1375,11 @@ private:
 
         if (offset)
         {
-            sub_imm(base, offset);
+            meta_sub_imm(base, offset);
         }
         if (increment)
         {
-            add_imm(base, increment);
+            meta_add_imm(base, increment);
         }
     }
 
@@ -1520,7 +1388,7 @@ private:
     {
         if (offset)
         {
-            add_imm(base, offset);
+            meta_add_imm(base, offset);
         }
 
         if (mask == vector_size)
@@ -1541,7 +1409,7 @@ private:
             st1(vreg.s4[0], ptr(base));
             for (int i = 1; i < mask; ++i)
             {
-                add_imm(base, 4);
+                meta_add_imm(base, 4);
                 offset += 4;
                 st1(vreg.s4[i], ptr(base));
             }
@@ -1549,11 +1417,11 @@ private:
 
         if (offset)
         {
-            sub_imm(base, offset);
+            meta_sub_imm(base, offset);
         }
         if (increment)
         {
-            add_imm(base, increment);
+            meta_add_imm(base, increment);
         }
     }
 
@@ -1567,25 +1435,25 @@ private:
 
         if (offset)
         {
-            add_imm(base, offset);
+            meta_add_imm(base, offset);
         }
 
         st1(vreg.s4[0], ptr(base));
 
         for (int i = 1; i < mask; ++i)
         {
-            add_imm(base, stride);
+            meta_add_imm(base, stride);
             offset += stride;
             st1(vreg.s4[i], ptr(base));
         }
 
         if (offset)
         {
-            sub_imm(base, offset);
+            meta_sub_imm(base, offset);
         }
         if (increment)
         {
-            add_imm(base, increment);
+            meta_add_imm(base, increment);
         }
     }
 
@@ -1599,25 +1467,25 @@ private:
 
         if (offset)
         {
-            add_imm(base, offset);
+            meta_add_imm(base, offset);
         }
 
         ld1(vreg.s4[0], ptr(base));
 
         for (int i = 1; i < mask; ++i)
         {
-            add_imm(base, stride);
+            meta_add_imm(base, stride);
             offset += stride;
             ld1(vreg.s4[i], ptr(base));
         }
 
         if (offset)
         {
-            sub_imm(base, offset);
+            meta_sub_imm(base, offset);
         }
         if (increment)
         {
-            add_imm(base, increment);
+            meta_add_imm(base, increment);
         }
     }
 
@@ -1648,7 +1516,7 @@ private:
 
         mov(tmpCReg_, CReg_);
         strong_assert(ordered_loads.size());
-        add_imm(tmpCReg_, ordered_loads.front().offset * bytes_per_float);
+        meta_add_imm(tmpCReg_, ordered_loads.front().offset * bytes_per_float);
 
         for (auto const& c : ordered_loads)
         {
@@ -1768,7 +1636,7 @@ private:
 
         mov(tmpCReg_, CReg_);
         strong_assert(ordered_stores.size());
-        add_imm(tmpCReg_, ordered_stores.front().offset * bytes_per_float);
+        meta_add_imm(tmpCReg_, ordered_stores.front().offset * bytes_per_float);
 
         for (auto const& c : ordered_stores)
         {
@@ -1931,60 +1799,29 @@ private:
                             ins(VReg(i.vreg2).s[1], WReg(ZeroReg_.getIdx()));
                         }
 
-                        if (delta && delta <= (i.num_lanes * 252) &&
-                            delta >= (-256 * i.num_lanes))
-                        {
-                            strong_assert(
-                                delta % (bytes_per_float * i.num_lanes) == 0);
+                        strong_assert(delta % (bytes_per_float * i.num_lanes) ==
+                                      0);
 
-                            switch (i.num_lanes)
-                            {
-                            case 1:
-                                ldp(SReg(i.vreg1), SReg(i.vreg2),
-                                    post_ptr(XReg(ptr_reg_idx), delta));
-                                break;
-                            case 2:
-                                ldp(DReg(i.vreg1), DReg(i.vreg2),
-                                    post_ptr(XReg(ptr_reg_idx), delta));
-                                break;
-                            case 3:
-                                strong_assert(
-                                    false && "Num of lanes not supported here");
-                                break;
-                            case 4:
-                                ldp(QReg(i.vreg1), QReg(i.vreg2),
-                                    post_ptr(XReg(ptr_reg_idx), delta));
-                                break;
-                            default:
-                                strong_assert(false &&
-                                              "Unknown number of lanes");
-                            }
-                        }
-                        else
+                        switch (i.num_lanes)
                         {
-                            switch (i.num_lanes)
-                            {
-                            case 1:
-                                ldp(SReg(i.vreg1), SReg(i.vreg2),
-                                    ptr(XReg(ptr_reg_idx)));
-                                break;
-                            case 2:
-                                ldp(DReg(i.vreg1), DReg(i.vreg2),
-                                    ptr(XReg(ptr_reg_idx)));
-                                break;
-                            case 3:
-                                strong_assert(
-                                    false && "Num of lanes not supported here");
-                                break;
-                            case 4:
-                                ldp(QReg(i.vreg1), QReg(i.vreg2),
-                                    ptr(XReg(ptr_reg_idx)));
-                                break;
-                            default:
-                                strong_assert(false &&
-                                              "Unknown number of lanes");
-                            }
-                            sadd_imm(XReg(ptr_reg_idx), delta);
+                        case 1:
+                            meta_ldp_post_ptr(SReg(i.vreg1), SReg(i.vreg2),
+                                              XReg(ptr_reg_idx), delta);
+                            break;
+                        case 2:
+                            meta_ldp_post_ptr(DReg(i.vreg1), DReg(i.vreg2),
+                                              XReg(ptr_reg_idx), delta);
+                            break;
+                        case 3:
+                            strong_assert(false &&
+                                          "Num of lanes not supported here");
+                            break;
+                        case 4:
+                            meta_ldp_post_ptr(QReg(i.vreg1), QReg(i.vreg2),
+                                              XReg(ptr_reg_idx), delta);
+                            break;
+                        default:
+                            strong_assert(false && "Unknown number of lanes");
                         }
                     },
                     [&](load_instruction const& i) {
@@ -1993,74 +1830,35 @@ private:
 
                         tensor_offsets[ptr_reg_idx] += delta;
 
-                        if (delta && delta < 256 && delta >= -256)
+                        switch (i.num_lanes)
                         {
-                            switch (i.num_lanes)
+                        case 1:
+                            meta_ldr_post_ptr(SReg(i.vreg), XReg(ptr_reg_idx),
+                                              delta);
+                            if (C_traits.access == SCALAR)
                             {
-                            case 1:
-                                ldr(SReg(i.vreg),
-                                    post_ptr(XReg(ptr_reg_idx), delta));
-                                if (C_traits.access == SCALAR)
-                                {
-                                    ins(VReg(i.vreg).s[1],
-                                        WReg(ZeroReg_.getIdx()));
-                                }
-
-                                break;
-                            case 2:
-                                ldr(DReg(i.vreg),
-                                    post_ptr(XReg(ptr_reg_idx), delta));
-                                break;
-                            case 3:
-                                ldr(QReg(i.vreg),
-                                    post_ptr(XReg(ptr_reg_idx), delta));
-                                if (C_traits.access == SCALAR)
-                                {
-                                    ins(VReg(i.vreg).s[3],
-                                        WReg(ZeroReg_.getIdx()));
-                                }
-                                break;
-                            case 4:
-                                ldr(QReg(i.vreg),
-                                    post_ptr(XReg(ptr_reg_idx), delta));
-                                break;
-                            default:
-                                strong_assert(false &&
-                                              "Unknown number of lanes");
+                                ins(VReg(i.vreg).s[1], WReg(ZeroReg_.getIdx()));
                             }
-                        }
-                        else
-                        {
-                            switch (i.num_lanes)
+
+                            break;
+                        case 2:
+                            meta_ldr_post_ptr(DReg(i.vreg), XReg(ptr_reg_idx),
+                                              delta);
+                            break;
+                        case 3:
+                            meta_ldr_post_ptr(QReg(i.vreg), XReg(ptr_reg_idx),
+                                              delta);
+                            if (C_traits.access == SCALAR)
                             {
-                            case 1:
-                                ldr(SReg(i.vreg), ptr(XReg(ptr_reg_idx)));
-                                if (C_traits.access == SCALAR)
-                                {
-                                    ins(VReg(i.vreg).s[1],
-                                        WReg(ZeroReg_.getIdx()));
-                                }
-
-                                break;
-                            case 2:
-                                ldr(DReg(i.vreg), ptr(XReg(ptr_reg_idx)));
-                                break;
-                            case 3:
-                                ldr(QReg(i.vreg), ptr(XReg(ptr_reg_idx)));
-                                if (C_traits.access == SCALAR)
-                                {
-                                    ins(VReg(i.vreg).s[3],
-                                        WReg(ZeroReg_.getIdx()));
-                                }
-                                break;
-                            case 4:
-                                ldr(QReg(i.vreg), ptr(XReg(ptr_reg_idx)));
-                                break;
-                            default:
-                                strong_assert(false &&
-                                              "Unknown number of lanes");
+                                ins(VReg(i.vreg).s[3], WReg(ZeroReg_.getIdx()));
                             }
-                            sadd_imm(XReg(ptr_reg_idx), delta);
+                            break;
+                        case 4:
+                            meta_ldr_post_ptr(QReg(i.vreg), XReg(ptr_reg_idx),
+                                              delta);
+                            break;
+                        default:
+                            strong_assert(false && "Unknown number of lanes");
                         }
                     },
                     [&](fmla_instruction const& fml) {
@@ -2096,7 +1894,7 @@ private:
 
         for (auto const& offs : tensor_offsets)
         {
-            sadd_imm(XReg(offs.first), -offs.second);
+            meta_sadd_imm(XReg(offs.first), -offs.second);
         }
 
         epilogue_fn();
@@ -2122,17 +1920,8 @@ private:
                         tensor_offsets[ptr_reg_idx] += delta;
                         strong_assert(i.num_lanes == 1);
 
-                        if (delta && delta <= 252 && delta >= -256)
-                        {
-                            ldp(SReg(i.vreg1), SReg(i.vreg2),
-                                post_ptr(XReg(ptr_reg_idx), delta));
-                        }
-                        else
-                        {
-                            ldp(SReg(i.vreg1), SReg(i.vreg2),
-                                ptr(XReg(ptr_reg_idx)));
-                            sadd_imm(XReg(ptr_reg_idx), delta);
-                        }
+                        meta_ldp_post_ptr(SReg(i.vreg1), SReg(i.vreg2),
+                                          XReg(ptr_reg_idx), delta);
                     },
                     [&](load_instruction const& i) {
                         int ptr_reg_idx = i.tensor_location.idx;
@@ -2141,16 +1930,8 @@ private:
                         tensor_offsets[ptr_reg_idx] += delta;
                         strong_assert(i.num_lanes == 1);
 
-                        if (delta && delta < 256 && delta >= -256)
-                        {
-                            ldr(SReg(i.vreg),
-                                post_ptr(XReg(ptr_reg_idx), delta));
-                        }
-                        else
-                        {
-                            ldr(SReg(i.vreg), ptr(XReg(ptr_reg_idx)));
-                            sadd_imm(XReg(ptr_reg_idx), delta);
-                        }
+                        meta_ldr_post_ptr(SReg(i.vreg), XReg(ptr_reg_idx),
+                                          delta);
                     },
                     [&](fmla_instruction const& fml) {
                         fmla(VReg(fml.dst.number).s2,
@@ -2170,7 +1951,7 @@ private:
 
         for (auto const& offs : tensor_offsets)
         {
-            sadd_imm(XReg(offs.first), -offs.second);
+            meta_sadd_imm(XReg(offs.first), -offs.second);
         }
 
         epilogue_fn();
@@ -2205,7 +1986,7 @@ private:
                 if (offs.first == BReg_.getIdx() ||
                     offs.first == AReg_.getIdx())
                 {
-                    sadd_imm(XReg(offs.first), -offs.second);
+                    meta_sadd_imm(XReg(offs.first), -offs.second);
                 }
             }
 
@@ -2229,62 +2010,26 @@ private:
 
                         tensor_offsets[ptr_reg_idx] += delta;
 
-                        if (delta && delta <= (i.num_lanes * 252) &&
-                            delta >= (-256 * i.num_lanes) &&
-                            (delta % (bytes_per_float * i.num_lanes) == 0))
+                        switch (i.num_lanes)
                         {
-                            // strong_assert(delta % (bytes_per_float *
-                            // i.num_lanes)
-                            // == 0);
-
-                            switch (i.num_lanes)
-                            {
-                            case 1:
-                                ldp(SReg(i.vreg1), SReg(i.vreg2),
-                                    post_ptr(XReg(ptr_reg_idx), delta));
-                                break;
-                            case 2:
-                                ldp(DReg(i.vreg1), DReg(i.vreg2),
-                                    post_ptr(XReg(ptr_reg_idx), delta));
-                                break;
-                            case 3:
-                                strong_assert(
-                                    false && "Num of lanes not supported here");
-                                break;
-                            case 4:
-                                ldp(QReg(i.vreg1), QReg(i.vreg2),
-                                    post_ptr(XReg(ptr_reg_idx), delta));
-                                break;
-                            default:
-                                strong_assert(false &&
-                                              "Unknown number of lanes");
-                            }
-                        }
-                        else
-                        {
-                            switch (i.num_lanes)
-                            {
-                            case 1:
-                                ldp(SReg(i.vreg1), SReg(i.vreg2),
-                                    ptr(XReg(ptr_reg_idx)));
-                                break;
-                            case 2:
-                                ldp(DReg(i.vreg1), DReg(i.vreg2),
-                                    ptr(XReg(ptr_reg_idx)));
-                                break;
-                            case 3:
-                                strong_assert(
-                                    false && "Num of lanes not supported here");
-                                break;
-                            case 4:
-                                ldp(QReg(i.vreg1), QReg(i.vreg2),
-                                    ptr(XReg(ptr_reg_idx)));
-                                break;
-                            default:
-                                strong_assert(false &&
-                                              "Unknown number of lanes");
-                            }
-                            sadd_imm(XReg(ptr_reg_idx), delta);
+                        case 1:
+                            meta_ldp_post_ptr(SReg(i.vreg1), SReg(i.vreg2),
+                                              XReg(ptr_reg_idx), delta);
+                            break;
+                        case 2:
+                            meta_ldp_post_ptr(DReg(i.vreg1), DReg(i.vreg2),
+                                              XReg(ptr_reg_idx), delta);
+                            break;
+                        case 3:
+                            strong_assert(false &&
+                                          "Num of lanes not supported here");
+                            break;
+                        case 4:
+                            meta_ldp_post_ptr(QReg(i.vreg1), QReg(i.vreg2),
+                                              XReg(ptr_reg_idx), delta);
+                            break;
+                        default:
+                            strong_assert(false && "Unknown number of lanes");
                         }
                     },
                     [&](load_instruction const& i) {
@@ -2295,42 +2040,18 @@ private:
 
                         if (i.num_lanes == 1)
                         {
-                            if (delta && delta < 256 && delta >= -256)
-                            {
-                                ldr(SReg(i.vreg),
-                                    post_ptr(XReg(ptr_reg_idx), delta));
-                            }
-                            else
-                            {
-                                ldr(SReg(i.vreg), ptr(XReg(ptr_reg_idx)));
-                                sadd_imm(XReg(ptr_reg_idx), delta);
-                            }
+                            meta_ldr_post_ptr(SReg(i.vreg), XReg(ptr_reg_idx),
+                                              delta);
                         }
                         else if (i.num_lanes == 2)
                         {
-                            if (delta && delta < 256 && delta >= -256)
-                            {
-                                ldr(DReg(i.vreg),
-                                    post_ptr(XReg(ptr_reg_idx), delta));
-                            }
-                            else
-                            {
-                                ldr(DReg(i.vreg), ptr(XReg(ptr_reg_idx)));
-                                sadd_imm(XReg(ptr_reg_idx), delta);
-                            }
+                            meta_ldr_post_ptr(DReg(i.vreg), XReg(ptr_reg_idx),
+                                              delta);
                         }
                         else
                         {
-                            if (delta && delta < 256 && delta >= -256)
-                            {
-                                ldr(QReg(i.vreg),
-                                    post_ptr(XReg(ptr_reg_idx), delta));
-                            }
-                            else
-                            {
-                                ldr(QReg(i.vreg), ptr(XReg(ptr_reg_idx)));
-                                sadd_imm(XReg(ptr_reg_idx), delta);
-                            }
+                            meta_ldr_post_ptr(QReg(i.vreg), XReg(ptr_reg_idx),
+                                              delta);
                         }
                     },
                     [&](fmla_instruction const& fml) {
@@ -2354,16 +2075,8 @@ private:
 
                         tensor_offsets[ptr_reg_idx] += delta;
 
-                        if (delta && delta <= 255 && delta >= -256)
-                        {
-                            ldr(WReg(i.reg),
-                                post_ptr(XReg(ptr_reg_idx), delta));
-                        }
-                        else
-                        {
-                            ldr(WReg(i.reg), ptr(XReg(ptr_reg_idx)));
-                            sadd_imm(XReg(ptr_reg_idx), delta);
-                        }
+                        meta_ldr_post_ptr(WReg(i.reg), XReg(ptr_reg_idx),
+                                          delta);
                     },
                     [&](load_xreg_instruction const& i) {
                         int ptr_reg_idx = i.tensor_location.idx;
@@ -2371,16 +2084,8 @@ private:
 
                         tensor_offsets[ptr_reg_idx] += delta;
 
-                        if (delta && delta <= 255 && delta >= -256)
-                        {
-                            ldr(XReg(i.reg),
-                                post_ptr(XReg(ptr_reg_idx), delta));
-                        }
-                        else
-                        {
-                            ldr(XReg(i.reg), ptr(XReg(ptr_reg_idx)));
-                            sadd_imm(XReg(ptr_reg_idx), delta);
-                        }
+                        meta_ldr_post_ptr(XReg(i.reg), XReg(ptr_reg_idx),
+                                          delta);
                     },
                     [&](ins_wreg_instruction const& i) {
                         base::ins(VReg(i.vreg).s[i.lane], WReg(i.reg));
@@ -2923,7 +2628,7 @@ private:
                                      ? loopReg_
                                      : Reg64(loop_registers[depth]);
 
-                mov_imm(loop_reg, full_iterations);
+                meta_mov_imm(loop_reg, full_iterations);
                 auto loopLabel = make_label();
                 L_aarch64(*loopLabel);
 
@@ -2941,10 +2646,10 @@ private:
                     if (depth < depth_for_register_blocked_C &&
                         C_formula.count(loop.var) == 0)
                     {
-                        add_imm(alpha_reg_, 2);
+                        meta_add_imm(alpha_reg_, 2);
                     }
 
-                    sub_imm(loop_reg, 1);
+                    meta_sub_imm(loop_reg, 1);
                     cmp(loop_reg, 0);
                 };
 
@@ -2990,7 +2695,7 @@ private:
                     if (depth < depth_for_register_blocked_C &&
                         C_formula.count(loop.var) == 0)
                     {
-                        add_imm(alpha_reg_, 2);
+                        meta_add_imm(alpha_reg_, 2);
                     }
 
                     advance_pointers(loop.var, loop.delta);
@@ -3037,7 +2742,7 @@ private:
             {
                 LN_LOG(INFO)
                     << tabs.back() << "SUB LOCKER: " << full_iterations << "\n";
-                sub_imm(alpha_reg_, full_iterations * 2);
+                meta_sub_imm(alpha_reg_, full_iterations * 2);
             }
 
             if (full_iterations > 1 && save_loop)
@@ -3840,7 +3545,8 @@ public:
         = {},
         std::optional<OptimizationConfiguration> /* optim_config */ =
             std::nullopt)
-        : order(_order)
+        : meta_base(x9, x5)
+        , order(_order)
         , sizes(sizes)
         , C_formula(C_formula)
         , A_formula(A_formula)
