@@ -1,3 +1,5 @@
+// Copyright 2004-present Facebook. All Rights Reserved.
+
 // Parts adopted from
 // github.com/facebook/hhvm/blob/master/hphp/runtime/vm/debug/perf-jitdump.cpp
 

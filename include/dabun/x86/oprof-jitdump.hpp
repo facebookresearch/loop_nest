@@ -1,3 +1,5 @@
+// Copyright 2004-present Facebook. All Rights Reserved.
+
 // Adopted from
 // github.com/facebook/hhvm/blob/master/hphp/runtime/vm/debug/oprof-jitdump.h
 

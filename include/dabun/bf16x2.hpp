@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "dabun/detail/biovault_bfloat16.hpp"
+#include "dabun/third_party/biovault_bfloat16.hpp"
 
 #include <array>
 #include <cassert>
