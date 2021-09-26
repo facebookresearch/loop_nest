@@ -6,11 +6,16 @@
 // TODO IMPORTANT VECTOR-VECTOR might be wrong because of horizontal
 // adds at the end, combined with the MLAs :(
 
+// TODO(zi) For the vector_vector case - 1) zero-fill opnly one of the
+// arguments; 2) remember zero filled registers so that we don't redo
+// it anymore
+
 #pragma once
 
 #include "dabun/arm/arithmetic_operation.hpp"
 #include "dabun/arm/configuration.hpp"
 #include "dabun/arm/elementwise_operation.hpp"
+#include "dabun/arm/meta_mnemonics.hpp"
 #include "dabun/arm/multi_vreg.hpp"
 #include "dabun/code_generator.hpp"
 #include "dabun/common.hpp"
@@ -2688,7 +2693,7 @@ private:
 
                         if (delta && delta <= (i.num_lanes * 252) &&
                             delta >= (-256 * i.num_lanes) &&
-                            (delta % (bytes_per_float * i.num_lanes) == 0))
+                            (delta % (32 * i.num_lanes) == 0))
                         {
                             switch (i.num_lanes)
                             {
@@ -2827,7 +2832,7 @@ private:
                 overloaded{
                     [&](load_pair_instruction const& i) {
                         print_instruction(insn);
-                        std::cout << i.num_lanes << "\n";
+                        // std::cout << i.num_lanes << "\n";
                         strong_assert(i.num_lanes != 1 && i.num_lanes != 3 &&
                                       i.num_lanes != 5 && i.num_lanes != 6 &&
                                       i.num_lanes != 7);
@@ -2839,21 +2844,17 @@ private:
 
                         if (C_traits.access == SCALAR)
                         {
-                            if (i.num_lanes == 1)
+                            if (i.num_lanes != 8)
                             {
-                                ins(VReg(i.vreg1).h[1],
-                                    WReg(ZeroReg_.getIdx()));
-                                ins(VReg(i.vreg2).h[1],
-                                    WReg(ZeroReg_.getIdx()));
+                                mov(VReg(i.vreg1).b16, ZeroVector_.b16);
+                                mov(VReg(i.vreg2).b16, ZeroVector_.b16);
                             }
                         }
 
                         if (delta && delta <= (i.num_lanes * 252) &&
-                            delta >= (-256 * i.num_lanes))
+                            delta >= (-256 * i.num_lanes) &&
+                            (delta % (4 * i.num_lanes) == 0))
                         {
-                            strong_assert(
-                                delta % (bytes_per_float * i.num_lanes) == 0);
-
                             switch (i.num_lanes)
                             {
                             case 2:
@@ -2902,6 +2903,14 @@ private:
 
                         tensor_offsets[ptr_reg_idx] += delta;
 
+                        if (C_traits.access == SCALAR)
+                        {
+                            if (i.num_lanes != 8)
+                            {
+                                mov(VReg(i.vreg).b16, ZeroVector_.b16);
+                            }
+                        }
+
                         if (delta && delta < 256 && delta >= -256)
                         {
                             switch (i.num_lanes)
@@ -2912,16 +2921,11 @@ private:
                                 if (C_traits.access == SCALAR)
                                 {
                                     ins(VReg(i.vreg).h[1], ZeroWReg_);
-                                    ins(VReg(i.vreg).s[1], ZeroWReg_);
                                 }
                                 break;
                             case 2:
                                 ldr(SReg(i.vreg),
                                     post_ptr(XReg(ptr_reg_idx), delta));
-                                if (C_traits.access == SCALAR)
-                                {
-                                    ins(VReg(i.vreg).s[1], ZeroWReg_);
-                                }
                                 break;
                             case 3:
                                 ldr(DReg(i.vreg),
@@ -2968,11 +2972,6 @@ private:
                             default:
                                 strong_assert(false &&
                                               "Unknown number of lanes");
-                            }
-
-                            if (C_traits.access == SCALAR && i.num_lanes <= 4)
-                            {
-                                ins(VReg(i.vreg).d[1], ZeroReg_);
                             }
                         }
                         else
@@ -2984,15 +2983,10 @@ private:
                                 if (C_traits.access == SCALAR)
                                 {
                                     ins(VReg(i.vreg).h[1], ZeroWReg_);
-                                    ins(VReg(i.vreg).s[1], ZeroWReg_);
                                 }
                                 break;
                             case 2:
                                 ldr(SReg(i.vreg), ptr(XReg(ptr_reg_idx)));
-                                if (C_traits.access == SCALAR)
-                                {
-                                    ins(VReg(i.vreg).s[1], ZeroWReg_);
-                                }
                                 break;
                             case 3:
                                 ldr(DReg(i.vreg), ptr(XReg(ptr_reg_idx)));
@@ -3033,11 +3027,6 @@ private:
                             default:
                                 strong_assert(false &&
                                               "Unknown number of lanes");
-                            }
-
-                            if (C_traits.access == SCALAR && i.num_lanes <= 4)
-                            {
-                                ins(VReg(i.vreg).d[1], ZeroReg_);
                             }
 
                             meta_add_imm(XReg(ptr_reg_idx), delta);

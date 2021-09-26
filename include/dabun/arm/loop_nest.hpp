@@ -73,8 +73,7 @@ private:
     using multi_vregs = multi_vreg<Vmm, SReg, HReg>;
 
     static constexpr int bytes_per_float = 4;
-
-    static constexpr int vector_size = isa_traits<aarch64>::vector_size;
+    static constexpr int vector_size     = isa_traits<aarch64>::vector_size;
 
     void prepare_stack()
     {
@@ -2015,6 +2014,8 @@ private:
                         case 1:
                             meta_ldp_post_ptr(SReg(i.vreg1), SReg(i.vreg2),
                                               XReg(ptr_reg_idx), delta);
+                            // TODO(zi) check whether we need to
+                            // insert 0 to reg[1] here.
                             break;
                         case 2:
                             meta_ldp_post_ptr(DReg(i.vreg1), DReg(i.vreg2),

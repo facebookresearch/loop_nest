@@ -28,6 +28,241 @@
 int main()
 {
     using namespace dabun;
+    {
+        std::cout << "Benchmark: 14" << std::endl;
+
+        int ArCr = 1;
+        int AcBr = 64 * 128;
+        int BcCc = 16 + 7;
+
+        int k = AcBr;
+        int c = BcCc;
+
+        auto gen_loop_nest = [&]() {
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
+                       {{"k", 64}, //
+                        {"k", 1},  //
+                        {"c", 1}}, //
+                       {{"k", k}, {"c", c}},
+                       // Vars of C (other variables are reduction variables)
+                       {"c"},
+                       // Variables of A
+                       {"k"},
+                       // Variables of B
+                       {"c", "k"},
+                       // C's strides for each variable
+                       {{"c", 1}},
+                       // A's strides for each variable
+                       {{"k", 1}},
+                       // B's strides for each variable
+                       {{"k", c}, {"c", 1}}, dabun::fma)
+                .get_shared();
+        };
+
+        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        std::cout << "Compile: " << compile_secs << std::endl;
+
+        auto fn = gen_loop_nest();
+        fn.save_to_file("zi.asm");
+        fn.register_perf("fn8");
+
+        auto A = get_random_vector<fp16>(AcBr * ArCr);
+        auto B = get_random_vector<fp16>(AcBr * BcCc);
+
+        auto CJ = std::vector<fp16>(ArCr * BcCc);
+        auto CN = CJ;
+
+        baseline_MM(ArCr, AcBr, BcCc, 0, 1, c, 1, 0, 1, A.data(), B.data(),
+                    CN.data(), 0);
+
+        fn(CJ.data(), A.data(), B.data(), 0);
+
+        std::cout << "MAXABSDIFF: "
+                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc,
+                                        CN.data())
+                  << "\n";
+
+        auto secs = measure_fastest(
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10);
+
+        double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
+
+        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
+    }
+
+    return 0;
+
+
+    // if (0)
+    {
+        int ArCr = 1;//123;
+        int AcBr = 1; //123;
+        int BcCc = 64;
+
+        auto gen_loop_nest = [&]() {
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
+                       // The first argument is the loop order in the form of
+                       // {dimension, stride}.  For now the outer dimension
+                       // has to divide the stride.  This is effectively the
+                       // same as Halide's split into outer and inner
+                       // variable, but can have arbitray number of splits.
+                       {{"ArCr", 6},
+                        {"BcCc", 32},
+                        {"AcBr", 6},
+                        {"AcBr", 1},
+                        {"ArCr", 1},
+                        {"BcCc", 1}},
+                       // The second argument is a map of the dimension sizes
+                       {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
+                       // Vars of C (other variables are reduction variables)
+                       {"ArCr", "BcCc"},
+                       // Variables of A
+                       {"ArCr", "AcBr"},
+                       // Variables of B
+                       {"AcBr", "BcCc"},
+                       // C's strides for each variable.  Note that the
+                       // strides data is a superset of the previous argument
+                       // (variables of C).  I'm still deciding on the final
+                       // design, possibly allowing for null strides that
+                       // will just deduce them from the sizes, or some
+                       // special structs indicating the layout (ie
+                       // row-major, col-major).  In this case the vars have
+                       // to be ordered though... Many decisions to make...
+                       {{"ArCr", BcCc}, {"BcCc", 1}},
+                       // A's strides for each variable
+                       {{"ArCr", AcBr}, {"AcBr", 1}},
+                       // B's strides for each variable
+                       {{"AcBr", BcCc}, {"BcCc", 1}}, dabun::fma, 372, nullptr,
+                       {}, dabun::elementwise_relu<DABUN_ISA>)
+                .get_shared();
+        };
+
+        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        std::cout << "Compile: " << compile_secs << std::endl;
+
+        auto fn = gen_loop_nest();
+        fn.save_to_file("zi.asm");
+        // fn.register_perf("fn1");
+
+        auto A = get_random_vector<fp16>(AcBr * ArCr);
+        auto B = get_random_vector<fp16>(AcBr * BcCc);
+
+        auto A_fp16 = aligned_vector_cast<fp16>(A);
+        auto B_fp16 = aligned_vector_cast<fp16>(B);
+
+        auto CN = get_random_vector<fp16>(ArCr * BcCc);
+        auto CJ = aligned_vector_cast<fp16>(CN);
+
+        baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, A.data(), B.data(),
+                    CN.data(), 1);
+
+        apply_relu(CN.data(), CN.data() + CN.size());
+
+        fn(CJ.data(), A_fp16.data(), B_fp16.data(), 1);
+
+        std::cout << "MAXABSDIFF: "
+                  << max_abs_difference_verbose(CN.data(), CN.data() + ArCr * BcCc,
+                                        CJ.data())
+                  << "\n";
+
+        auto secs = measure_fastest(
+            [&]() { fn(CJ.data(), A_fp16.data(), B_fp16.data(), 0); }, 10);
+
+        double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
+
+        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
+
+        // bench_implementation_fmas_per_cycle(
+        //     fn, AcBr * ArCr, AcBr * BcCc, ArCr * BcCc,
+        //     1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
+    }
+
+    // return 0;
+
+    {
+        int ArCr = 8; // 126; // 123;
+        int AcBr = 8; // 124;  // 126; // 123;
+        int BcCc = 62;
+
+        auto gen_loop_nest = [&]() {
+            return dabun::loop_nest_code_generator<DABUN_ISA>(
+                       // The first argument is the loop order in the form of
+                       // {dimension, stride}.  For now the outer dimension
+                       // has to divide the stride.  This is effectively the
+                       // same as Halide's split into outer and inner
+                       // variable, but can have arbitray number of splits.
+                       {{"ArCr", 8},
+                        {"BcCc", 2},
+                        {"AcBr", 32},
+                        {"ArCr", 1},
+                        {"BcCc", 1},
+                        {"AcBr", 1}},
+                       // The second argument is a map of the dimension sizes
+                       {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
+                       // Vars of C (other variables are reduction variables)
+                       {"ArCr", "BcCc"},
+                       // Variables of A
+                       {"ArCr", "AcBr"},
+                       // Variables of B
+                       {"AcBr", "BcCc"},
+                       // C's strides for each variable.  Note that the
+                       // strides data is a superset of the previous argument
+                       // (variables of C).  I'm still deciding on the final
+                       // design, possibly allowing for null strides that
+                       // will just deduce them from the sizes, or some
+                       // special structs indicating the layout (ie
+                       // row-major, col-major).  In this case the vars have
+                       // to be ordered though... Many decisions to make...
+                       {{"ArCr", BcCc}, {"BcCc", 1}},
+                       // A's strides for each variable
+                       {{"ArCr", AcBr}, {"AcBr", 1}},
+                       // B's strides for each variable
+                       {{"AcBr", 1}, {"BcCc", ArCr}}, dabun::fma, 3 /* 372 */,
+                       nullptr, {}, dabun::elementwise_relu<DABUN_ISA>)
+                .get_shared();
+        };
+
+        // auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        // std::cout << "Compile: " << compile_secs << std::endl;
+
+        auto fn = gen_loop_nest();
+        fn.save_to_file("zi.asm");
+        // fn.register_perf("fn1");
+
+        auto A = get_random_vector<float>(AcBr * ArCr);
+        auto B = get_random_vector<float>(AcBr * BcCc);
+
+        auto A_float = aligned_vector_cast<float>(A);
+        auto B_float = aligned_vector_cast<float>(B);
+
+        auto CN = get_random_vector<float>(ArCr * BcCc);
+        auto CJ = aligned_vector_cast<float>(CN);
+
+        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, 1, ArCr, BcCc, 1, A.data(),
+                    B.data(), CN.data(), 1);
+
+        apply_relu(CN.data(), CN.data() + CN.size());
+
+        fn(CJ.data(), A_float.data(), B_float.data(), 1);
+
+        std::cout << "MAXABSDIFF: "
+                  << max_abs_difference(CN.data(), CN.data() + ArCr * BcCc,
+                                        CJ.data())
+                  << "\n";
+
+        auto secs = measure_fastest(
+            [&]() { fn(CJ.data(), A_float.data(), B_float.data(), 0); }, 10);
+
+        double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
+
+        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
+
+        // bench_implementation_fmas_per_cycle(
+        //     fn, AcBr * ArCr, AcBr * BcCc, ArCr * BcCc,
+        //     1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
+    }
+
+    // return 0;
 
     // Simple reduction of matrix columns using the FMA loop nest
     // The trick is to use a fake tensor "A" - that is a tensor with
@@ -104,91 +339,7 @@ int main()
         std::cout << "GFLOPS: " << (gflops / secs) << "\n";
     }
 
-    return 0;
-
-    if (0)
-    {
-        int ArCr = 123;
-        int AcBr = 123;
-        int BcCc = 62;
-
-        auto gen_loop_nest = [&]() {
-            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
-                       // The first argument is the loop order in the form of
-                       // {dimension, stride}.  For now the outer dimension
-                       // has to divide the stride.  This is effectively the
-                       // same as Halide's split into outer and inner
-                       // variable, but can have arbitray number of splits.
-                       {{"ArCr", 6},
-                        {"BcCc", 32},
-                        {"AcBr", 6},
-                        {"AcBr", 1},
-                        {"ArCr", 1},
-                        {"BcCc", 1}},
-                       // The second argument is a map of the dimension sizes
-                       {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
-                       // Vars of C (other variables are reduction variables)
-                       {"ArCr", "BcCc"},
-                       // Variables of A
-                       {"ArCr", "AcBr"},
-                       // Variables of B
-                       {"AcBr", "BcCc"},
-                       // C's strides for each variable.  Note that the
-                       // strides data is a superset of the previous argument
-                       // (variables of C).  I'm still deciding on the final
-                       // design, possibly allowing for null strides that
-                       // will just deduce them from the sizes, or some
-                       // special structs indicating the layout (ie
-                       // row-major, col-major).  In this case the vars have
-                       // to be ordered though... Many decisions to make...
-                       {{"ArCr", BcCc}, {"BcCc", 1}},
-                       // A's strides for each variable
-                       {{"ArCr", AcBr}, {"AcBr", 1}},
-                       // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, dabun::fma, 372, nullptr,
-                       {}, dabun::elementwise_relu<DABUN_ISA>)
-                .get_shared();
-        };
-
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
-        std::cout << "Compile: " << compile_secs << std::endl;
-
-        auto fn = gen_loop_nest();
-        fn.save_to_file("zi.asm");
-        // fn.register_perf("fn1");
-
-        auto A = get_random_vector<fp16>(AcBr * ArCr);
-        auto B = get_random_vector<fp16>(AcBr * BcCc);
-
-        auto A_fp16 = aligned_vector_cast<fp16>(A);
-        auto B_fp16 = aligned_vector_cast<fp16>(B);
-
-        auto CN = get_random_vector<fp16>(ArCr * BcCc);
-        auto CJ = aligned_vector_cast<fp16>(CN);
-
-        baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, A.data(), B.data(),
-                    CN.data(), 1);
-
-        apply_relu(CN.data(), CN.data() + CN.size());
-
-        fn(CJ.data(), A_fp16.data(), B_fp16.data(), 1);
-
-        std::cout << "MAXABSDIFF: "
-                  << max_abs_difference(CN.data(), CN.data() + ArCr * BcCc,
-                                        CJ.data())
-                  << "\n";
-
-        auto secs = measure_fastest(
-            [&]() { fn(CJ.data(), A_fp16.data(), B_fp16.data(), 0); }, 10);
-
-        double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
-
-        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
-
-        // bench_implementation_fmas_per_cycle(
-        //     fn, AcBr * ArCr, AcBr * BcCc, ArCr * BcCc,
-        //     1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
-    }
+    // return 0;
 
     {
         std::cout << "Benchmark: 10 (has horizontal add)" << std::endl;
@@ -268,92 +419,7 @@ int main()
         std::cout << "GFLOPS: " << (gflops / secs) << "\n";
     }
 
-    return 0;
-
-    {
-        int ArCr = 123;
-        int AcBr = 123;
-        int BcCc = 62;
-
-        auto gen_loop_nest = [&]() {
-            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
-                       // The first argument is the loop order in the form of
-                       // {dimension, stride}.  For now the outer dimension
-                       // has to divide the stride.  This is effectively the
-                       // same as Halide's split into outer and inner
-                       // variable, but can have arbitray number of splits.
-                       {{"ArCr", 6},
-                        {"BcCc", 2},
-                        {"AcBr", 32},
-                        {"ArCr", 1},
-                        {"BcCc", 1},
-                        {"AcBr", 1}},
-                       // The second argument is a map of the dimension sizes
-                       {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
-                       // Vars of C (other variables are reduction variables)
-                       {"ArCr", "BcCc"},
-                       // Variables of A
-                       {"ArCr", "AcBr"},
-                       // Variables of B
-                       {"AcBr", "BcCc"},
-                       // C's strides for each variable.  Note that the
-                       // strides data is a superset of the previous argument
-                       // (variables of C).  I'm still deciding on the final
-                       // design, possibly allowing for null strides that
-                       // will just deduce them from the sizes, or some
-                       // special structs indicating the layout (ie
-                       // row-major, col-major).  In this case the vars have
-                       // to be ordered though... Many decisions to make...
-                       {{"ArCr", BcCc}, {"BcCc", 1}},
-                       // A's strides for each variable
-                       {{"ArCr", AcBr}, {"AcBr", 1}},
-                       // B's strides for each variable
-                       {{"AcBr", 1}, {"BcCc", ArCr}}, dabun::fma, 372, nullptr,
-                       {}, dabun::elementwise_relu<DABUN_ISA>)
-                .get_shared();
-        };
-
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
-        std::cout << "Compile: " << compile_secs << std::endl;
-
-        auto fn = gen_loop_nest();
-        fn.save_to_file("zi.asm");
-        // fn.register_perf("fn1");
-
-        auto A = get_random_vector<fp16>(AcBr * ArCr);
-        auto B = get_random_vector<fp16>(AcBr * BcCc);
-
-        auto A_fp16 = aligned_vector_cast<fp16>(A);
-        auto B_fp16 = aligned_vector_cast<fp16>(B);
-
-        auto CN = get_random_vector<fp16>(ArCr * BcCc);
-        auto CJ = aligned_vector_cast<fp16>(CN);
-
-        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, 1, ArCr, A.data(),
-                    B.data(), CN.data(), 1);
-
-        apply_relu(CN.data(), CN.data() + CN.size());
-
-        fn(CJ.data(), A_fp16.data(), B_fp16.data(), 1);
-
-        std::cout << "MAXABSDIFF: "
-                  << max_abs_difference(CN.data(), CN.data() + ArCr * BcCc,
-                                        CJ.data())
-                  << "\n";
-
-        auto secs = measure_fastest(
-            [&]() { fn(CJ.data(), A_fp16.data(), B_fp16.data(), 0); }, 10);
-
-        double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
-
-        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
-
-        // bench_implementation_fmas_per_cycle(
-        //     fn, AcBr * ArCr, AcBr * BcCc, ArCr * BcCc,
-        //     1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
-    }
-
-    return 0;
+    // return 0;
 
     {
         std::cout << "Benchmark: 10" << std::endl;
@@ -363,7 +429,7 @@ int main()
         int BcCc = 256 + 3;
 
         auto gen_loop_nest = [&]() {
-            return dabun::loop_nest_code_generator<DABUN_ISA>(
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -408,11 +474,11 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn4");
 
-        auto A = get_random_vector<float>(AcBr * ArCr);
-        auto B = get_random_vector<float>(AcBr * BcCc);
+        auto A = get_random_vector<fp16>(AcBr * ArCr);
+        auto B = get_random_vector<fp16>(AcBr * BcCc);
 
-        auto CN = std::vector<float>(ArCr * BcCc);
-        auto CJ = std::vector<float>(ArCr * BcCc);
+        auto CN = std::vector<fp16>(ArCr * BcCc);
+        auto CJ = std::vector<fp16>(ArCr * BcCc);
 
         baseline_MM_row_col_major(ArCr, AcBr, BcCc, AcBr, AcBr, BcCc, A.data(),
                                   B.data(), CN.data());
@@ -445,7 +511,7 @@ int main()
         int BcCc = 333;
 
         auto gen_loop_nest = [&]() {
-            return dabun::loop_nest_code_generator<DABUN_ISA>(
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -499,10 +565,10 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn1");
 
-        auto A = get_random_vector<float>(AcBr * ArCr);
-        auto B = get_random_vector<float>(AcBr * BcCc);
+        auto A = get_random_vector<fp16>(AcBr * ArCr);
+        auto B = get_random_vector<fp16>(AcBr * BcCc);
 
-        auto CN = get_random_vector<float>(ArCr * BcCc);
+        auto CN = get_random_vector<fp16>(ArCr * BcCc);
         auto CJ = CN;
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, A.data(), B.data(),
@@ -539,7 +605,7 @@ int main()
         int BcCc = 133;
 
         auto gen_loop_nest = [&]() {
-            return dabun::loop_nest_code_generator<DABUN_ISA>(
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -589,11 +655,11 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn2");
 
-        auto A = get_random_vector<float>(AcBr * ArCr);
-        auto B = get_random_vector<float>(AcBr * BcCc);
+        auto A = get_random_vector<fp16>(AcBr * ArCr);
+        auto B = get_random_vector<fp16>(AcBr * BcCc);
 
-        auto CN = std::vector<float>(ArCr * BcCc);
-        auto CJ = std::vector<float>(ArCr * BcCc);
+        auto CN = std::vector<fp16>(ArCr * BcCc);
+        auto CJ = std::vector<fp16>(ArCr * BcCc);
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, A.data(), B.data(),
                     CN.data());
@@ -631,7 +697,7 @@ int main()
         int BcCc = 256;
 
         auto gen_loop_nest = [&]() {
-            return dabun::loop_nest_code_generator<DABUN_ISA>(
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -682,16 +748,16 @@ int main()
 
         auto fnx = gen_loop_nest();
         auto fny = aot_fn_cast<void(int)>(std::move(fnx));
-        auto fn  = aot_fn_cast<void(float*, float const*, float const*, int)>(
+        auto fn  = aot_fn_cast<void(fp16*, fp16 const*, fp16 const*, int)>(
             std::move(fny));
 
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn1");
 
-        auto A = get_random_vector<float>(AcBr * ArCr);
-        auto B = get_random_vector<float>(AcBr * BcCc);
+        auto A = get_random_vector<fp16>(AcBr * ArCr);
+        auto B = get_random_vector<fp16>(AcBr * BcCc);
 
-        auto CN = get_random_vector<float>(ArCr * BcCc);
+        auto CN = get_random_vector<fp16>(ArCr * BcCc);
         auto CJ = CN;
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, ArCr, 1, A.data(),
@@ -736,7 +802,7 @@ int main()
         int IOC = 32;
 
         auto gen_loop_nest = [&]() {
-            return dabun::loop_nest_code_generator<DABUN_ISA>(
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -785,10 +851,10 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn1");
 
-        auto A = get_random_vector<float>(IHW * IHW * IOC);
-        auto B = get_random_vector<float>(KHW * KHW * IOC);
+        auto A = get_random_vector<fp16>(IHW * IHW * IOC);
+        auto B = get_random_vector<fp16>(KHW * KHW * IOC);
 
-        auto CN = get_random_vector<float>(OHW * OHW * IOC);
+        auto CN = get_random_vector<fp16>(OHW * OHW * IOC);
         auto CJ = CN;
 
         baseline_CW_HWC(IOC, OHW, KHW, A.data(), B.data(), CN.data(), 0);
@@ -858,7 +924,7 @@ int main()
         25: d:2 s 1
         */
         auto gen_loop_nest = [&]() {
-            return loop_nest_code_generator<DABUN_ISA>(
+            return arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                        {{"c:0", 1},
                         {"d:0", 1},
                         {"c:1", 1},
@@ -903,10 +969,7 @@ int main()
         auto compile_secs = measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
-        auto fnx = gen_loop_nest();
-        auto fny = aot_fn_cast<void(int)>(std::move(fnx));
-        auto fn  = aot_fn_cast<void(float*, float const*, float const*, int)>(
-            std::move(fny));
+        auto fn = gen_loop_nest();
 
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn1");
@@ -914,19 +977,19 @@ int main()
         auto M = 1;
         auto N = 128;
         auto K = 128;
-        auto A = get_random_vector<float>(M * K);
+        auto A = get_random_vector<fp16>(M * K);
         for (auto i = 0; i < M * K; ++i)
         {
             A.data()[i] = 1;
         }
-        auto B = get_random_vector<float>(K * N);
+        auto B = get_random_vector<fp16>(K * N);
         for (auto i = 0; i < N * K; ++i)
         {
             B.data()[i] = 1;
         }
 
-        auto CN = get_random_vector<float>(M * N);
-        auto CJ = get_random_vector<float>(M * N);
+        auto CN = get_random_vector<fp16>(M * N);
+        auto CJ = get_random_vector<fp16>(M * N);
 
         baseline_MM(M, K, N, K, 1, N, 1, N, 1, A.data(), B.data(), CN.data(),
                     0);
@@ -965,7 +1028,7 @@ int main()
         int IS   = OS + KS - 1;
 
         auto gen_loop_nest = [&]() {
-            return dabun::loop_nest_code_generator<DABUN_ISA>(
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                        {{"c_out", 16}, //
                         {"o_h", 1},
                         {"o_w", 28},
@@ -1016,10 +1079,10 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn10");
 
-        auto A  = get_random_vector<float>(CIN * IS * IS);
-        auto B  = get_random_vector<float>(COUT * CIN * KS * KS);
-        auto CN = std::vector<float>(COUT * OS * OS);
-        auto CJ = std::vector<float>(COUT * OS * OS);
+        auto A  = get_random_vector<fp16>(CIN * IS * IS);
+        auto B  = get_random_vector<fp16>(COUT * CIN * KS * KS);
+        auto CN = std::vector<fp16>(COUT * OS * OS);
+        auto CJ = std::vector<fp16>(COUT * OS * OS);
 
         baseline_Conv(COUT, CIN, OS, OS, KS, KS, A.data(), B.data(), CN.data());
 
@@ -1070,7 +1133,7 @@ int main()
                                                 {"k_w", COUT * CIN},
                                                 {"k_h", COUT * CIN * KS}};
 
-        auto fn_c = dabun::loop_nest_code_generator<DABUN_ISA>(
+        auto fn_c = dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                         {{"c_out", 16}, //
                          {"o_h", 1},
                          {"o_w", 28},
@@ -1099,7 +1162,7 @@ int main()
 
         // Bottom left
         auto fn_corners =
-            dabun::loop_nest_code_generator<DABUN_ISA>(
+            dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                 {{"c_out", 16}, //
                  {"o_h", 1},
                  {"o_w", 28},
@@ -1140,7 +1203,7 @@ int main()
 
         // Bottom-Top
         auto fn_bt =
-            dabun::loop_nest_code_generator<DABUN_ISA>(
+            dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                 {{"c_out", 16}, //
                  {"o_h", 1},
                  {"o_w", 28},
@@ -1174,7 +1237,7 @@ int main()
 
         // Left-Right
         auto fn_lr =
-            dabun::loop_nest_code_generator<DABUN_ISA>(
+            dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                 {{"c_out", 16}, //
                  {"o_h", 1},
                  {"o_w", 28},
@@ -1209,10 +1272,10 @@ int main()
         fn_c.save_to_file("zi.asm");
         // fn.register_perf("fn10");
 
-        auto A  = get_random_vector<float>(CIN * OS * OS);
-        auto B  = get_random_vector<float>(COUT * CIN * KS * KS);
-        auto CN = std::vector<float>(COUT * OS * OS);
-        auto CJ = std::vector<float>(COUT * OS * OS);
+        auto A  = get_random_vector<fp16>(CIN * OS * OS);
+        auto B  = get_random_vector<fp16>(COUT * CIN * KS * KS);
+        auto CN = std::vector<fp16>(COUT * OS * OS);
+        auto CJ = std::vector<fp16>(COUT * OS * OS);
 
         baseline_padded_Conv(COUT, CIN, OS, OS, KS, KS, PS, PS, A.data(),
                              B.data(), CN.data());
@@ -1281,7 +1344,7 @@ int main()
         int BcCc = 512;
 
         auto gen_loop_nest = [&]() {
-            return dabun::loop_nest_code_generator<DABUN_ISA>(
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -1330,18 +1393,15 @@ int main()
         auto compile_secs = measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
-        auto fnx = gen_loop_nest();
-        auto fny = aot_fn_cast<void(int)>(std::move(fnx));
-        auto fn  = aot_fn_cast<void(float*, float const*, float const*, int)>(
-            std::move(fny));
+        auto fn = gen_loop_nest();
 
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn1");
 
-        auto A = get_random_vector<float>(AcBr * ArCr);
-        auto B = get_random_vector<float>(AcBr * BcCc);
+        auto A = get_random_vector<fp16>(AcBr * ArCr);
+        auto B = get_random_vector<fp16>(AcBr * BcCc);
 
-        auto CN = get_random_vector<float>(ArCr * BcCc);
+        auto CN = get_random_vector<fp16>(ArCr * BcCc);
         auto CJ = CN;
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
@@ -1390,7 +1450,7 @@ int main()
         int IS   = OS + KS - 1;
 
         auto gen_loop_nest = [&]() {
-            return dabun::loop_nest_code_generator<DABUN_ISA>(
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                        {{"g_out", 1}, //
                         {"o_h", 5},
                         {"o_w", 5},
@@ -1450,10 +1510,10 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn9");
 
-        auto A  = get_random_vector<float>(GIN * CIN * IS * IS);
-        auto B  = get_random_vector<float>(GOUT * GIN * COUT * CIN * KS * KS);
-        auto CN = std::vector<float>(GOUT * COUT * OS * OS);
-        auto CJ = std::vector<float>(GOUT * COUT * OS * OS);
+        auto A  = get_random_vector<fp16>(GIN * CIN * IS * IS);
+        auto B  = get_random_vector<fp16>(GOUT * GIN * COUT * CIN * KS * KS);
+        auto CN = std::vector<fp16>(GOUT * COUT * OS * OS);
+        auto CJ = std::vector<fp16>(GOUT * COUT * OS * OS);
 
         baseline_Conv_NCHW8c(GOUT, COUT, GIN, CIN, OS, OS, KS, KS, A.data(),
                              B.data(), CN.data());
@@ -1480,112 +1540,6 @@ int main()
 
     // return 0;
 
-    // Simple reduction of matrix columns using the FMA loop nest
-    // The trick is to use a fake tensor "A" - that is a tensor with
-    // a single element and 0 strides.
-    {
-        std::cout << "Benchmark: 3" << std::endl;
-
-        int ArCr = 1;
-        int AcBr = 333;
-        int BcCc = 333;
-
-        auto gen_loop_nest = [&]() {
-            return dabun::loop_nest_code_generator<DABUN_ISA>(
-                       {{"AcBr", 512},
-                        {"BcCc",
-                         (std::is_same_v<DABUN_ISA, avx2> ? 8 : 16) * 10},
-                        {"AcBr", 1},
-                        {"ArCr", 1},
-                        {"BcCc", 1}},
-                       // The second argument is a map of the dimension sizes
-                       {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
-                       // Vars of C (other variables are reduction variables)
-                       {"ArCr", "BcCc"},
-                       // Variables of A
-                       {"ArCr", "AcBr"},
-                       // Variables of B
-                       {"AcBr", "BcCc"},
-                       // C's strides for each variable.  Note that the
-                       // strides data is a superset of the previous argument
-                       // (variables of C).  I'm still deciding on the final
-                       // design, possibly allowing for null strides that
-                       // will just deduce them from the sizes, or some
-                       // special structs indicating the layout (ie
-                       // row-major, col-major).  In this case the vars have
-                       // to be ordered though... Many decisions to make...
-                       {{"ArCr", BcCc}, {"BcCc", 1}},
-                       // A's strides for each variable
-                       {{"ArCr", 0}, {"AcBr", 0}},
-                       // B's strides for each variable
-                       {{"AcBr", BcCc}, {"BcCc", 1}}, dabun::fma, 512)
-                .get_shared();
-        };
-
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
-        std::cout << "Compile: " << compile_secs << std::endl;
-
-        auto fn = gen_loop_nest();
-
-        auto baseline_fn = dabun::loop_nest_slow_baseline(
-            {{"AcBr", 512},
-             {"BcCc", (std::is_same_v<DABUN_ISA, avx2> ? 8 : 16) * 10},
-             {"AcBr", 1},
-             {"ArCr", 1},
-             {"BcCc", 1}},
-            // The second argument is a map of the dimension sizes
-            {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
-            // Vars of C (other variables are reduction variables)
-            {"ArCr", "BcCc"},
-            // Variables of A
-            {"ArCr", "AcBr"},
-            // Variables of B
-            {"AcBr", "BcCc"},
-            // C's strides for each variable.  Note that the
-            // strides data is a superset of the previous argument
-            // (variables of C).  I'm still deciding on the final
-            // design, possibly allowing for null strides that
-            // will just deduce them from the sizes, or some
-            // special structs indicating the layout (ie
-            // row-major, col-major).  In this case the vars have
-            // to be ordered though... Many decisions to make...
-            {{"ArCr", BcCc}, {"BcCc", 1}},
-            // A's strides for each variable
-            {{"ArCr", 0}, {"AcBr", 0}},
-            // B's strides for each variable
-            {{"AcBr", BcCc}, {"BcCc", 1}});
-
-        fn.save_to_file("zi.asm");
-        // fn.register_perf("fn1");
-
-        // float A = 1.f;
-
-        auto B  = get_random_vector<float>(AcBr * BcCc);
-        auto CN = get_random_vector<float>(ArCr * BcCc);
-        auto CJ = CN;
-
-        // baseline_MM(ArCr, AcBr, BcCc, 0, 0, BcCc, 1, BcCc, 1, &A, B.data(),
-        //             CN.data(), 1);
-
-        using dabun::one_constant;
-
-        fn(CJ.data(), one_constant<float>, B.data(), 1);
-        baseline_fn(CN.data(), one_constant<float>, B.data(), 1);
-
-        // apply_relu(CN.data(), CN.data() + CN.size());
-        std::cout << "MAXABSDIFF: "
-                  << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc,
-                                        CN.data())
-                  << "\n";
-
-        auto secs = measure_fastest(
-            [&]() { fn(CJ.data(), one_constant<float>, B.data(), 0); }, 100);
-
-        double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
-
-        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
-    }
-
     // return 0;
 
     // Simple reduction of matrix columns using the FMA loop nest
@@ -1599,7 +1553,7 @@ int main()
         int BcCc = 333;
 
         auto gen_loop_nest = [&]() {
-            return dabun::loop_nest_code_generator<DABUN_ISA>(
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                        {{"AcBr", 512},
                         {"BcCc",
                          (std::is_same_v<DABUN_ISA, avx2> ? 8 : 16) * 10},
@@ -1638,10 +1592,10 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn1");
 
-        float A = 1.f;
+        fp16 A = 1.f;
 
-        auto B  = get_random_vector<float>(AcBr * BcCc);
-        auto CN = get_random_vector<float>(ArCr * BcCc);
+        auto B  = get_random_vector<fp16>(AcBr * BcCc);
+        auto CN = get_random_vector<fp16>(ArCr * BcCc);
         auto CJ = CN;
 
         baseline_MM(ArCr, AcBr, BcCc, 0, 0, 1, AcBr, BcCc, 1, &A, B.data(),
@@ -1682,7 +1636,7 @@ int main()
         // int BcCc = 333;
 
         auto gen_loop_nest = [&]() {
-            return dabun::loop_nest_code_generator<DABUN_ISA>(
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -1726,10 +1680,10 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn1");
 
-        auto A = get_random_vector<float>(AcBr * ArCr);
-        auto B = get_random_vector<float>(AcBr * BcCc);
+        auto A = get_random_vector<fp16>(AcBr * ArCr);
+        auto B = get_random_vector<fp16>(AcBr * BcCc);
 
-        auto CN = get_random_vector<float>(ArCr * BcCc);
+        auto CN = get_random_vector<fp16>(ArCr * BcCc);
         auto CJ = CN;
 
         baseline_MM(ArCr, AcBr, BcCc, 1, ArCr, 1, AcBr, 1, ArCr, A.data(),
@@ -1770,7 +1724,7 @@ int main()
         int r = ArCr;
 
         auto gen_loop_nest = [&]() {
-            return dabun::loop_nest_code_generator<DABUN_ISA>(
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                        {{"r", 16}, //
                         {"r", 1},  //
                         {"k", 64},
@@ -1799,11 +1753,11 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn3");
 
-        auto A = get_random_vector<float>(AcBr * ArCr * 2);
-        auto B = get_random_vector<float>(AcBr * BcCc * 2);
+        auto A = get_random_vector<fp16>(AcBr * ArCr * 2);
+        auto B = get_random_vector<fp16>(AcBr * BcCc * 2);
 
-        auto CN = std::vector<float>(ArCr * BcCc);
-        auto CJ = std::vector<float>(ArCr * BcCc);
+        auto CN = std::vector<fp16>(ArCr * BcCc);
+        auto CJ = std::vector<fp16>(ArCr * BcCc);
 
         baseline_MM(ArCr, AcBr, BcCc, k * 2, 2, 2, 2, 1, 1, A.data(), B.data(),
                     CN.data(), 1);
@@ -1841,7 +1795,7 @@ int main()
         int r = ArCr;
 
         auto gen_loop_nest = [&]() {
-            return dabun::loop_nest_code_generator<DABUN_ISA>(
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                        {{"r", 16}, //
                         {"r", 1},  //
                         {"k", 64},
@@ -1869,11 +1823,11 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn3");
 
-        auto A = get_random_vector<float>(AcBr * ArCr);
-        auto B = get_random_vector<float>(AcBr * BcCc);
+        auto A = get_random_vector<fp16>(AcBr * ArCr);
+        auto B = get_random_vector<fp16>(AcBr * BcCc);
 
-        auto CN = std::vector<float>(ArCr * BcCc);
-        auto CJ = std::vector<float>(ArCr * BcCc);
+        auto CN = std::vector<fp16>(ArCr * BcCc);
+        auto CJ = std::vector<fp16>(ArCr * BcCc);
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, A.data(), B.data(),
                     CN.data());
@@ -1911,7 +1865,7 @@ int main()
         int BcCc = 256 + 251;
 
         auto gen_loop_nest = [&]() {
-            return dabun::loop_nest_code_generator<DABUN_ISA>(
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form
                        // of {dimension, stride}.  For now the outer
                        // dimension has to divide the stride.  This is
@@ -1955,11 +1909,11 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn5");
 
-        auto A = get_random_vector<float>(AcBr * ArCr);
-        auto B = get_random_vector<float>(AcBr * BcCc);
+        auto A = get_random_vector<fp16>(AcBr * ArCr);
+        auto B = get_random_vector<fp16>(AcBr * BcCc);
 
-        auto CN = std::vector<float>(ArCr * BcCc + 16);
-        auto CJ = std::vector<float>(ArCr * BcCc + 16);
+        auto CN = std::vector<fp16>(ArCr * BcCc + 16);
+        auto CJ = std::vector<fp16>(ArCr * BcCc + 16);
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, A.data(), B.data(),
                     CN.data());
@@ -1993,7 +1947,7 @@ int main()
         int BcCc = 259;
 
         auto gen_loop_nest = [&]() {
-            return dabun::loop_nest_code_generator<DABUN_ISA>(
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
                        // has to divide the stride.  This is effectively the
@@ -2040,11 +1994,11 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn6");
 
-        auto A = get_random_vector<float>(AcBr * ArCr);
-        auto B = get_random_vector<float>(AcBr * BcCc);
+        auto A = get_random_vector<fp16>(AcBr * ArCr);
+        auto B = get_random_vector<fp16>(AcBr * BcCc);
 
-        auto CN = std::vector<float>(ArCr * BcCc);
-        auto CJ = std::vector<float>(ArCr * BcCc);
+        auto CN = std::vector<fp16>(ArCr * BcCc);
+        auto CJ = std::vector<fp16>(ArCr * BcCc);
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, A.data(), B.data(),
                     CN.data());
@@ -2085,7 +2039,7 @@ int main()
         int IZ = OZ + KZ - 1;
 
         auto gen_loop_nest = [&]() {
-            return dabun::loop_nest_code_generator<DABUN_ISA>(
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension has
                        // to divide the stride.  This is effectively the same as
@@ -2144,11 +2098,11 @@ int main()
         fn.save_to_file("zi.asm");
         fn.register_perf("fn7");
 
-        auto A = get_random_vector<float>(IX * IY * IZ);
-        auto B = get_random_vector<float>(KX * KY * KZ);
+        auto A = get_random_vector<fp16>(IX * IY * IZ);
+        auto B = get_random_vector<fp16>(KX * KY * KZ);
 
-        auto CN = std::vector<float>(OX * OY * OZ);
-        auto CJ = std::vector<float>(OX * OY * OZ);
+        auto CN = std::vector<fp16>(OX * OY * OZ);
+        auto CJ = std::vector<fp16>(OX * OY * OZ);
 
         baseline_3DConv(OX, OY, OZ, KX, KY, KZ, A.data(), B.data(), CN.data());
 
@@ -2188,7 +2142,7 @@ int main()
         int c = BcCc;
 
         auto gen_loop_nest = [&]() {
-            return dabun::loop_nest_code_generator<DABUN_ISA>(
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                        {{"k", 64}, //
                         {"k", 1},  //
                         {"c", 1}}, //
@@ -2215,10 +2169,10 @@ int main()
         fn.save_to_file("zi.asm");
         fn.register_perf("fn8");
 
-        auto A = get_random_vector<float>(AcBr * ArCr);
-        auto B = get_random_vector<float>(AcBr * BcCc);
+        auto A = get_random_vector<fp16>(AcBr * ArCr);
+        auto B = get_random_vector<fp16>(AcBr * BcCc);
 
-        auto CJ = std::vector<float>(ArCr * BcCc);
+        auto CJ = std::vector<fp16>(ArCr * BcCc);
         auto CN = CJ;
 
         baseline_MM(ArCr, AcBr, BcCc, 0, 1, c, 1, 0, 1, A.data(), B.data(),
@@ -2255,7 +2209,7 @@ int main()
         int c = BcCc;
 
         auto gen_loop_nest = [&]() {
-            return dabun::loop_nest_code_generator<DABUN_ISA>(
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                        {{"k", 4},  //
                         {"k", 1},  //
                         {"c", 1}}, //
@@ -2280,10 +2234,10 @@ int main()
 
         auto fn = gen_loop_nest();
 
-        auto A = get_random_vector<float>(AcBr * ArCr);
-        auto B = get_random_vector<float>(AcBr * BcCc);
+        auto A = get_random_vector<fp16>(AcBr * ArCr);
+        auto B = get_random_vector<fp16>(AcBr * BcCc);
 
-        auto CJ = std::vector<float>(ArCr * BcCc);
+        auto CJ = std::vector<fp16>(ArCr * BcCc);
         auto CN = CJ;
 
         baseline_MM(ArCr, AcBr, BcCc, 0, 1, c, 1, 0, 1, A.data(), B.data(),
@@ -2319,7 +2273,7 @@ int main()
         int IS   = OS + KS - 1;
 
         auto gen_loop_nest = [&]() {
-            return dabun::loop_nest_code_generator<DABUN_ISA>(
+            return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
                        {{"c_out", 16}, //
                         {"o_h", 1},
                         {"o_w", 28},
@@ -2370,10 +2324,10 @@ int main()
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn10");
 
-        auto A  = get_random_vector<float>(CIN * IS * IS);
-        auto B  = get_random_vector<float>(COUT * CIN * KS * KS);
-        auto CN = std::vector<float>(COUT * OS * OS);
-        auto CJ = std::vector<float>(COUT * OS * OS);
+        auto A  = get_random_vector<fp16>(CIN * IS * IS);
+        auto B  = get_random_vector<fp16>(COUT * CIN * KS * KS);
+        auto CN = std::vector<fp16>(COUT * OS * OS);
+        auto CJ = std::vector<fp16>(COUT * OS * OS);
 
         baseline_Conv(COUT, CIN, OS, OS, KS, KS, A.data(), B.data(), CN.data());
 

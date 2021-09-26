@@ -26,6 +26,90 @@
 int main()
 {
     using namespace dabun;
+    {
+        int ArCr = 4; // 126; // 123;
+        int AcBr = 4; // 124;  // 126; // 123;
+        int BcCc = 2; // 62;
+
+        auto gen_loop_nest = [&]() {
+            return dabun::loop_nest_code_generator<DABUN_ISA>(
+                       // The first argument is the loop order in the form of
+                       // {dimension, stride}.  For now the outer dimension
+                       // has to divide the stride.  This is effectively the
+                       // same as Halide's split into outer and inner
+                       // variable, but can have arbitray number of splits.
+                       {{"ArCr", 8},
+                        {"BcCc", 2},
+                        {"AcBr", 32},
+                        {"ArCr", 1},
+                        {"BcCc", 1},
+                        {"AcBr", 1}},
+                       // The second argument is a map of the dimension sizes
+                       {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
+                       // Vars of C (other variables are reduction variables)
+                       {"ArCr", "BcCc"},
+                       // Variables of A
+                       {"ArCr", "AcBr"},
+                       // Variables of B
+                       {"AcBr", "BcCc"},
+                       // C's strides for each variable.  Note that the
+                       // strides data is a superset of the previous argument
+                       // (variables of C).  I'm still deciding on the final
+                       // design, possibly allowing for null strides that
+                       // will just deduce them from the sizes, or some
+                       // special structs indicating the layout (ie
+                       // row-major, col-major).  In this case the vars have
+                       // to be ordered though... Many decisions to make...
+                       {{"ArCr", BcCc}, {"BcCc", 1}},
+                       // A's strides for each variable
+                       {{"ArCr", AcBr}, {"AcBr", 1}},
+                       // B's strides for each variable
+                       {{"AcBr", 1}, {"BcCc", ArCr}}, dabun::fma, 372,
+                       nullptr, {}, dabun::elementwise_relu<DABUN_ISA>)
+                .get_shared();
+        };
+
+        // auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        // std::cout << "Compile: " << compile_secs << std::endl;
+
+        auto fn = gen_loop_nest();
+        fn.save_to_file("zi.asm");
+        // fn.register_perf("fn1");
+
+        auto A = get_random_vector<float>(AcBr * ArCr);
+        auto B = get_random_vector<float>(AcBr * BcCc);
+
+        auto A_float = aligned_vector_cast<float>(A);
+        auto B_float = aligned_vector_cast<float>(B);
+
+        auto CN = get_random_vector<float>(ArCr * BcCc);
+        auto CJ = aligned_vector_cast<float>(CN);
+
+        baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, 1, ArCr, BcCc, 1, A.data(),
+                    B.data(), CN.data(), 1);
+
+        apply_relu(CN.data(), CN.data() + CN.size());
+
+        fn(CJ.data(), A_float.data(), B_float.data(), 1);
+
+        std::cout << "MAXABSDIFF: "
+                  << max_abs_difference_verbose(CN.data(), CN.data() + ArCr * BcCc,
+                                        CJ.data())
+                  << "\n";
+
+        auto secs = measure_fastest(
+            [&]() { fn(CJ.data(), A_float.data(), B_float.data(), 0); }, 10);
+
+        double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
+
+        std::cout << "GFLOPS: " << (gflops / secs) << "\n";
+
+        // bench_implementation_fmas_per_cycle(
+        //     fn, AcBr * ArCr, AcBr * BcCc, ArCr * BcCc,
+        //     1.0 * AcBr * ArCr * BcCc * 2, 10, 10);
+    }
+
+    // return 0;
 
     {
         int ArCr = 72;
