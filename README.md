@@ -1,1 +1,1 @@
-![dabun logo](/assets/logo/icononly_transparent_nobuffer.png)
+![dabun logo](/assets/logo/icononly_transparent_nobuffer.png | width=250)
