@@ -3644,8 +3644,13 @@ public:
     access_kind get_B_access_kind() const { return B_traits.access; }
     access_kind get_C_access_kind() const { return C_traits.access; }
 
-public:
+private:
+    struct not_depricated_tag
+    {
+    };
+
     loop_nest_code_generator(
+        not_depricated_tag,
         std::vector<std::pair<std::string, int>> const& _order,
         std::map<std::string, int> const&               sizes,
         std::set<std::string> const&                    C_formula,
@@ -3827,6 +3832,36 @@ public:
         issue_arithmetic_epilogue();
     }
 
+public:
+    // [[deprecated("Use the named argument constructor")]]
+    loop_nest_code_generator(
+        std::vector<std::pair<std::string, int>> const& _order,
+        std::map<std::string, int> const&               sizes,
+        std::set<std::string> const&                    C_formula,
+        std::set<std::string> const&                    A_formula,
+        std::set<std::string> const&                    B_formula,
+        std::map<std::string, int> const&               C_strides,
+        std::map<std::string, int> const&               A_strides,
+        std::map<std::string, int> const&               B_strides,
+        std::shared_ptr<operation_pair_base>            op_pair,
+        std::optional<int> user_fma_unroll_limit = std::nullopt,
+        std::shared_ptr<elementwise_operation<ISA>> elementwise_preop = nullptr,
+        std::vector<std::map<std::string, int>> const&
+            elementwise_preop_strides = {},
+        std::shared_ptr<elementwise_operation<ISA>> elementwise_postop =
+            nullptr,
+        std::vector<std::map<std::string, int>> const&
+            elementwise_postop_strides                        = {},
+        std::optional<OptimizationConfiguration> optim_config = std::nullopt)
+        : loop_nest_code_generator(
+              not_depricated_tag(), _order, sizes, C_formula, A_formula,
+              B_formula, C_strides, A_strides, B_strides, op_pair,
+              user_fma_unroll_limit, elementwise_preop,
+              elementwise_preop_strides, elementwise_postop,
+              elementwise_postop_strides, optim_config)
+    {
+    }
+
     loop_nest_code_generator(
         LN_arguments const&                  arguments,
         std::shared_ptr<operation_pair_base> op_pair,
@@ -3844,7 +3879,7 @@ public:
               arguments.get_C_axes(), arguments.get_A_axes(),
               arguments.get_B_axes(), arguments.get_C_strides(),
               arguments.get_A_strides(), arguments.get_B_strides(), op_pair,
-              user_operation_unroll_limit, elementwise_preop,
+              user_fma_unroll_limit, elementwise_preop,
               elementwise_preop_strides, elementwise_postop,
               elementwise_postop_strides, optim_config)
     {

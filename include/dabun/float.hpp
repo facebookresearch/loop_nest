@@ -1,5 +1,11 @@
 #pragma once
 
+#if !defined(__aarch64__) // Should also somehow detect whether _Float16 is
+                          // available
+#include "dabun/third_party/half.hpp"
+
+#endif
+
 #include <type_traits>
 
 namespace dabun
@@ -30,6 +36,12 @@ struct is_fp16_t : std::false_type
 
 using fp16 = _Float16;
 
+#else
+
+using fp16 = half_float::half;
+
+#endif
+
 template <>
 struct printable_fp<fp16>
 {
@@ -40,8 +52,6 @@ template <>
 struct is_fp16_t<fp16> : std::true_type
 {
 };
-
-#endif
 
 template <class T>
 inline constexpr bool is_fp16_v = is_fp16_t<T>::value;
