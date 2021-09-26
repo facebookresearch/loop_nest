@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "dabun/LN_arguments.hpp"
 #include "dabun/code_generator.hpp"
 #include "dabun/common.hpp"
 #include "dabun/core.hpp"
@@ -1515,9 +1516,9 @@ private:
             arg1_registers.resize(5);
         }
 
-        int cycle = optim_config.delay_innermost_operations()
-                        ? arg1_registers.size()
-                        : 1;
+        int cycle   = optim_config.delay_innermost_operations()
+                          ? arg1_registers.size()
+                          : 1;
         int current = 0;
 
         std::vector<std::function<void()>> issue_delayed_ops(cycle, []() {});
@@ -1854,9 +1855,9 @@ private:
             arg1_registers.resize(5);
         }
 
-        int cycle = optim_config.delay_innermost_operations()
-                        ? arg1_registers.size()
-                        : 1;
+        int cycle   = optim_config.delay_innermost_operations()
+                          ? arg1_registers.size()
+                          : 1;
         int current = 0;
 
         std::vector<std::function<void()>> issue_delayed_ops(cycle, []() {});
@@ -3657,11 +3658,11 @@ public:
         std::optional<int> user_fma_unroll_limit = std::nullopt,
         std::shared_ptr<elementwise_operation<ISA>> elementwise_preop = nullptr,
         std::vector<std::map<std::string, int>> const&
-                                                    elementwise_preop_strides = {},
+            elementwise_preop_strides = {},
         std::shared_ptr<elementwise_operation<ISA>> elementwise_postop =
             nullptr,
         std::vector<std::map<std::string, int>> const&
-                                                 elementwise_postop_strides = {},
+            elementwise_postop_strides                        = {},
         std::optional<OptimizationConfiguration> optim_config = std::nullopt)
         : order(_order)
         , sizes(sizes)
@@ -3824,6 +3825,29 @@ public:
 
         issue_embedded_constants();
         issue_arithmetic_epilogue();
+    }
+
+    loop_nest_code_generator(
+        LN_arguments const&                  arguments,
+        std::shared_ptr<operation_pair_base> op_pair,
+        std::optional<int> user_fma_unroll_limit = std::nullopt,
+        std::shared_ptr<elementwise_operation<ISA>> elementwise_preop = nullptr,
+        std::vector<std::map<std::string, int>> const&
+            elementwise_preop_strides = {},
+        std::shared_ptr<elementwise_operation<ISA>> elementwise_postop =
+            nullptr,
+        std::vector<std::map<std::string, int>> const&
+            elementwise_postop_strides                        = {},
+        std::optional<OptimizationConfiguration> optim_config = std::nullopt)
+        : loop_nest_code_generator(
+              arguments.get_order(), arguments.get_sizes(),
+              arguments.get_C_axes(), arguments.get_A_axes(),
+              arguments.get_B_axes(), arguments.get_C_strides(),
+              arguments.get_A_strides(), arguments.get_B_strides(), op_pair,
+              user_operation_unroll_limit, elementwise_preop,
+              elementwise_preop_strides, elementwise_postop,
+              elementwise_postop_strides, optim_config)
+    {
     }
 };
 

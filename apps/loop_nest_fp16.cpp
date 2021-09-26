@@ -28,34 +28,47 @@
 int main()
 {
     using namespace dabun;
+
+    for (int AcBr = 1; AcBr <= 65536; AcBr *= 2)
     {
         std::cout << "Benchmark: 14" << std::endl;
 
         int ArCr = 1;
-        int AcBr = 64 * 128;
+        // int AcBr = 64 * 128;
         int BcCc = 16 + 7;
 
         int k = AcBr;
         int c = BcCc;
 
+        auto arg = LN_sizes({{"k", k}, {"c", c}})
+                       .C_axis("c")
+                       .A_axis("k")
+                       .B_axes({"c", "k"})
+                       .C_stride("c", 1)
+                       .A_stride("k", 1)
+                       .B_strides({{"k", c}, {"c", 1}})
+                       .append_loops({{"k", 64}, {"k", 1}, {"c", 1}});
+
         auto gen_loop_nest = [&]() {
             return dabun::arm::loop_nest_fp16_code_generator<DABUN_ISA>(
-                       {{"k", 64}, //
-                        {"k", 1},  //
-                        {"c", 1}}, //
-                       {{"k", k}, {"c", c}},
-                       // Vars of C (other variables are reduction variables)
-                       {"c"},
-                       // Variables of A
-                       {"k"},
-                       // Variables of B
-                       {"c", "k"},
-                       // C's strides for each variable
-                       {{"c", 1}},
-                       // A's strides for each variable
-                       {{"k", 1}},
-                       // B's strides for each variable
-                       {{"k", c}, {"c", 1}}, dabun::fma)
+                arg,
+                       // {{"k", 64}, //
+                       //  {"k", 1},  //
+                       //  {"c", 1}}, //
+                       // {{"k", k}, {"c", c}},
+                       // // Vars of C (other variables are reduction variables)
+                       // {"c"},
+                       // // Variables of A
+                       // {"k"},
+                       // // Variables of B
+                       // {"c", "k"},
+                       // // C's strides for each variable
+                       // {{"c", 1}},
+                       // // A's strides for each variable
+                       // {{"k", 1}},
+                       // // B's strides for each variable
+                       // {{"k", c}, {"c", 1}},
+                dabun::fma)
                 .get_shared();
         };
 
@@ -92,11 +105,10 @@ int main()
 
     return 0;
 
-
     // if (0)
     {
-        int ArCr = 1;//123;
-        int AcBr = 1; //123;
+        int ArCr = 1; // 123;
+        int AcBr = 1; // 123;
         int BcCc = 64;
 
         auto gen_loop_nest = [&]() {
@@ -161,8 +173,8 @@ int main()
         fn(CJ.data(), A_fp16.data(), B_fp16.data(), 1);
 
         std::cout << "MAXABSDIFF: "
-                  << max_abs_difference_verbose(CN.data(), CN.data() + ArCr * BcCc,
-                                        CJ.data())
+                  << max_abs_difference_verbose(
+                         CN.data(), CN.data() + ArCr * BcCc, CJ.data())
                   << "\n";
 
         auto secs = measure_fastest(
