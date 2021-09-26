@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cassert>
 #include <chrono>
+#include <cstdint>
 #include <limits>
 #include <tuple>
 #include <utility>
