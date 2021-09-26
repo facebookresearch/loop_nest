@@ -5,7 +5,6 @@
 	path = extern/xbyak_aarch64
 	url = https://github.com/zlateski/xbyak_aarch64
 	branch = fjmaster
-[submodule "fmt"]
+[submodule "extern/fmt"]
 	path = extern/fmt
 	url = https://github.com/fmtlib/fmt
-	branch = master
