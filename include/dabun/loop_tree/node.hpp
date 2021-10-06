@@ -2,14 +2,15 @@
 
 #pragma once
 
-#include <map>
-#include <string>
-#include <vector>
-
 #include "dabun/detail/tmp_file_name.hpp"
+#include "dabun/isa.hpp"
 #include "dabun/loop_tree/report.hpp"
 #include "dabun/loop_tree/types.hpp"
 #include "dabun/loop_tree/utility.hpp"
+
+#include <map>
+#include <string>
+#include <vector>
 
 namespace dabun
 {
@@ -39,31 +40,31 @@ inline std::string const& node_kind_to_str(node_kind kind)
 
 // Forward declarations
 
-template <class ISA>
+template <extension VEX, class Arithmetic>
 class node;
 
-template <class ISA>
+template <extension VEX, class Arithmetic>
 class compute_node;
 
-template <class ISA>
+template <extension VEX, class Arithmetic>
 class compiled_loop_nest_node;
 
-template <class ISA>
+template <extension VEX, class Arithmetic>
 class transpose_node;
 
-template <class ISA>
+template <extension VEX, class Arithmetic>
 class compiled_transpose_node;
 
-template <class ISA>
+template <extension VEX, class Arithmetic>
 class for_loop_node;
 
-template <class ISA>
+template <extension VEX, class Arithmetic>
 class node
 {
 
 private:
-    node_kind                  kind_;
-    std::vector<node_ptr<ISA>> children_;
+    node_kind                              kind_;
+    std::vector<node_ptr<VEX, Arithmetic>> children_;
 
 public:
     virtual ~node(){};
@@ -73,14 +74,17 @@ public:
     {
     }
 
-    std::vector<node_ptr<ISA>> const& get_children() const { return children_; }
+    std::vector<node_ptr<VEX, Arithmetic>> const& get_children() const
+    {
+        return children_;
+    }
 
-    void set_children(std::vector<node_ptr<ISA>> const& children)
+    void set_children(std::vector<node_ptr<VEX, Arithmetic>> const& children)
     {
         children_ = children;
     }
 
-    void set_children(std::vector<node_ptr<ISA>>&& children)
+    void set_children(std::vector<node_ptr<VEX, Arithmetic>>&& children)
     {
         children_ = std::move(children);
     }
@@ -104,11 +108,13 @@ public:
                              std::string const& indent) const = 0;
 };
 
-template <class ISA>
-class compute_node : public node<ISA>
+template <extension VEX, class Arithmetic>
+class compute_node : public node<VEX, Arithmetic>
 {
 private:
-    using super_type = node<ISA>;
+    using ISA = typename extension_to_deprecated_ISA<VEX>::type;
+
+    using super_type = node<VEX, Arithmetic>;
 
     // 0 -> A, 1 -> B, rest are followed tensors
     std::vector<std::string> inputs;
@@ -296,11 +302,11 @@ public:
         return {[alpha = this->alpha, input_idx_0 = tensors_idx.at(inputs[0]),
                  input_idx_1 = tensors_idx.at(inputs[1]),
                  output_idx =
-                     tensors_idx.at(output)](std::vector<float*>& tensors,
+                     tensors_idx.at(output)](std::vector<Arithmetic*>& tensors,
                                              std::vector<int>& alpha_offsets) {
-                    float* A = tensors[input_idx_0];
-                    float* B = tensors[input_idx_1];
-                    float* C = tensors[output_idx];
+                    Arithmetic* A = tensors[input_idx_0];
+                    Arithmetic* B = tensors[input_idx_1];
+                    Arithmetic* C = tensors[output_idx];
                     if ((alpha + alpha_offsets[output_idx]) == 0)
                     {
                         C[0] = 0.0;
@@ -312,30 +318,32 @@ public:
     }
 };
 
-template <class ISA>
-node_ptr<ISA> make_compute_node(
+template <extension VEX, class Arithmetic>
+node_ptr<VEX, Arithmetic> make_compute_node(
     std::vector<std::string> const& inputs, std::string const& output,
     strides_map_type const& strides, arithmetic_op_kind plus,
     arithmetic_op_kind multiplies, int alpha,
-    std::optional<int>                       unroll_limit      = std::nullopt,
-    elementwise_op_ptr<ISA> const&           elementwise_preop = nullptr,
-    std::vector<std::string> const&          elementwise_preop_tensors = {},
-    elementwise_op_ptr<ISA> const&           elementwise_postop = nullptr,
+    std::optional<int> unroll_limit = std::nullopt,
+    elementwise_op_ptr<extension_to_deprecated_ISA_t<VEX>> const&
+                                    elementwise_preop         = nullptr,
+    std::vector<std::string> const& elementwise_preop_tensors = {},
+    elementwise_op_ptr<extension_to_deprecated_ISA_t<VEX>> const&
+                                             elementwise_postop = nullptr,
     std::vector<std::string> const&          elementwise_postop_tensors = {},
     std::optional<OptimizationConfiguration> optim_config = std::nullopt)
 {
-    return node_ptr<ISA>(new compute_node<ISA>(
+    return node_ptr<VEX, Arithmetic>(new compute_node<VEX, Arithmetic>(
         inputs, output, strides, plus, multiplies, alpha, unroll_limit,
         elementwise_preop, elementwise_preop_tensors, elementwise_postop,
         elementwise_postop_tensors, optim_config));
 }
 
-template <class ISA>
-class transpose_node : public node<ISA>
+template <extension VEX, class Arithmetic>
+class transpose_node : public node<VEX, Arithmetic>
 {
 
 private:
-    using super_type = node<ISA>;
+    using super_type = node<VEX, Arithmetic>;
 
     std::string        input;
     std::string        output;
@@ -399,33 +407,33 @@ public:
         return {[input = this->input, output = this->output,
                  input_idx  = tensors_idx.at(input),
                  output_idx = tensors_idx.at(output)](
-                    std::vector<float*>& tensors, std::vector<int>&) {
+                    std::vector<Arithmetic*>& tensors, std::vector<int>&) {
                     strong_assert(tensors[input_idx]);
                     strong_assert(tensors[output_idx]);
 
-                    float* A = tensors[input_idx];
-                    float* C = tensors[output_idx];
-                    C[0]     = A[0];
+                    Arithmetic* A = tensors[input_idx];
+                    Arithmetic* C = tensors[output_idx];
+                    C[0]          = A[0];
                 },
                 report};
     }
 };
 
-template <class ISA>
-node_ptr<ISA>
+template <extension VEX, class Arithmetic>
+node_ptr<VEX, Arithmetic>
 make_transpose_node(std::string const& input, std::string const& output,
                     strides_map_type const& strides,
                     std::optional<int>      unroll_limit = std::nullopt)
 {
-    return node_ptr<ISA>(
-        new transpose_node<ISA>(input, output, strides, unroll_limit));
+    return node_ptr<VEX, Arithmetic>(new transpose_node<VEX, Arithmetic>(
+        input, output, strides, unroll_limit));
 }
 
-template <class ISA>
-class for_loop_node : public node<ISA>
+template <extension VEX, class Arithmetic>
+class for_loop_node : public node<VEX, Arithmetic>
 {
 private:
-    using super_type = node<ISA>;
+    using super_type = node<VEX, Arithmetic>;
 
     std::string var;
     int         delta;
@@ -466,7 +474,7 @@ private:
         }
     }
 
-    std::function<void(std::vector<float*>&, int)>
+    std::function<void(std::vector<Arithmetic*>&, int)>
     get_tensor_advancer(std::map<std::string, int> const& tensors_idx,
                         std::set<std::string> const&      tensor_names) const
     {
@@ -486,7 +494,7 @@ private:
             }
         }
 
-        return [=](std::vector<float*>& tensors, int delta = 1) {
+        return [=](std::vector<Arithmetic*>& tensors, int delta = 1) {
             for (auto const& p : to_advance)
             {
                 tensors[p.first] += p.second * delta;
@@ -523,7 +531,7 @@ public:
     int                get_delta() const { return delta; }
 
     for_loop_node(std::string var, int delta,
-                  std::vector<node_ptr<ISA>> const& children)
+                  std::vector<node_ptr<VEX, Arithmetic>> const& children)
         : super_type(node_kind::for_loop)
         , var(var)
         , delta(delta)
@@ -607,8 +615,8 @@ public:
                       << delta << ")\n";
 
         return {[full, full_fns, advancer, alpha_offsets_adjuster,
-                 tail_fns](std::vector<float*>& tensors,
-                           std::vector<int>&    alpha_offsets) {
+                 tail_fns](std::vector<Arithmetic*>& tensors,
+                           std::vector<int>&         alpha_offsets) {
                     for (int i = 0; i < full; ++i)
                     {
                         for (auto const& fn : full_fns)
@@ -631,18 +639,22 @@ public:
     }
 };
 
-template <class ISA>
-node_ptr<ISA> make_for_loop_node(std::string var, int delta,
-                                 std::vector<node_ptr<ISA>> const& children)
+template <extension VEX, class Arithmetic>
+node_ptr<VEX, Arithmetic>
+make_for_loop_node(std::string var, int delta,
+                   std::vector<node_ptr<VEX, Arithmetic>> const& children)
 {
-    return node_ptr<ISA>(new for_loop_node<ISA>(var, delta, children));
+    return node_ptr<VEX, Arithmetic>(
+        new for_loop_node<VEX, Arithmetic>(var, delta, children));
 }
 
-template <class ISA>
-class compiled_loop_nest_node : public node<ISA>
+template <extension VEX, class Arithmetic>
+class compiled_loop_nest_node : public node<VEX, Arithmetic>
 {
 private:
-    using super_type = node<ISA>;
+    using ISA = typename extension_to_deprecated_ISA<VEX>::type;
+
+    using super_type = node<VEX, Arithmetic>;
 
     std::vector<std::string>                 inputs;
     std::string                              output;
@@ -721,13 +733,13 @@ public:
     {
     }
 
-    compiled_loop_nest_node(compiled_loop_nest_node<ISA> const& other) =
-        default;
+    compiled_loop_nest_node(
+        compiled_loop_nest_node<VEX, Arithmetic> const& other) = default;
 
     // creates an initial loop nest
     compiled_loop_nest_node(
-        std::shared_ptr<for_loop_node<ISA>> const& for_node,
-        std::shared_ptr<compute_node<ISA>> const&  compute_node)
+        std::shared_ptr<for_loop_node<VEX, Arithmetic>> const& for_node,
+        std::shared_ptr<compute_node<VEX, Arithmetic>> const&  compute_node)
         : compiled_loop_nest_node(
               compute_node->get_inputs(), compute_node->get_output(),
               {{for_node->get_var(), for_node->get_delta()}},
@@ -743,9 +755,10 @@ public:
     }
 
     // extends an existing loop nest
-    compiled_loop_nest_node(std::shared_ptr<for_loop_node<ISA>> const& for_node,
-                            std::shared_ptr<compiled_loop_nest_node<ISA>> const&
-                                compute_compiler_node)
+    compiled_loop_nest_node(
+        std::shared_ptr<for_loop_node<VEX, Arithmetic>> const& for_node,
+        std::shared_ptr<compiled_loop_nest_node<VEX, Arithmetic>> const&
+            compute_compiler_node)
         : compiled_loop_nest_node(*compute_compiler_node)
     {
         order.insert(order.begin(),
@@ -783,7 +796,11 @@ public:
                               strides.at(inputs[1]), unroll_limit);
 #endif
 
-        loop_nest_code_generator<ISA> generated(
+        shared_aot_fn<void(Arithmetic*, Arithmetic const*, Arithmetic const*,
+                           int)>
+            aot_fn;
+
+        loop_nest_compiler<VEX, Arithmetic> generated(
             order, sizes, formulas.at(output), formulas.at(inputs[0]),
             formulas.at(inputs[1]), strides.at(output), strides.at(inputs[0]),
             strides.at(inputs[1]),
@@ -798,8 +815,8 @@ public:
             asm_dump = ::dabun::detail::get_temporary_file_name(".asm");
         }
 
-        auto aot_fn = std::move(generated).get_shared();
-        aot_fn.save_to_file("loop_nest.asm");
+        aot_fn = std::move(generated).get_shared();
+        // aot_fn.save_to_file("loop_nest.asm");
 
         if (spit_asm)
         {
@@ -847,8 +864,8 @@ public:
                      input_idx_0 = tensors_idx.at(inputs[0]),
                      input_idx_1 = tensors_idx.at(inputs[1]),
                      output_idx  = tensors_idx.at(output)](
-                        std::vector<float*>& tensors,
-                        std::vector<int>&    alpha_offsets) {
+                        std::vector<Arithmetic*>& tensors,
+                        std::vector<int>&         alpha_offsets) {
                         auto last_iter_mask =
                             alpha_offsets[output_idx] == last_iteration ? 0b0
                                                                         : 0b10;
@@ -864,16 +881,17 @@ public:
         else if (extra_tensors.size() == 1)
         {
             auto aot_casted =
-                aot_fn_cast<void(float*, float const*, float const*, int,
-                                 float const*)>(std::move(aot_fn));
+                aot_fn_cast<void(Arithmetic*, Arithmetic const*,
+                                 Arithmetic const*, int, Arithmetic const*)>(
+                    std::move(aot_fn));
 
             return {[aot_casted, alpha, last_iteration,
                      input_idx_0      = tensors_idx.at(inputs[0]),
                      input_idx_1      = tensors_idx.at(inputs[1]),
                      output_idx       = tensors_idx.at(output),
                      extra_tensor_idx = tensors_idx.at(extra_tensors[0])](
-                        std::vector<float*>& tensors,
-                        std::vector<int>&    alpha_offsets) {
+                        std::vector<Arithmetic*>& tensors,
+                        std::vector<int>&         alpha_offsets) {
                         aot_casted(
                             tensors[output_idx], tensors[input_idx_0],
                             tensors[input_idx_1],
@@ -887,10 +905,9 @@ public:
         }
         else if (extra_tensors.size() == 2)
         {
-            auto aot_casted =
-                aot_fn_cast<void(float*, float const*, float const*, int,
-                                 float const*, float const*)>(
-                    std::move(aot_fn));
+            auto aot_casted = aot_fn_cast<void(
+                Arithmetic*, Arithmetic const*, Arithmetic const*, int,
+                Arithmetic const*, Arithmetic const*)>(std::move(aot_fn));
 
             return {[aot_casted, alpha, last_iteration,
                      input_idx_0        = tensors_idx.at(inputs[0]),
@@ -898,8 +915,8 @@ public:
                      output_idx         = tensors_idx.at(output),
                      extra_tensor_idx_0 = tensors_idx.at(extra_tensors[0]),
                      extra_tensor_idx_1 = tensors_idx.at(extra_tensors[1])](
-                        std::vector<float*>& tensors,
-                        std::vector<int>&    alpha_offsets) {
+                        std::vector<Arithmetic*>& tensors,
+                        std::vector<int>&         alpha_offsets) {
                         aot_casted(
                             tensors[output_idx], tensors[input_idx_0],
                             tensors[input_idx_1],
@@ -938,11 +955,13 @@ public:
     }
 };
 
-template <class ISA>
-class compiled_transpose_node : public node<ISA>
+template <extension VEX, class Arithmetic>
+class compiled_transpose_node : public node<VEX, Arithmetic>
 {
 private:
-    using super_type = node<ISA>;
+    using ISA = typename extension_to_deprecated_ISA<VEX>::type;
+
+    using super_type = node<VEX, Arithmetic>;
 
     std::string                              input;
     std::string                              output;
@@ -980,13 +999,13 @@ public:
     {
     }
 
-    compiled_transpose_node(const compiled_transpose_node<ISA>& other) =
-        default;
+    compiled_transpose_node(
+        const compiled_transpose_node<VEX, Arithmetic>& other) = default;
 
     // creates initial transpose nest
     compiled_transpose_node(
-        std::shared_ptr<for_loop_node<ISA>> const&  for_node,
-        std::shared_ptr<transpose_node<ISA>> const& transpose_node)
+        std::shared_ptr<for_loop_node<VEX, Arithmetic>> const&  for_node,
+        std::shared_ptr<transpose_node<VEX, Arithmetic>> const& transpose_node)
         : compiled_transpose_node(
               transpose_node->get_input(), transpose_node->get_output(),
               {{for_node->get_var(), for_node->get_delta()}},
@@ -997,8 +1016,9 @@ public:
 
     // extends the tranpose nest
     compiled_transpose_node(
-        std::shared_ptr<for_loop_node<ISA>> const&           for_node,
-        std::shared_ptr<compiled_transpose_node<ISA>> const& transpose_compiler)
+        std::shared_ptr<for_loop_node<VEX, Arithmetic>> const& for_node,
+        std::shared_ptr<compiled_transpose_node<VEX, Arithmetic>> const&
+            transpose_compiler)
         : compiled_transpose_node(*transpose_compiler)
     {
         order.insert(order.begin(),
@@ -1017,7 +1037,8 @@ public:
                           order, sizes, strides.at(output), strides.at(input),
                           64 /* unroll_limit */)
                           .get_shared();
-        aot_fn.save_to_file("transpose.asm");
+
+        // aot_fn.save_to_file("transpose.asm");
 
         std::string asm_dump = "n/a";
 
@@ -1036,7 +1057,7 @@ public:
 
         return {[aot_fn, output_idx = tensors_idx.at(output),
                  input_idx = tensors_idx.at(input)](
-                    std::vector<float*>& tensors, std::vector<int>&) {
+                    std::vector<Arithmetic*>& tensors, std::vector<int>&) {
                     aot_fn(tensors[output_idx], tensors[input_idx]);
                 },
                 {std::make_shared<node_report>(info)}};

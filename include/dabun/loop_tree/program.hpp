@@ -26,11 +26,12 @@ namespace dabun
 namespace loop_tree
 {
 
+template <class Arithmetic>
 class program
 {
 private:
-    std::shared_ptr<node_report>                              report;
-    std::function<void(std::map<std::string, float*> const&)> fn;
+    std::shared_ptr<node_report>                                   report;
+    std::function<void(std::map<std::string, Arithmetic*> const&)> fn;
 
 public:
     program(){};
@@ -46,54 +47,61 @@ public:
     {
     }
 
-    void operator()(std::map<std::string, float*> const& m) const { fn(m); }
+    void operator()(std::map<std::string, Arithmetic*> const& m) const
+    {
+        fn(m);
+    }
 
     std::shared_ptr<node_report> const& get_report() const { return report; }
 };
 
-template <class ISA>
-node_ptr<ISA> merge_loop_into_compiler(
-    std::shared_ptr<for_loop_node<ISA>> const&           node,
-    std::shared_ptr<compiled_loop_nest_node<ISA>> const& child)
+template <extension VEX, class Arithmetic>
+node_ptr<VEX, Arithmetic> merge_loop_into_compiler(
+    std::shared_ptr<for_loop_node<VEX, Arithmetic>> const&           node,
+    std::shared_ptr<compiled_loop_nest_node<VEX, Arithmetic>> const& child)
 {
-    return node_ptr<ISA>(new compiled_loop_nest_node<ISA>(node, child));
+    return node_ptr<VEX, Arithmetic>(
+        new compiled_loop_nest_node<VEX, Arithmetic>(node, child));
 }
 
-template <class ISA>
-node_ptr<ISA>
-merge_loop_into_compiler(std::shared_ptr<for_loop_node<ISA>> const& node,
-                         std::shared_ptr<compute_node<ISA>> const&  child)
+template <extension VEX, class Arithmetic>
+node_ptr<VEX, Arithmetic> merge_loop_into_compiler(
+    std::shared_ptr<for_loop_node<VEX, Arithmetic>> const& node,
+    std::shared_ptr<compute_node<VEX, Arithmetic>> const&  child)
 {
-    return node_ptr<ISA>(new compiled_loop_nest_node<ISA>(node, child));
+    return node_ptr<VEX, Arithmetic>(
+        new compiled_loop_nest_node<VEX, Arithmetic>(node, child));
 }
 
-template <class ISA>
-node_ptr<ISA>
-merge_loop_into_compiler(std::shared_ptr<for_loop_node<ISA>> const&  node,
-                         std::shared_ptr<transpose_node<ISA>> const& child)
+template <extension VEX, class Arithmetic>
+node_ptr<VEX, Arithmetic> merge_loop_into_compiler(
+    std::shared_ptr<for_loop_node<VEX, Arithmetic>> const&  node,
+    std::shared_ptr<transpose_node<VEX, Arithmetic>> const& child)
 {
-    return node_ptr<ISA>(new compiled_transpose_node<ISA>(node, child));
+    return node_ptr<VEX, Arithmetic>(
+        new compiled_transpose_node<VEX, Arithmetic>(node, child));
 }
 
-template <class ISA>
-node_ptr<ISA> merge_loop_into_compiler(
-    std::shared_ptr<for_loop_node<ISA>> const&           node,
-    std::shared_ptr<compiled_transpose_node<ISA>> const& child)
+template <extension VEX, class Arithmetic>
+node_ptr<VEX, Arithmetic> merge_loop_into_compiler(
+    std::shared_ptr<for_loop_node<VEX, Arithmetic>> const&           node,
+    std::shared_ptr<compiled_transpose_node<VEX, Arithmetic>> const& child)
 {
-    return node_ptr<ISA>(new compiled_transpose_node<ISA>(node, child));
+    return node_ptr<VEX, Arithmetic>(
+        new compiled_transpose_node<VEX, Arithmetic>(node, child));
 }
 
-template <class ISA>
-node_ptr<ISA> simplify_loop_nests(node_ptr<ISA> const& node,
-                                  int                  current_depth = 0,
-                                  int max_interpreted_depth          = 0)
+template <extension VEX, class Arithmetic>
+node_ptr<VEX, Arithmetic>
+simplify_loop_nests(node_ptr<VEX, Arithmetic> const& node,
+                    int current_depth = 0, int max_interpreted_depth = 0)
 {
     if (node->kind() != node_kind::for_loop)
     {
         return node;
     }
 
-    std::vector<node_ptr<ISA>> new_children;
+    std::vector<node_ptr<VEX, Arithmetic>> new_children;
     for (auto c : node->get_children())
     {
         new_children.push_back(
@@ -114,8 +122,9 @@ node_ptr<ISA> simplify_loop_nests(node_ptr<ISA> const& node,
         return node;
     }
 
-    auto for_node = std::dynamic_pointer_cast<for_loop_node<ISA>>(node);
-    node_ptr<ISA> single_child = new_children.at(0);
+    auto for_node =
+        std::dynamic_pointer_cast<for_loop_node<VEX, Arithmetic>>(node);
+    node_ptr<VEX, Arithmetic> single_child = new_children.at(0);
 
     switch (single_child->kind())
     {
@@ -126,26 +135,29 @@ node_ptr<ISA> simplify_loop_nests(node_ptr<ISA> const& node,
 
     case node_kind::compute:
         return merge_loop_into_compiler(
-            for_node,
-            std::dynamic_pointer_cast<compute_node<ISA>>(single_child));
+            for_node, std::dynamic_pointer_cast<compute_node<VEX, Arithmetic>>(
+                          single_child));
         break;
 
     case node_kind::compiled_loop_nest:
         return merge_loop_into_compiler(
-            for_node, std::dynamic_pointer_cast<compiled_loop_nest_node<ISA>>(
-                          single_child));
+            for_node,
+            std::dynamic_pointer_cast<compiled_loop_nest_node<VEX, Arithmetic>>(
+                single_child));
         break;
 
     case node_kind::transpose:
         return merge_loop_into_compiler(
             for_node,
-            std::dynamic_pointer_cast<transpose_node<ISA>>(single_child));
+            std::dynamic_pointer_cast<transpose_node<VEX, Arithmetic>>(
+                single_child));
         break;
 
     case node_kind::compiled_transpose:
         return merge_loop_into_compiler(
-            for_node, std::dynamic_pointer_cast<compiled_transpose_node<ISA>>(
-                          single_child));
+            for_node,
+            std::dynamic_pointer_cast<compiled_transpose_node<VEX, Arithmetic>>(
+                single_child));
         break;
 
     default:
@@ -153,10 +165,11 @@ node_ptr<ISA> simplify_loop_nests(node_ptr<ISA> const& node,
     }
 }
 
-template <class ISA>
-inline std::string
-dump_recursively(node_ptr<ISA> const& node, formulas_map_type const& formulas,
-                 std::map<std::string, int> const& sizes, std::string& indent)
+template <extension VEX, class Arithmetic>
+inline std::string dump_recursively(node_ptr<VEX, Arithmetic> const&  node,
+                                    formulas_map_type const&          formulas,
+                                    std::map<std::string, int> const& sizes,
+                                    std::string&                      indent)
 {
     std::ostringstream ss;
     ss << node->dump(formulas, sizes, indent);
@@ -173,10 +186,9 @@ dump_recursively(node_ptr<ISA> const& node, formulas_map_type const& formulas,
     return ss.str();
 }
 
-inline std::int64_t get_tensor_size(std::string const&                name,
-                                    strides_map_type const&           strides,
-                                    std::map<std::string, int> const& sizes,
-                                    formulas_map_type const&          formulas)
+inline std::int64_t get_tensor_num_elements(
+    std::string const& name, strides_map_type const& strides,
+    std::map<std::string, int> const& sizes, formulas_map_type const& formulas)
 {
     std::int64_t size = 1;
     for (auto const& s : sizes)
@@ -184,13 +196,14 @@ inline std::int64_t get_tensor_size(std::string const&                name,
         if (formulas.at(name).count(s.first))
             size += (s.second - 1) * strides.at(name).at(s.first);
     }
-    size *= 4;
+    // size *= 4;
     return size;
 }
 
-template <class ISA>
+template <extension VEX, class Arithmetic>
 std::int64_t get_largest_intermediate_output_size(
-    node_ptr<ISA> const& node, std::vector<std::string> const& provided_tensors,
+    node_ptr<VEX, Arithmetic> const&  node,
+    std::vector<std::string> const&   provided_tensors,
     std::map<std::string, int> const& sizes, formulas_map_type const& formulas)
 {
     std::int64_t max_size = 0;
@@ -221,9 +234,10 @@ std::int64_t get_largest_intermediate_output_size(
 
         for (auto const& name : possible_intermediates)
         {
-            max_size = std::max(
-                max_size, get_tensor_size(name, node->get_tensor_strides(),
-                                          sizes, formulas));
+            max_size = std::max(max_size, get_tensor_num_elements(
+                                              name, node->get_tensor_strides(),
+                                              sizes, formulas) *
+                                              sizeof(Arithmetic));
         }
 
         return max_size;
@@ -233,13 +247,13 @@ std::int64_t get_largest_intermediate_output_size(
     }
 }
 
-template <class ISA>
+template <extension VEX, class Arithmetic>
 class loop_tree_program
 {
 private:
-    std::vector<node_ptr<ISA>> nodes;
-    std::map<std::string, int> sizes;
-    formulas_map_type          formulas;
+    std::vector<node_ptr<VEX, Arithmetic>> nodes;
+    std::map<std::string, int>             sizes;
+    formulas_map_type                      formulas;
     // for forcing partially interpreted trees (mainly for testing)
     int max_interpreted_depth;
 
@@ -247,9 +261,9 @@ private:
     std::map<std::string, int> tensors_idx;
 
 public:
-    loop_tree_program(std::vector<node_ptr<ISA>> const& nodes,
-                      std::map<std::string, int> const& sizes,
-                      formulas_map_type const&          formulas,
+    loop_tree_program(std::vector<node_ptr<VEX, Arithmetic>> const& nodes,
+                      std::map<std::string, int> const&             sizes,
+                      formulas_map_type const&                      formulas,
                       std::optional<int> max_interpreted_depth = std::nullopt)
         : nodes(nodes)
         , sizes(sizes)
@@ -262,7 +276,7 @@ public:
         LN_LOG(DEBUG) << dump();
 
         LN_LOG(DEBUG) << "Pass: Simplifying loop nests\n";
-        std::vector<node_ptr<ISA>> new_nodes;
+        std::vector<node_ptr<VEX, Arithmetic>> new_nodes;
         for (auto c : nodes)
         {
             new_nodes.push_back(
@@ -290,7 +304,10 @@ public:
         };
     }
 
-    std::vector<node_ptr<ISA>> const& get_children() { return nodes; }
+    std::vector<node_ptr<VEX, Arithmetic>> const& get_children()
+    {
+        return nodes;
+    }
 
     std::string dump() const
     {
@@ -316,7 +333,7 @@ public:
         return max_size;
     }
 
-    program get_fn(bool spit_asm = true) const
+    program<Arithmetic> get_fn(bool spit_asm = true) const
     {
         std::vector<loop_tree_fn_type> sub_functions;
         // added to alpha at runtime to handle tensor initialization
@@ -334,36 +351,38 @@ public:
             report.insert(report.end(), sub.second.begin(), sub.second.end());
         }
 
-        return program(std::make_shared<node_report>(program_node_info{0, 0},
-                                                     std::move(report)),
-                       [sub_functions, alpha_offsets_size,
-                        tensors_idx = this->tensors_idx](
-                           std::map<std::string, float*> const& tensors) {
-                           std::vector<int>    alpha_offs(alpha_offsets_size);
-                           std::vector<float*> tensors_vec(tensors_idx.size());
-                           for (auto const& e : tensors)
-                           {
-                               int idx          = tensors_idx.at(e.first);
-                               tensors_vec[idx] = e.second;
-                           }
+        return program<Arithmetic>(
+            std::make_shared<node_report>(program_node_info{0, 0},
+                                          std::move(report)),
+            [sub_functions, alpha_offsets_size,
+             tensors_idx = this->tensors_idx](
+                std::map<std::string, Arithmetic*> const& tensors) {
+                std::vector<int>         alpha_offs(alpha_offsets_size);
+                std::vector<Arithmetic*> tensors_vec(tensors_idx.size());
+                for (auto const& e : tensors)
+                {
+                    int idx          = tensors_idx.at(e.first);
+                    tensors_vec[idx] = e.second;
+                }
 
-                           for (auto const& f : sub_functions)
-                           {
-                               f(tensors_vec, alpha_offs);
-                           }
-                       });
+                for (auto const& f : sub_functions)
+                {
+                    f(tensors_vec, alpha_offs);
+                }
+            });
     }
 };
 
-template <class ISA>
-std::shared_ptr<loop_tree_program<ISA>>
-make_loop_tree_program(std::vector<node_ptr<ISA>> const& nodes,
-                       std::map<std::string, int> const& sizes,
-                       formulas_map_type const&          formulas,
+template <extension VEX, class Arithmetic>
+std::shared_ptr<loop_tree_program<VEX, Arithmetic>>
+make_loop_tree_program(std::vector<node_ptr<VEX, Arithmetic>> const& nodes,
+                       std::map<std::string, int> const&             sizes,
+                       formulas_map_type const&                      formulas,
                        std::optional<int> max_interpreted_depth = std::nullopt)
 {
-    return std::shared_ptr<loop_tree_program<ISA>>(new loop_tree_program<ISA>(
-        nodes, sizes, formulas, max_interpreted_depth));
+    return std::shared_ptr<loop_tree_program<VEX, Arithmetic>>(
+        new loop_tree_program<VEX, Arithmetic>(nodes, sizes, formulas,
+                                               max_interpreted_depth));
 }
 
 } // namespace loop_tree

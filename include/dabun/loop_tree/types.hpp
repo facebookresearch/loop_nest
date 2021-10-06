@@ -3,6 +3,7 @@
 #pragma once
 
 #include "dabun/elementwise_operation.hpp"
+#include "dabun/isa.hpp"
 
 #include <map>
 #include <memory>
@@ -15,7 +16,7 @@ namespace loop_tree
 {
 
 // forward declaration
-template <class ISA>
+template <extension, class>
 class node;
 
 // Type aliases for readability
@@ -32,8 +33,8 @@ using formulas_map_type = std::map<std::string, std::set<std::string>>;
 template <class ISA>
 using elementwise_op_ptr = std::shared_ptr<elementwise_operation<ISA>>;
 
-template <class ISA>
-using node_ptr = std::shared_ptr<node<ISA>>;
+template <extension VEX, class Arithmetic>
+using node_ptr = std::shared_ptr<node<VEX, Arithmetic>>;
 
 // Note: add classes from dabun/arithmetic_operations.hpp
 // as needed
