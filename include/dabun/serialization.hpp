@@ -17,12 +17,12 @@ namespace dabun
 namespace detail
 {
 
-static inline std::string to_string(std::string s) { return s; }
+inline std::string to_string(std::string s) { return s; }
 
-static inline std::string to_string(int v) { return std::to_string(v); }
+inline std::string to_string(int v) { return std::to_string(v); }
 
 template <class K, class V>
-static inline std::string to_string(std::map<K, V> m)
+std::string to_string(std::map<K, V> m)
 {
     std::ostringstream out;
     int                i = 1;
@@ -42,7 +42,7 @@ static inline std::string to_string(std::map<K, V> m)
 }
 
 template <class V>
-static inline std::string to_string(const std::set<V> s)
+std::string to_string(const std::set<V> s)
 {
     std::ostringstream out;
     int                i = 1;
@@ -60,7 +60,7 @@ static inline std::string to_string(const std::set<V> s)
 }
 
 template <class V1, class V2>
-static inline std::string to_string(const std::pair<V1, V2> p)
+std::string to_string(const std::pair<V1, V2> p)
 {
     std::ostringstream out;
     out << to_string(p.first);
@@ -69,7 +69,7 @@ static inline std::string to_string(const std::pair<V1, V2> p)
     return out.str();
 }
 
-static inline std::vector<std::string> get_tokens(std::string line, char delim)
+inline std::vector<std::string> get_tokens(std::string line, char delim)
 {
     std::vector<std::string> tokens;
     std::stringstream        ss(line);
@@ -82,8 +82,7 @@ static inline std::vector<std::string> get_tokens(std::string line, char delim)
     return tokens;
 }
 
-static inline std::vector<std::vector<std::string>>
-get_tokenized(std::string str)
+inline std::vector<std::vector<std::string>> get_tokenized(std::string str)
 {
     auto lines = get_tokens(str, '\n');
 
@@ -156,7 +155,7 @@ private:
     // assumes no pre/post-ops for now
     // these are kind of janky in the halide translator...
 
-    std::string order_to_string()
+    inline std::string order_to_string()
     {
         std::ostringstream out;
         int                i = 1;
@@ -173,14 +172,14 @@ private:
         return out.str();
     }
 
-    std::string sizes_to_string()
+    inline std::string sizes_to_string()
     {
         std::ostringstream out;
         out << to_string(sizes);
         return out.str();
     }
 
-    std::string formulas_to_string()
+    inline std::string formulas_to_string()
     {
         std::ostringstream out;
         out << to_string(formulas.at("C")) << "\n";
@@ -189,7 +188,7 @@ private:
         return out.str();
     }
 
-    std::string strides_to_string()
+    inline std::string strides_to_string()
     {
         std::ostringstream out;
         out << to_string(strides.at("C")) << "\n";
@@ -198,7 +197,7 @@ private:
         return out.str();
     }
 
-    std::string unroll_limit_to_string()
+    inline std::string unroll_limit_to_string()
     {
         std::ostringstream out;
         if (user_unroll_limit)
@@ -212,7 +211,7 @@ private:
         return out.str();
     }
 
-    std::vector<std::pair<std::string, int>>
+    inline std::vector<std::pair<std::string, int>>
     parse_vector_pairs(std::vector<std::string> tokens)
     {
         std::vector<std::pair<std::string, int>> out;
@@ -232,13 +231,13 @@ private:
         return out;
     }
 
-    std::set<std::string> parse_set(std::vector<std::string> tokens)
+    inline std::set<std::string> parse_set(std::vector<std::string> tokens)
     {
         std::set<std::string> formula(tokens.begin(), tokens.end());
         return formula;
     }
 
-    std::map<std::string, int> parse_map(std::vector<std::string> tokens)
+    inline std::map<std::string, int> parse_map(std::vector<std::string> tokens)
     {
         std::map<std::string, int> out;
         std::string                key;
@@ -257,24 +256,30 @@ private:
     }
 
 public:
-    std::vector<std::pair<std::string, int>> get_order() const { return order; }
+    inline std::vector<std::pair<std::string, int>> get_order() const
+    {
+        return order;
+    }
 
-    std::set<std::string> get_formula(std::string name) const
+    inline std::set<std::string> get_formula(std::string name) const
     {
         return formulas.at(name);
     }
 
-    std::map<std::string, int> get_sizes() const { return sizes; }
+    inline std::map<std::string, int> get_sizes() const { return sizes; }
 
-    std::map<std::string, int> get_strides(std::string name) const
+    inline std::map<std::string, int> get_strides(std::string name) const
     {
         return strides.at(name);
     }
 
-    std::optional<int> get_unroll_limit() const { return user_unroll_limit; }
+    inline std::optional<int> get_unroll_limit() const
+    {
+        return user_unroll_limit;
+    }
 
     // loop nest style constructor
-    serialized_loop_nest_inputs(
+    inline serialized_loop_nest_inputs(
         std::vector<std::pair<std::string, int>> const& order,
         std::map<std::string, int> const&               sizes,
         std::set<std::string> const&                    C_formula,
@@ -292,7 +297,7 @@ public:
     {
     }
     // serialize
-    std::string str()
+    inline std::string str()
     {
         std::stringstream out;
         out << order_to_string() << "\n";
@@ -303,7 +308,7 @@ public:
         return out.str();
     }
 
-    void to_file(std::string file_path)
+    inline void to_file(std::string file_path)
     {
 
         std::ofstream fout(file_path);
@@ -312,7 +317,7 @@ public:
     }
 
     // deserialize
-    serialized_loop_nest_inputs(std::string input)
+    inline serialized_loop_nest_inputs(std::string input)
     {
         auto tokenized_lines = get_tokenized(input);
         assert(tokenized_lines.size() == 9);
