@@ -1,7 +1,10 @@
+// Copyright 2004-present Facebook. All Rights Reserved.
+
 #pragma once
 
 #include "dabun/aot_fn.hpp"
 #include "dabun/core.hpp"
+#include "dabun/isa.hpp"
 #include "dabun/memory_resource.hpp"
 #include "dabun/xbyak.hpp"
 
@@ -97,7 +100,7 @@ private:
         return T(ptr, size, get_deleter());
     }
 
-#if defined(DABUN_ARM)
+#if defined(DABUN_ARCH_AARCH64)
 
 protected:
     std::vector<std::any> raii;
@@ -113,7 +116,7 @@ public:
 #endif
 
 public:
-#if !defined(DABUN_ARM)
+#if !defined(DABUN_ARCH_AARCH64)
     using Reg64  = Xbyak::Reg64;
     using Label  = Xbyak::Label;
     using Xmm    = Xbyak::Xmm;

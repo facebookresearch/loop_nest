@@ -2,9 +2,10 @@
 
 #pragma once
 
+#include "dabun/isa.hpp"
 #include "dabun/namespace.hpp"
 
-#if defined(DABUN_ARM)
+#if defined(DABUN_ARCH_AARCH64)
 #include "dabun/arm/peak_gflops.hpp"
 #else
 #include "dabun/x86/peak_gflops.hpp"

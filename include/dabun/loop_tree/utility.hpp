@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "dabun/arithmetic_operation.hpp"
+#include "dabun/isa.hpp"
 #include "dabun/loop_tree/types.hpp"
 
 namespace dabun
@@ -24,7 +25,7 @@ get_operation_pair(arithmetic_op_kind plus_op, arithmetic_op_kind multiplies_op)
 
     std::map<std::pair<arithmetic_op_kind, arithmetic_op_kind>,
              std::shared_ptr<operation_pair_base>>
-#ifndef LOOP_NEST_ARM
+#ifndef DABUN_ARCH_AARCH64
         op_map = {
             {{arithmetic_op_kind::plus, arithmetic_op_kind::multiplies},
              std::make_shared<

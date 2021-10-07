@@ -6,7 +6,7 @@
 #include "dabun/isa.hpp"
 #include "dabun/namespace.hpp"
 
-#if defined(DABUN_ARM)
+#if defined(DABUN_ARCH_AARCH64)
 #include "dabun/arm/loop_nest.hpp"
 #include "dabun/arm/loop_nest_fp16.hpp"
 #else
@@ -18,7 +18,7 @@ namespace dabun
 
 using DABUN_ISA_NAMESPACE ::loop_nest_code_generator;
 
-#if defined(DABUN_ARM)
+#if defined(DABUN_ARCH_AARCH64)
 
 using DABUN_ISA_NAMESPACE ::loop_nest_fp16_code_generator;
 

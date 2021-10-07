@@ -2,9 +2,10 @@
 
 #pragma once
 
+#include "dabun/isa.hpp"
 #include "dabun/namespace.hpp"
 
-#if defined(DABUN_ARM)
+#if defined(DABUN_ARCH_AARCH64)
 #include "dabun/arm/elementwise_operation.hpp"
 #else
 #include "dabun/x86/elementwise_operation.hpp"

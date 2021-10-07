@@ -1,8 +1,11 @@
+// Copyright 2004-present Facebook. All Rights Reserved.
+
 #pragma once
 
+#include "dabun/isa.hpp"
 #include "dabun/xbyak.hpp"
 
-#if !defined(DABUN_ARM)
+#if !defined(DABUN_ARCH_AARCH64)
 #include "dabun/x86/aot_perf.hpp"
 #endif
 
@@ -129,7 +132,7 @@ public:
         fout.write(reinterpret_cast<char*>(executable_buffer_.get()), size_);
     }
 
-#if !defined(DABUN_ARM)
+#if !defined(DABUN_ARCH_AARCH64)
     void register_perf(std::string const& name = "")
     {
         get_xbyak_profiler().set(name.c_str(), executable_buffer_.get(),
@@ -217,7 +220,7 @@ public:
         fout.write(reinterpret_cast<char*>(executable_buffer_.get()), size_);
     }
 
-#if !defined(DABUN_ARM)
+#if !defined(DABUN_ARCH_AARCH64)
     void register_perf(std::string const& name = "")
     {
         get_xbyak_profiler().set(name.c_str(), executable_buffer_.get(),
@@ -320,7 +323,7 @@ public:
         fout.write(reinterpret_cast<char*>(executable_buffer_ptr_), size_);
     }
 
-#if !defined(DABUN_ARM)
+#if !defined(DABUN_ARCH_AARCH64)
     void register_perf(std::string const& name = "")
     {
         get_xbyak_profiler().set(name.c_str(), executable_buffer_ptr_,
