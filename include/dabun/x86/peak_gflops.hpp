@@ -12,7 +12,7 @@ namespace dabun
 namespace x86
 {
 
-template <class ISA>
+template <class ISA, class = float>
 struct bench_gflops
 {
 private:
@@ -56,7 +56,7 @@ private:
 public:
     static double do_bench(int iterations = 10000000)
     {
-        auto  fn = test(iterations).get_shared();
+        auto  fn      = test(iterations).get_shared();
         float data[1] = {0};
 
         auto secs = measure_fastest([&]() { fn(data); }, 100);

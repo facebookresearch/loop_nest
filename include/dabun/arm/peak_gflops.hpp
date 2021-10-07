@@ -10,11 +10,11 @@ namespace dabun
 namespace arm
 {
 
-template <class ISA>
+template <class ISA, class Arithmetic = float>
 struct bench_gflops;
 
-template <>
-struct bench_gflops<aarch64>
+template <class Arithmetic>
+struct bench_gflops<aarch64, Arithmetic>
 {
 private:
     static constexpr int vector_size = isa_traits<aarch64>::vector_size;
@@ -38,13 +38,27 @@ private:
 
             for (int i = 0; i < 10; ++i)
             {
-                for (int r = 2; r < 8; ++r)
+                if constexpr (std::is_same_v<Arithmetic, float>)
                 {
-                    fmla(VReg(r).s4, v0.s4, v1.s4);
+                    for (int r = 2; r < 8; ++r)
+                    {
+                        fmla(VReg(r).s4, v0.s4, v1.s4);
+                    }
+                    for (int r = 16; r < 32; ++r)
+                    {
+                        fmla(VReg(r).s4, v0.s4, v1.s4);
+                    }
                 }
-                for (int r = 16; r < 32; ++r)
+                else
                 {
-                    fmla(VReg(r).s4, v0.s4, v1.s4);
+                    for (int r = 2; r < 8; ++r)
+                    {
+                        fmla(VReg(r).h8, v0.h8, v1.h8);
+                    }
+                    for (int r = 16; r < 32; ++r)
+                    {
+                        fmla(VReg(r).h8, v0.h8, v1.h8);
+                    }
                 }
             }
 
@@ -62,8 +76,8 @@ public:
 
         auto secs = measure_fastest([&]() { fn(iterations); }, 100);
 
-        double gflops =
-            2.0 * iterations * 10 * (16 + 6) * vector_size / 1000000000;
+        double gflops = 2.0 * iterations * 10 * (16 + 6) *
+                        (vector_size * 4 / sizeof(Arithmetic)) / 1000000000;
 
         return gflops / secs;
     }

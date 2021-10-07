@@ -13,10 +13,10 @@
 namespace dabun
 {
 
-template <class T>
-double peak_gflops(T const&, int iterations = 1000000)
+template <class T, class A>
+double peak_gflops(int iterations = 1000000)
 {
-    return DABUN_ISA_NAMESPACE ::bench_gflops<T>::do_bench(iterations);
+    return DABUN_ISA_NAMESPACE ::bench_gflops<T, A>::do_bench(iterations);
 }
 
 } // namespace dabun
