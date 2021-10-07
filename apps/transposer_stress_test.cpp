@@ -16,9 +16,15 @@
 #include <string>
 #include <vector>
 
+#ifndef DABUN_ARITHMETIC
+#define DABUN_ARITHMETIC float
+#endif
+
 int main()
 {
     using namespace dabun;
+
+    using float_t = DABUN_ARITHMETIC;
 
     srand(0);
 
@@ -54,7 +60,8 @@ int main()
                     if (o.second != 1)
                     {
                         o.second = round_up(o.second,
-                                            isa_traits<DABUN_ISA>::vector_size);
+                                            isa_traits<DABUN_ISA>::vector_size *
+                                                4 / sizeof(float_t));
                     }
                 }
                 std::cout << o.first << "=" << o.second << "  ";
@@ -65,16 +72,16 @@ int main()
 
             std::cout << "MU=" << max_unrolled << std::endl;
 
-            auto fn_baselome =
-                transposer_baseline(full_order, // The second argument is a
-                                                // map of the dimension sizes
-                                    {{"AcBr", AcBr}, {"ArCr", ArCr}},
-                                    // out's strides for each variable.
-                                    {{"ArCr", AcBr}, {"AcBr", 1}},
-                                    // in's strides for each variable
-                                    {{"ArCr", 1}, {"AcBr", ArCr}});
+            auto fn_baselome = transposer_baseline<float_t>(
+                full_order, // The second argument is a
+                            // map of the dimension sizes
+                {{"AcBr", AcBr}, {"ArCr", ArCr}},
+                // out's strides for each variable.
+                {{"ArCr", AcBr}, {"AcBr", 1}},
+                // in's strides for each variable
+                {{"ArCr", 1}, {"AcBr", ArCr}});
 
-            auto fn = transposer_code_generator<DABUN_ISA>(
+            auto fn = transposer_code_generator<DABUN_ISA, float_t>(
                           full_order, // The second argument is a map of the
                                       // dimension sizes
                           {{"AcBr", AcBr}, {"ArCr", ArCr}},
@@ -86,8 +93,8 @@ int main()
 
             fn.save_to_file("zi.asm");
 
-            auto A  = get_random_vector<float>(AcBr * ArCr);
-            auto CN = get_random_vector<float>(ArCr * AcBr);
+            auto A  = get_random_vector<float_t>(AcBr * ArCr);
+            auto CN = get_random_vector<float_t>(ArCr * AcBr);
             auto CJ = CN;
 
             fn_baselome(CN.data(), A.data());

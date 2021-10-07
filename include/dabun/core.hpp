@@ -33,6 +33,15 @@ struct overloaded : Ts...
 
 // explicit deduction guide (not needed as of C++20)
 template <class... Ts>
-overloaded(Ts...)->overloaded<Ts...>;
+overloaded(Ts...) -> overloaded<Ts...>;
+
+template <class T>
+struct identity_type
+{
+    using type = T;
+};
+
+template <class T>
+using identity_type_t = typename identity_type<T>::type;
 
 } // namespace dabun
