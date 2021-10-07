@@ -5,6 +5,7 @@
 #include "baselines.hpp"
 #include "dabun/arithmetic_operation.hpp"
 #include "dabun/check.hpp"
+#include "dabun/float.hpp"
 #include "dabun/loop_tree/program.hpp"
 #include "dabun/random_vector.hpp"
 #include "dabun/transposer.hpp"
@@ -41,6 +42,9 @@ using namespace dabun::loop_tree;
 
 int main()
 {
+
+    using float_t = DABUN_ARITHMETIC;
+
     {
         /*
         C = 0
@@ -125,20 +129,20 @@ int main()
        ----------> Execution
        */
 
-        auto A  = get_random_vector<float>(AcBr * ArCr);
-        auto B1 = get_random_vector<float>(AcBr * BcCc);
-        auto B2 = get_random_vector<float>(AcBr * BcCc);
-        auto CN = get_random_vector<float>(ArCr * BcCc);
+        auto A  = get_random_vector<float_t>(AcBr * ArCr);
+        auto B1 = get_random_vector<float_t>(AcBr * BcCc);
+        auto B2 = get_random_vector<float_t>(AcBr * BcCc);
+        auto CN = get_random_vector<float_t>(ArCr * BcCc);
         auto CJ = CN;
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
                     B1.data(), CN.data(), 0);
         apply_relu(CN.data(), CN.data() + ArCr * BcCc);
 
-        std::map<std::string, float*> tensors = {{"C", CJ.data()},
-                                                 {"A", A.data()},
-                                                 {"B1", B1.data()},
-                                                 {"B2", B2.data()}};
+        std::map<std::string, float_t*> tensors = {{"C", CJ.data()},
+                                                   {"A", A.data()},
+                                                   {"B1", B1.data()},
+                                                   {"B2", B2.data()}};
 
         fn(tensors);
 
@@ -234,14 +238,14 @@ int main()
         ----------> Execution
         */
 
-        auto A1  = get_random_vector<float>(AcBr1 * ArCr);
-        auto B1  = get_random_vector<float>(AcBr1 * BcCc);
-        auto CN1 = get_random_vector<float>(ArCr * BcCc);
+        auto A1  = get_random_vector<float_t>(AcBr1 * ArCr);
+        auto B1  = get_random_vector<float_t>(AcBr1 * BcCc);
+        auto CN1 = get_random_vector<float_t>(ArCr * BcCc);
         auto CJ1 = CN1;
 
-        auto A2  = get_random_vector<float>(AcBr2 * ArCr);
-        auto B2  = get_random_vector<float>(AcBr2 * BcCc);
-        auto CN2 = get_random_vector<float>(ArCr * BcCc);
+        auto A2  = get_random_vector<float_t>(AcBr2 * ArCr);
+        auto B2  = get_random_vector<float_t>(AcBr2 * BcCc);
+        auto CN2 = get_random_vector<float_t>(ArCr * BcCc);
         auto CJ2 = CN2;
 
         baseline_MM(ArCr, AcBr1, BcCc, AcBr1, 1, BcCc, 1, BcCc, 1, A1.data(),
@@ -250,7 +254,7 @@ int main()
         baseline_MM(ArCr, AcBr2, BcCc, AcBr2, 1, BcCc, 1, BcCc, 1, A2.data(),
                     B2.data(), CN2.data(), 1);
 
-        std::map<std::string, float*> tensors = {
+        std::map<std::string, float_t*> tensors = {
             {"C1", CJ1.data()}, {"A1", A1.data()}, {"B1", B1.data()},
             {"C2", CJ2.data()}, {"A2", A2.data()}, {"B2", B2.data()}};
 
@@ -354,14 +358,14 @@ int main()
         ----------> Execution
         */
 
-        auto A1  = get_random_vector<float>(AcBr1 * ArCr);
-        auto B1  = get_random_vector<float>(AcBr1 * BcCc);
-        auto CN1 = get_random_vector<float>(ArCr * BcCc);
+        auto A1  = get_random_vector<float_t>(AcBr1 * ArCr);
+        auto B1  = get_random_vector<float_t>(AcBr1 * BcCc);
+        auto CN1 = get_random_vector<float_t>(ArCr * BcCc);
         auto CJ1 = CN1;
 
-        auto A2  = get_random_vector<float>(AcBr2 * ArCr);
-        auto B2  = get_random_vector<float>(AcBr2 * BcCc);
-        auto CN2 = get_random_vector<float>(ArCr * BcCc);
+        auto A2  = get_random_vector<float_t>(AcBr2 * ArCr);
+        auto B2  = get_random_vector<float_t>(AcBr2 * BcCc);
+        auto CN2 = get_random_vector<float_t>(ArCr * BcCc);
         auto CJ2 = CN2;
 
         baseline_MM(ArCr, AcBr1, BcCc, AcBr1, 1, BcCc, 1, BcCc, 1, A1.data(),
@@ -370,7 +374,7 @@ int main()
         baseline_MM(ArCr, AcBr2, BcCc, AcBr2, 1, BcCc, 1, BcCc, 1, A2.data(),
                     B2.data(), CN2.data(), 0);
 
-        std::map<std::string, float*> tensors = {
+        std::map<std::string, float_t*> tensors = {
             {"C1", CJ1.data()}, {"A1", A1.data()}, {"B1", B1.data()},
             {"C2", CJ2.data()}, {"A2", A2.data()}, {"B2", B2.data()}};
 
@@ -476,14 +480,14 @@ int main()
        ----------> Execution
        */
 
-        auto A1  = get_random_vector<float>(AcBr1 * ArCr);
-        auto B1  = get_random_vector<float>(AcBr1 * BcCc);
-        auto CN1 = get_random_vector<float>(ArCr * BcCc);
+        auto A1  = get_random_vector<float_t>(AcBr1 * ArCr);
+        auto B1  = get_random_vector<float_t>(AcBr1 * BcCc);
+        auto CN1 = get_random_vector<float_t>(ArCr * BcCc);
         auto CJ1 = CN1;
 
-        auto A2  = get_random_vector<float>(AcBr2 * ArCr);
-        auto B2  = get_random_vector<float>(AcBr2 * BcCc);
-        auto CN2 = get_random_vector<float>(ArCr * BcCc);
+        auto A2  = get_random_vector<float_t>(AcBr2 * ArCr);
+        auto B2  = get_random_vector<float_t>(AcBr2 * BcCc);
+        auto CN2 = get_random_vector<float_t>(ArCr * BcCc);
         auto CJ2 = CN2;
 
         baseline_MM(ArCr, AcBr1, BcCc, AcBr1, 1, BcCc, 1, BcCc, 1, A1.data(),
@@ -492,7 +496,7 @@ int main()
         baseline_MM(ArCr, AcBr2, BcCc, AcBr2, 1, BcCc, 1, BcCc, 1, A2.data(),
                     B2.data(), CN2.data(), 0);
 
-        std::map<std::string, float*> tensors = {
+        std::map<std::string, float_t*> tensors = {
             {"C1", CJ1.data()}, {"A1", A1.data()}, {"B1", B1.data()},
             {"C2", CJ2.data()}, {"A2", A2.data()}, {"B2", B2.data()}};
 
@@ -608,14 +612,14 @@ int main()
        ----------> Execution
        */
 
-        auto A1  = get_random_vector<float>(AcBr1 * ArCr1);
-        auto B1  = get_random_vector<float>(AcBr1 * BcCc);
-        auto CN1 = get_random_vector<float>(ArCr1 * BcCc);
+        auto A1  = get_random_vector<float_t>(AcBr1 * ArCr1);
+        auto B1  = get_random_vector<float_t>(AcBr1 * BcCc);
+        auto CN1 = get_random_vector<float_t>(ArCr1 * BcCc);
         auto CJ1 = CN1;
 
-        auto A2  = get_random_vector<float>(AcBr2 * ArCr2);
-        auto B2  = get_random_vector<float>(AcBr2 * BcCc);
-        auto CN2 = get_random_vector<float>(ArCr2 * BcCc);
+        auto A2  = get_random_vector<float_t>(AcBr2 * ArCr2);
+        auto B2  = get_random_vector<float_t>(AcBr2 * BcCc);
+        auto CN2 = get_random_vector<float_t>(ArCr2 * BcCc);
         auto CJ2 = CN2;
 
         baseline_MM(ArCr1, AcBr1, BcCc, AcBr1, 1, BcCc, 1, BcCc, 1, A1.data(),
@@ -624,7 +628,7 @@ int main()
         baseline_MM(ArCr2, AcBr2, BcCc, AcBr2, 1, BcCc, 1, BcCc, 1, A2.data(),
                     B2.data(), CN2.data(), 1);
 
-        std::map<std::string, float*> tensors = {
+        std::map<std::string, float_t*> tensors = {
             {"C1", CJ1.data()}, {"A1", A1.data()}, {"B1", B1.data()},
             {"C2", CJ2.data()}, {"A2", A2.data()}, {"B2", B2.data()}};
 
@@ -693,10 +697,10 @@ int main()
 
         auto fn = tree->get_fn();
 
-        auto A = get_random_vector<float>(AcBr * ArCr);
-        auto B = get_random_vector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float_t>(AcBr * ArCr);
+        auto B = get_random_vector<float_t>(AcBr * BcCc);
 
-        auto CN = get_random_vector<float>(ArCr * BcCc);
+        auto CN = get_random_vector<float_t>(ArCr * BcCc);
         auto CJ = CN;
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
@@ -759,10 +763,10 @@ int main()
 
         auto fn = tree->get_fn();
 
-        auto A = get_random_vector<float>(AcBr * ArCr);
-        auto B = get_random_vector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float_t>(AcBr * ArCr);
+        auto B = get_random_vector<float_t>(AcBr * BcCc);
 
-        auto CN = get_random_vector<float>(ArCr * BcCc);
+        auto CN = get_random_vector<float_t>(ArCr * BcCc);
         auto CJ = CN;
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
@@ -819,12 +823,12 @@ int main()
         /*
        ----------> Execution
        */
-        auto A  = get_random_vector<float>(R * C);
-        auto B  = get_random_vector<float>(R * C);
-        auto BJ = get_random_vector<float>(R * C);
+        auto A  = get_random_vector<float_t>(R * C);
+        auto B  = get_random_vector<float_t>(R * C);
+        auto BJ = get_random_vector<float_t>(R * C);
 
         auto transpose =
-            transposer_baseline(order, sizes, out_strides, in_strides);
+            transposer_baseline<float_t>(order, sizes, out_strides, in_strides);
 
         transpose(B.data(), A.data());
 
@@ -894,13 +898,13 @@ int main()
         /*
         ----------> Execution
         */
-        auto A = get_random_vector<float>(AcBr * ArCr);
-        auto B = get_random_vector<float>(AcBr * BcCc);
+        auto A = get_random_vector<float_t>(AcBr * ArCr);
+        auto B = get_random_vector<float_t>(AcBr * BcCc);
 
-        auto CN = get_random_vector<float>(ArCr * BcCc);
+        auto CN = get_random_vector<float_t>(ArCr * BcCc);
         auto CJ = CN;
 
-        auto bias = get_random_vector<float>(1 * BcCc * 1);
+        auto bias = get_random_vector<float_t>(1 * BcCc * 1);
 
         baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, BcCc, 1, A.data(),
                     B.data(), CN.data(), 0);
@@ -976,11 +980,11 @@ int main()
         /*
         ----------> Execution
         */
-        auto A    = get_random_vector<float>(AcBr * ArCr);
-        auto B    = get_random_vector<float>(AcBr * BcCc);
-        auto CN   = get_random_vector<float>(ArCr * BcCc);
+        auto A    = get_random_vector<float_t>(AcBr * ArCr);
+        auto B    = get_random_vector<float_t>(AcBr * BcCc);
+        auto CN   = get_random_vector<float_t>(ArCr * BcCc);
         auto CJ   = CN;
-        auto bias = get_random_vector<float>(1 * BcCc * 1);
+        auto bias = get_random_vector<float_t>(1 * BcCc * 1);
 
         baseline_matrix_bias(ArCr, BcCc, BcCc, 1, 0, 1, CN.data(), bias.data());
         apply_relu(CN.data(), CN.data() + ArCr * BcCc);
@@ -1064,10 +1068,10 @@ int main()
         /*
         ----------> Execution
         */
-        auto A  = get_random_vector<float>(IX * IY * IZ);
-        auto B  = get_random_vector<float>(KX * KY * KZ);
-        auto CN = std::vector<float>(OX * OY * OZ);
-        auto CJ = std::vector<float>(OX * OY * OZ);
+        auto A  = get_random_vector<float_t>(IX * IY * IZ);
+        auto B  = get_random_vector<float_t>(KX * KY * KZ);
+        auto CN = std::vector<float_t>(OX * OY * OZ);
+        auto CJ = std::vector<float_t>(OX * OY * OZ);
 
         if (!SKIP_EXPENSIVE)
         {
@@ -1150,10 +1154,10 @@ int main()
         /*
         ----------> Execution
         */
-        auto A  = get_random_vector<float>(CIN * IS * IS);
-        auto B  = get_random_vector<float>(COUT * CIN * KS * KS);
-        auto CN = std::vector<float>(COUT * OS * OS);
-        auto CJ = std::vector<float>(COUT * OS * OS);
+        auto A  = get_random_vector<float_t>(CIN * IS * IS);
+        auto B  = get_random_vector<float_t>(COUT * CIN * KS * KS);
+        auto CN = std::vector<float_t>(COUT * OS * OS);
+        auto CJ = std::vector<float_t>(COUT * OS * OS);
 
         if (!SKIP_EXPENSIVE)
         {

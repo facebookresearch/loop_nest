@@ -3513,9 +3513,7 @@ private:
 
 public:
     std::int64_t get_effective_flops() const { return effective_flops_; }
-
     std::int64_t get_masked_out_flops() const { return masked_out_flops_; }
-
     std::int64_t get_total_memory() const { return total_memory_; }
 
     access_kind get_A_access_kind() const { return A_traits.access; }

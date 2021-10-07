@@ -10,6 +10,7 @@
 namespace dabun
 {
 
+template <class Arithmetic>
 auto transposer_baseline(std::vector<std::pair<std::string, int>> const& order,
                          std::map<std::string, int> const&               sizes,
                          std::map<std::string, int> const& out_strides,
@@ -52,40 +53,41 @@ auto transposer_baseline(std::vector<std::pair<std::string, int>> const& order,
                 : 0;
     }
 
-    return [=](float* out_ptr, float const* in_ptr) {
+    return [=](Arithmetic* out_ptr, Arithmetic const* in_ptr) {
         auto limits = initial_limits;
 
-        std::function<void(float*, float const*, int)> recursive_compute =
-            [&](float* out, float const* in, int order_depth) {
-                if (order_depth == order_ids.size())
-                {
-                    out[0] = in[0];
-                }
-                else
-                {
-                    auto var   = order_ids[order_depth];
-                    auto delta = order_delta[order_depth];
-                    auto limit = limits[var];
-                    auto full  = limit / delta;
-                    auto rest  = limit % delta;
-
-                    auto save = std::exchange(limits[var], delta);
-                    for (int i = 0; i < full; ++i)
+        std::function<void(Arithmetic*, Arithmetic const*, int)>
+            recursive_compute =
+                [&](Arithmetic* out, Arithmetic const* in, int order_depth) {
+                    if (order_depth == order_ids.size())
                     {
-                        recursive_compute(out, in, order_depth + 1);
-                        in += order_in_strides[order_depth];
-                        out += order_out_strides[order_depth];
+                        out[0] = in[0];
                     }
-                    limits[var] = save;
-
-                    if (rest)
+                    else
                     {
-                        int s = std::exchange(limits[var], rest);
-                        recursive_compute(out, in, order_depth + 1);
-                        limits[var] = s;
+                        auto var   = order_ids[order_depth];
+                        auto delta = order_delta[order_depth];
+                        auto limit = limits[var];
+                        auto full  = limit / delta;
+                        auto rest  = limit % delta;
+
+                        auto save = std::exchange(limits[var], delta);
+                        for (int i = 0; i < full; ++i)
+                        {
+                            recursive_compute(out, in, order_depth + 1);
+                            in += order_in_strides[order_depth];
+                            out += order_out_strides[order_depth];
+                        }
+                        limits[var] = save;
+
+                        if (rest)
+                        {
+                            int s = std::exchange(limits[var], rest);
+                            recursive_compute(out, in, order_depth + 1);
+                            limits[var] = s;
+                        }
                     }
-                }
-            };
+                };
 
         recursive_compute(out_ptr, in_ptr, 0);
     };

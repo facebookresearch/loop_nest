@@ -31,6 +31,9 @@ public:
     void meta_add_or_sub_imm(Xbyak_aarch64::XReg const& srcdst, T imm,
                              Xbyak_aarch64::XReg const& tmpreg)
     {
+        std::cout << "ZZZ: " << srcdst.getIdx() << " :: " << tmpreg.getIdx()
+                  << "\n";
+
         if (imm == 0)
             return;
 
@@ -61,6 +64,54 @@ public:
     }
 
     template <class VectorRegister>
+    void meta_str_post_ptr(VectorRegister const&      vr,
+                           Xbyak_aarch64::XReg const& addr, int delta,
+                           Xbyak_aarch64::XReg const& tmpreg)
+    {
+        if (delta && delta < 256 && delta >= -256)
+        {
+            self().str(vr, Xbyak_aarch64::post_ptr(addr, delta));
+        }
+        else
+        {
+            self().str(vr, Xbyak_aarch64::ptr(addr));
+            meta_add_or_sub_imm(addr, delta, tmpreg);
+        }
+    }
+
+    template <class VectorRegister>
+    void meta_ldrh_post_ptr(VectorRegister const&      vr,
+                            Xbyak_aarch64::XReg const& addr, int delta,
+                            Xbyak_aarch64::XReg const& tmpreg)
+    {
+        if (delta && delta < 256 && delta >= -256)
+        {
+            self().ldrh(vr, Xbyak_aarch64::post_ptr(addr, delta));
+        }
+        else
+        {
+            self().ldrh(vr, Xbyak_aarch64::ptr(addr));
+            meta_add_or_sub_imm(addr, delta, tmpreg);
+        }
+    }
+
+    template <class VectorRegister>
+    void meta_strh_post_ptr(VectorRegister const&      vr,
+                            Xbyak_aarch64::XReg const& addr, int delta,
+                            Xbyak_aarch64::XReg const& tmpreg)
+    {
+        if (delta && delta < 256 && delta >= -256)
+        {
+            self().strh(vr, Xbyak_aarch64::post_ptr(addr, delta));
+        }
+        else
+        {
+            self().strh(vr, Xbyak_aarch64::ptr(addr));
+            meta_add_or_sub_imm(addr, delta, tmpreg);
+        }
+    }
+
+    template <class VectorRegister>
     void meta_ldp_post_ptr(VectorRegister const& vr1, VectorRegister const& vr2,
                            Xbyak_aarch64::XReg const& addr, int delta,
                            Xbyak_aarch64::XReg const& tmpreg)
@@ -83,6 +134,28 @@ public:
     }
 
     template <class VectorRegister>
+    void meta_stp_post_ptr(VectorRegister const& vr1, VectorRegister const& vr2,
+                           Xbyak_aarch64::XReg const& addr, int delta,
+                           Xbyak_aarch64::XReg const& tmpreg)
+    {
+        int num_32bit_elements = vr1.getBit() / 32;
+
+        strong_assert(num_32bit_elements > 0);
+
+        if (delta && delta <= 252 * num_32bit_elements &&
+            delta >= -256 * num_32bit_elements &&
+            (delta % (4 /* bytes */ * num_32bit_elements) == 0))
+        {
+            self().stp(vr1, vr2, Xbyak_aarch64::post_ptr(addr, delta));
+        }
+        else
+        {
+            self().stp(vr1, vr2, Xbyak_aarch64::ptr(addr));
+            meta_add_or_sub_imm(addr, delta, tmpreg);
+        }
+    }
+
+    template <class VectorRegister>
     void meta_ldr_post_ptr(VectorRegister const&      vr,
                            Xbyak_aarch64::XReg const& addr, int delta)
     {
@@ -90,10 +163,38 @@ public:
     }
 
     template <class VectorRegister>
+    void meta_ldrh_post_ptr(VectorRegister const&      vr,
+                            Xbyak_aarch64::XReg const& addr, int delta)
+    {
+        meta_ldrh_post_ptr(vr, addr, delta, tmp_register);
+    }
+
+    template <class VectorRegister>
     void meta_ldp_post_ptr(VectorRegister const& vr1, VectorRegister const& vr2,
                            Xbyak_aarch64::XReg const& addr, int delta)
     {
         meta_ldp_post_ptr(vr1, vr2, addr, delta, tmp_register);
+    }
+
+    template <class VectorRegister>
+    void meta_str_post_ptr(VectorRegister const&      vr,
+                           Xbyak_aarch64::XReg const& addr, int delta)
+    {
+        meta_str_post_ptr(vr, addr, delta, tmp_register);
+    }
+
+    template <class VectorRegister>
+    void meta_strh_post_ptr(VectorRegister const&      vr,
+                            Xbyak_aarch64::XReg const& addr, int delta)
+    {
+        meta_strh_post_ptr(vr, addr, delta, tmp_register);
+    }
+
+    template <class VectorRegister>
+    void meta_stp_post_ptr(VectorRegister const& vr1, VectorRegister const& vr2,
+                           Xbyak_aarch64::XReg const& addr, int delta)
+    {
+        meta_stp_post_ptr(vr1, vr2, addr, delta, tmp_register);
     }
 
     template <class T>

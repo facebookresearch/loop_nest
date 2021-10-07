@@ -92,7 +92,7 @@ public:
     node_kind kind() const { return kind_; }
 
     // tensor positions, dimension sizes, and tensor formulas
-    virtual std::pair<loop_tree_fn_type, report_vector>
+    virtual std::pair<loop_tree_fn_type<Arithmetic>, report_vector>
     get_fn(std::map<std::string, int> const&, std::map<std::string, int> const&,
            std::map<std::string, int> const&, formulas_map_type const&,
            bool) const = 0;
@@ -274,7 +274,7 @@ public:
         return {output};
     }
 
-    std::pair<loop_tree_fn_type, report_vector>
+    std::pair<loop_tree_fn_type<Arithmetic>, report_vector>
     get_fn(std::map<std::string, int> const& tensors_idx,
            std::map<std::string, int> const& /* sizes */,
            std::map<std::string, int> const& /* iteration_depths */,
@@ -396,7 +396,7 @@ public:
         return strides;
     }
 
-    std::pair<loop_tree_fn_type, report_vector>
+    std::pair<loop_tree_fn_type<Arithmetic>, report_vector>
     get_fn(std::map<std::string, int> const& tensors_idx,
            std::map<std::string, int> const&, std::map<std::string, int> const&,
            formulas_map_type const&, bool) const override
@@ -555,7 +555,7 @@ public:
         return in_scope_tensor_strides;
     }
 
-    std::pair<loop_tree_fn_type, report_vector>
+    std::pair<loop_tree_fn_type<Arithmetic>, report_vector>
     get_fn(std::map<std::string, int> const& tensors_idx,
            std::map<std::string, int> const& sizes,
            std::map<std::string, int> const& iteration_depths,
@@ -573,7 +573,7 @@ public:
             std::make_shared<node_report>(for_loop_node_info{
                 1, 1, var, full + (rest ? 1 : 0), delta, limit})};
 
-        std::vector<loop_tree_fn_type> full_fns, tail_fns;
+        std::vector<loop_tree_fn_type<Arithmetic>> full_fns, tail_fns;
 
         auto s           = sizes;
         auto iter_depths = iteration_depths;
@@ -765,7 +765,7 @@ public:
                      {for_node->get_var(), for_node->get_delta()});
     }
 
-    std::pair<loop_tree_fn_type, report_vector>
+    std::pair<loop_tree_fn_type<Arithmetic>, report_vector>
     get_fn(std::map<std::string, int> const& tensors_idx,
            std::map<std::string, int> const& sizes,
            std::map<std::string, int> const& iteration_depths,
@@ -933,7 +933,7 @@ public:
         {
             throw std::invalid_argument(
                 "loop_nest currently supports at most 2 followed tensors");
-            return {loop_tree_fn_type(), report_vector{}};
+            return {loop_tree_fn_type<Arithmetic>(), report_vector{}};
         }
     }
 
@@ -1025,18 +1025,19 @@ public:
                      {for_node->get_var(), for_node->get_delta()});
     }
 
-    std::pair<loop_tree_fn_type, report_vector>
+    std::pair<loop_tree_fn_type<Arithmetic>, report_vector>
     get_fn(std::map<std::string, int> const& tensors_idx,
            std::map<std::string, int> const& sizes,
            std::map<std::string, int> const&,
            formulas_map_type const& /* formulas */,
            bool spit_asm) const override
     {
-        auto aot_fn = transposer_code_generator<std::conditional_t<
-            std::is_same_v<ISA, avx512>, avx2_plus, ISA>>(
-                          order, sizes, strides.at(output), strides.at(input),
-                          64 /* unroll_limit */)
-                          .get_shared();
+        auto aot_fn =
+            transposer_compiler<
+                (VEX == extension::avx512 ? extension::avx512_ymm : VEX),
+                Arithmetic>(order, sizes, strides.at(output), strides.at(input),
+                            64 /* unroll_limit */)
+                .get_shared();
 
         // aot_fn.save_to_file("transpose.asm");
 

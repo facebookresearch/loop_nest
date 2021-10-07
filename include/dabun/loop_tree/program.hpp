@@ -335,7 +335,7 @@ public:
 
     program<Arithmetic> get_fn(bool spit_asm = true) const
     {
-        std::vector<loop_tree_fn_type> sub_functions;
+        std::vector<loop_tree_fn_type<Arithmetic>> sub_functions;
         // added to alpha at runtime to handle tensor initialization
         int alpha_offsets_size = static_cast<int>(tensors_idx.size());
 

@@ -54,11 +54,11 @@ template <>
 class loop_nest_fp16_code_generator<aarch64>
     : public code_generator<void(fp16* C, fp16 const* A, fp16 const* B,
                                  int alpha)>,
-      public meta_mnemonics<loop_nest_code_generator<aarch64>>
+      public meta_mnemonics<loop_nest_fp16_code_generator<aarch64>>
 
 {
 private:
-    using meta_base = meta_mnemonics<loop_nest_code_generator<aarch64>>;
+    using meta_base = meta_mnemonics<loop_nest_fp16_code_generator<aarch64>>;
 
     struct tensor_location_t
     {
@@ -3405,6 +3405,15 @@ private:
         issue_loop_helper(0, false, false, depth_for_register_blocked_C,
                           unroll_stage, true, 1, true);
     }
+
+public:
+    std::int64_t get_effective_flops() const { return effective_flops_; }
+    std::int64_t get_masked_out_flops() const { return masked_out_flops_; }
+    std::int64_t get_total_memory() const { return total_memory_; }
+
+    access_kind get_A_access_kind() const { return A_traits.access; }
+    access_kind get_B_access_kind() const { return B_traits.access; }
+    access_kind get_C_access_kind() const { return C_traits.access; }
 
 private:
     struct not_depricated_tag
