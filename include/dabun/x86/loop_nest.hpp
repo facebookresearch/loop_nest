@@ -42,12 +42,13 @@ namespace x86
 
 template <class ISA>
 class loop_nest_code_generator
-    : public code_generator<void(float* C, float const* A, float const* B,
+    : public basic_code_generator,
+      public with_signature<loop_nest_code_generator<ISA>,
+                            void(float* C, float const* A, float const* B,
                                  int alpha)>
 {
 private:
-    using base =
-        code_generator<void(float* C, float const* A, float const* B, int)>;
+    using base      = basic_code_generator;
     using Vmm       = std::conditional_t<std::is_same_v<ISA, avx512>, Zmm, Ymm>;
     using multi_zmm = multi_vmm<Vmm>;
 

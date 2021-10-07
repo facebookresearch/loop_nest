@@ -161,19 +161,19 @@ public:
     }
 
     template <class Signature>
-    unique_aot_fn<Signature> get_unique() &&
+    unique_aot_fn<Signature> get_unique_fn() &&
     {
         return get_unique_or_shared<unique_aot_fn<Signature>>();
     }
 
     template <class Signature>
-    shared_aot_fn<Signature> get_shared() &&
+    shared_aot_fn<Signature> get_shared_fn() &&
     {
         return get_unique_or_shared<shared_aot_fn<Signature>>();
     }
 
     template <class Signature>
-    aot_fn_ref<Signature> get_reference() &&
+    aot_fn_ref<Signature> get_reference_fn() &&
     {
         assert(xbyak_allocator_adapter::is_inplace());
         ready();
@@ -183,9 +183,15 @@ public:
     }
 };
 
-template <class Signature>
-class code_generator : public basic_code_generator
+template <class>
+class code_generator;
+
+template <class Ret, class... Args>
+class code_generator<Ret(Args...)> : public basic_code_generator
 {
+private:
+    using Signature = identity_type_t<Ret(Args...)>;
+
 public:
     explicit code_generator(
         memory_resource* resource = memory_resource::default_resource())
@@ -196,19 +202,52 @@ public:
     unique_aot_fn<Signature> get_unique() &&
     {
         basic_code_generator* base = this;
-        return std::move(*base).template get_unique<Signature>();
+        return std::move(*base).template get_unique_fn<Signature>();
     }
 
     shared_aot_fn<Signature> get_shared() &&
     {
         basic_code_generator* base = this;
-        return std::move(*base).template get_shared<Signature>();
+        return std::move(*base).template get_shared_fn<Signature>();
     }
 
     aot_fn_ref<Signature> get_reference() &&
     {
         basic_code_generator* base = this;
-        return std::move(*base).template get_reference<Signature>();
+        return std::move(*base).template get_reference_fn<Signature>();
+    }
+};
+
+template <class, class>
+class with_signature;
+
+template <class BasicCodeGenerator, class Ret, class... Args>
+class with_signature<BasicCodeGenerator, Ret(Args...)>
+{
+private:
+    using Signature = identity_type_t<Ret(Args...)>;
+
+    BasicCodeGenerator& self()
+    {
+        static_assert(
+            std::is_base_of_v<basic_code_generator, BasicCodeGenerator>);
+        return static_cast<BasicCodeGenerator&>(*this);
+    }
+
+public:
+    unique_aot_fn<Signature> get_unique() &&
+    {
+        return std::move(self()).template get_unique_fn<Signature>();
+    }
+
+    shared_aot_fn<Signature> get_shared() &&
+    {
+        return std::move(self()).template get_shared_fn<Signature>();
+    }
+
+    aot_fn_ref<Signature> get_reference() &&
+    {
+        return std::move(self()).template get_reference_fn<Signature>();
     }
 };
 
