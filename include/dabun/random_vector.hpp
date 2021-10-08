@@ -2,6 +2,7 @@
 
 #include "dabun/aligned_vector.hpp"
 #include "dabun/bf16x2.hpp"
+#include "dabun/float.hpp"
 #include "dabun/qvec4.hpp"
 
 #include <limits>

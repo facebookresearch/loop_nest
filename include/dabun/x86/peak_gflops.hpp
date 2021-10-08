@@ -2,10 +2,14 @@
 
 #pragma once
 
-#include "dabun/code_generator.hpp"
 #include "dabun/isa.hpp"
+
+#ifdef DABUN_ARCH_X86_64
+
+#include "dabun/code_generator.hpp"
 #include "dabun/math.hpp"
 #include "dabun/measure.hpp"
+#include "dabun/xbyak.hpp"
 
 namespace dabun
 {
@@ -70,3 +74,5 @@ public:
 
 } // namespace x86
 } // namespace dabun
+
+#endif

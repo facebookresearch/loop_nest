@@ -2,8 +2,12 @@
 
 #pragma once
 
+#include "dabun/aot_fn.hpp"
+#include "dabun/configuration.hpp"
 #include "dabun/detail/tmp_file_name.hpp"
 #include "dabun/isa.hpp"
+#include "dabun/log.hpp"
+#include "dabun/loop_nest.hpp"
 #include "dabun/loop_tree/report.hpp"
 #include "dabun/loop_tree/types.hpp"
 #include "dabun/loop_tree/utility.hpp"

@@ -31,11 +31,13 @@ class transposer_code_generator;
 
 template <class Arithmetic>
 class transposer_code_generator<aarch64, Arithmetic>
-    : public code_generator<void(Arithmetic* Out, Arithmetic const* In)>,
-      public meta_mnemonics<transposer_code_generator<aarch64, Arithmetic>>
+    : public basic_code_generator,
+      public meta_mnemonics<transposer_code_generator<aarch64, Arithmetic>>,
+      public with_signature<transposer_code_generator<aarch64, Arithmetic>,
+                            void(Arithmetic* Out, Arithmetic const* In)>
 {
 private:
-    using cg = code_generator<void(Arithmetic* Out, Arithmetic const* In)>;
+    // using cg = code_generator<void(Arithmetic* Out, Arithmetic const* In)>;
     using meta_base =
         meta_mnemonics<transposer_code_generator<aarch64, Arithmetic>>;
 
@@ -55,31 +57,28 @@ private:
 private:
     void prepare_stack()
     {
-        cg::sub(cg::sp, cg::sp, 1024);
-        cg::sub(cg::sp, cg::sp, 1024);
-        cg::mov(stack_reg, cg::sp);
+        sub(sp, sp, 1024);
+        sub(sp, sp, 1024);
+        mov(stack_reg, sp);
     }
 
     void restore_stack()
     {
-        cg::add(cg::sp, cg::sp, 1024);
-        cg::add(cg::sp, cg::sp, 1024);
+        add(sp, sp, 1024);
+        add(sp, sp, 1024);
     }
 
 private:
     static constexpr int default_max_unrolled_moves = 32;
 
-    using Reg64 = typename cg::Reg64;
-    using WReg  = typename cg::WReg;
+    Reg64 out_reg   = x0;
+    Reg64 in_reg    = x1;
+    Reg64 loop_reg  = x2;
+    Reg64 stack_reg = x3;
+    Reg64 xtmp1     = x4;
 
-    Reg64 out_reg   = cg::x0;
-    Reg64 in_reg    = cg::x1;
-    Reg64 loop_reg  = cg::x2;
-    Reg64 stack_reg = cg::x3;
-    Reg64 xtmp1     = cg::x4;
-
-    Reg64 movReg1 = cg::x5;
-    Reg64 movReg2 = cg::x6;
+    Reg64 movReg1 = x5;
+    Reg64 movReg2 = x6;
 
     std::vector<std::pair<std::string, int>> order;
     std::map<std::string, int>               sizes;
@@ -684,8 +683,8 @@ private:
             if (full_iterations > 1)
             {
                 meta_base::meta_mov_imm(loop_reg, full_iterations);
-                auto loopLabel = cg::make_label();
-                cg::L_aarch64(*loopLabel);
+                auto loopLabel = make_label();
+                L_aarch64(*loopLabel);
 
                 // --------------------------------------------------
                 // RECURSION
@@ -701,7 +700,7 @@ private:
                 advance_pointers(loop.var, loop.delta);
 
                 meta_base::meta_sub_imm(loop_reg, 1);
-                cg::cbnz(loop_reg, *loopLabel);
+                cbnz(loop_reg, *loopLabel);
             }
             else if (full_iterations == 1)
             {
@@ -766,7 +765,7 @@ public:
         std::map<std::string, int> const&               Out_strides,
         std::map<std::string, int> const&               In_strides,
         std::optional<int> user_unroll_limit = std::nullopt)
-        : meta_base(cg::x3, cg::x4)
+        : meta_base(x3, x4)
         , order(Order)
         , sizes(Sizes)
         , out_strides(Out_strides)
@@ -805,7 +804,7 @@ public:
 
         restore_stack();
 
-        cg::ret();
+        ret();
     }
 };
 

@@ -7,6 +7,7 @@
 
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -21,7 +22,7 @@ class node;
 
 // Type aliases for readability
 // void (vector of tensors, vector of alpha offsets)
-template<class Arithmetic>
+template <class Arithmetic>
 using loop_tree_fn_type =
     std::function<void(std::vector<Arithmetic*>&, std::vector<int>&)>;
 

@@ -2,11 +2,12 @@
 
 #pragma once
 
-#include "dabun/x86/xbyak.hpp"
+#include "dabun/isa.hpp"
+#ifdef DABUN_ARCH_X86_64
 
+#include "dabun/x86/xbyak.hpp"
 #include "dabun/common.hpp"
 #include "dabun/core.hpp"
-#include "dabun/isa.hpp"
 
 #include <cstdint>
 #include <limits>
@@ -420,3 +421,5 @@ inline std::shared_ptr<operation_pair_base> const plus_max =
 
 } // namespace x86
 } // namespace dabun
+
+#endif

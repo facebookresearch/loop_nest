@@ -1,5 +1,6 @@
 #pragma once
 
+#include "dabun/core.hpp"
 #include "dabun/xbyak.hpp"
 
 #include <cassert>
@@ -109,25 +110,6 @@ inline int get_cursor_offset(std::map<std::string, int> coordinates,
         off += coordinates[s.first] * s.second;
     }
     return off;
-}
-
-// Sourced from https://en.cppreference.com/w/cpp/numeric/bit_cast
-// to enable bit_cast from C++20
-template <class To, class From>
-typename std::enable_if_t<sizeof(To) == sizeof(From) &&
-                              std::is_trivially_copyable_v<From> &&
-                              std::is_trivially_copyable_v<To>,
-                          To>
-// constexpr support needs compiler magic
-bit_cast(const From& src) noexcept
-{
-    static_assert(std::is_trivially_constructible_v<To>,
-                  "This implementation additionally requires destination type "
-                  "to be trivially constructible");
-
-    To dst;
-    std::memcpy(&dst, &src, sizeof(To));
-    return dst;
 }
 
 } // namespace dabun

@@ -2,6 +2,9 @@
 
 #pragma once
 
+#include "dabun/isa.hpp"
+#ifdef DABUN_ARCH_X86_64
+
 namespace dabun
 {
 namespace x86
@@ -49,3 +52,5 @@ inline OptimizationConfiguration no_optims(false, false, false);
 
 } // namespace x86
 } // namespace dabun
+
+#endif

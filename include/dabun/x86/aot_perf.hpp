@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include "dabun/isa.hpp"
+
+#ifdef DABUN_ARCH_X86_64
+
 #include "dabun/log.hpp"
 #include "dabun/x86/oprof-jitdump.hpp"
 #include "dabun/x86/xbyak.hpp"
@@ -346,3 +350,5 @@ inline detail::profiler_wrapper& get_xbyak_profiler()
 }
 
 } // namespace dabun
+
+#endif

@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <cstring>
 #include <stdexcept>
 
 #define DABUN_STRINGIFY_0(s) #s
@@ -45,5 +46,24 @@ struct identity_type
 
 template <class T>
 using identity_type_t = typename identity_type<T>::type;
+
+// Sourced from https://en.cppreference.com/w/cpp/numeric/bit_cast
+// to enable bit_cast from C++20
+template <class To, class From>
+typename std::enable_if_t<sizeof(To) == sizeof(From) &&
+                              std::is_trivially_copyable_v<From> &&
+                              std::is_trivially_copyable_v<To>,
+                          To>
+// constexpr support needs compiler magic
+bit_cast(const From& src) noexcept
+{
+    static_assert(std::is_trivially_constructible_v<To>,
+                  "This implementation additionally requires destination type "
+                  "to be trivially constructible");
+
+    To dst;
+    std::memcpy(&dst, &src, sizeof(To));
+    return dst;
+}
 
 } // namespace dabun

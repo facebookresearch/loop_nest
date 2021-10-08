@@ -1,4 +1,9 @@
+// Copyright 2004-present Facebook. All Rights Reserved.
+
 #pragma once
+
+#include "dabun/isa.hpp"
+#ifdef DABUN_ARCH_X86_64
 
 // Mosty from
 // https://en.wikipedia.org/wiki/Denormal_number#Disabling_denormal_floats_at_the_code_level
@@ -62,3 +67,5 @@ inline denormals_disabler denormals_disabler_instance;
 
 #undef LN_MM_SET_FLUSH_ZERO_MODE
 #undef LN_MM_GET_FLUSH_ZERO_MODE
+
+#endif

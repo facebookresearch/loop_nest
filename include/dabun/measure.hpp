@@ -30,19 +30,33 @@ struct flops_measurement
 };
 
 template <class Fn>
+__attribute__((always_inline)) double measure_single_run(Fn&& fn)
+{
+    using namespace std::chrono;
+
+    auto start = high_resolution_clock::now();
+    fn();
+    auto end = high_resolution_clock::now();
+
+    auto nsecs = duration_cast<nanoseconds>(end - start).count();
+
+    return static_cast<double>(nsecs) / 1e9;
+}
+
+template <class Fn>
 double measure_fastest(Fn&& fn, int iterations = 1)
 {
-    auto nsecs = std::chrono::nanoseconds::max().count();
+    using namespace std::chrono;
+
+    auto nsecs = nanoseconds::max().count();
 
     for (int i = 0; i < iterations; ++i)
     {
-        auto start = std::chrono::high_resolution_clock::now();
+        auto start = high_resolution_clock::now();
         fn();
-        auto end = std::chrono::high_resolution_clock::now();
+        auto end = high_resolution_clock::now();
 
-        auto new_time =
-            std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
-                .count();
+        auto new_time = duration_cast<nanoseconds>(end - start).count();
 
         nsecs = std::min(nsecs, new_time);
     }
@@ -51,11 +65,34 @@ double measure_fastest(Fn&& fn, int iterations = 1)
 }
 
 template <class Fn>
+double measure_fastest_time_limited(Fn&& fn, int iterations = 1,
+                                    double seconds = 1.0)
+{
+    double ret        = std::numeric_limits<double>::max();
+    double total_time = 0.0;
+
+    for (int i = 0; i < iterations; ++i)
+    {
+        auto t = measure_single_run(fn);
+        ret    = std::min(ret, t);
+        total_time += t;
+        if (total_time > seconds)
+        {
+            return ret;
+        }
+    }
+
+    return ret;
+}
+
+template <class Fn>
 double measure_mean(Fn&& fn, int iterations = 1, int warmup_iterations = 1)
 {
+    using namespace std::chrono;
+
     if (iterations <= 0)
     {
-        return -1;
+        return std::numeric_limits<double>::max();
     }
 
     for (int i = 0; i < warmup_iterations; ++i)
@@ -63,17 +100,15 @@ double measure_mean(Fn&& fn, int iterations = 1, int warmup_iterations = 1)
         fn();
     }
 
-    auto start = std::chrono::high_resolution_clock::now();
+    auto start = high_resolution_clock::now();
 
     for (int i = 0; i < iterations; ++i)
     {
         fn();
     }
 
-    auto end = std::chrono::high_resolution_clock::now();
-    auto nsecs =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
-            .count();
+    auto end   = high_resolution_clock::now();
+    auto nsecs = duration_cast<nanoseconds>(end - start).count();
 
     return static_cast<double>(nsecs) / 1e9 / iterations;
 }
@@ -81,6 +116,8 @@ double measure_mean(Fn&& fn, int iterations = 1, int warmup_iterations = 1)
 template <class Fn>
 double measure_median(Fn&& fn, int iterations = 1, int warmup_iterations = 1)
 {
+    using namespace std::chrono;
+
     std::vector<double> measurements(iterations);
 
     if (iterations <= 0)
@@ -95,12 +132,10 @@ double measure_median(Fn&& fn, int iterations = 1, int warmup_iterations = 1)
 
     for (int i = 0; i < iterations; ++i)
     {
-        auto start = std::chrono::high_resolution_clock::now();
+        auto start = high_resolution_clock::now();
         fn();
-        auto end = std::chrono::high_resolution_clock::now();
-        auto nsecs =
-            std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
-                .count();
+        auto end        = high_resolution_clock::now();
+        auto nsecs      = duration_cast<nanoseconds>(end - start).count();
         measurements[i] = static_cast<double>(nsecs) / 1e9;
     }
 
@@ -113,7 +148,9 @@ template <class Fn>
 std::tuple<double, double, double> measure_all(Fn&& fn, int iterations = 1,
                                                int warmup_iterations = 1)
 {
-    auto fastest = std::chrono::nanoseconds::max().count();
+    using namespace std::chrono;
+
+    auto fastest = nanoseconds::max().count();
 
     std::vector<double> measurements(iterations);
 
@@ -129,12 +166,10 @@ std::tuple<double, double, double> measure_all(Fn&& fn, int iterations = 1,
 
     for (int i = 0; i < iterations; ++i)
     {
-        auto start = std::chrono::high_resolution_clock::now();
+        auto start = high_resolution_clock::now();
         fn();
-        auto end = std::chrono::high_resolution_clock::now();
-        auto nsecs =
-            std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
-                .count();
+        auto end        = high_resolution_clock::now();
+        auto nsecs      = duration_cast<nanoseconds>(end - start).count();
         measurements[i] = static_cast<double>(nsecs) / 1e9;
 
         fastest = std::min(fastest, nsecs);

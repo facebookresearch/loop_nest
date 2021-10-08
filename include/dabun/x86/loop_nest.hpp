@@ -5,18 +5,20 @@
 
 #pragma once
 
+#include "dabun/isa.hpp"
+#ifdef DABUN_ARCH_X86_64
+
 #include "dabun/LN_arguments.hpp"
 #include "dabun/code_generator.hpp"
 #include "dabun/common.hpp"
 #include "dabun/core.hpp"
-#include "dabun/denormals.hpp"
 #include "dabun/detail/most_frequent_queue.hpp"
-#include "dabun/isa.hpp"
 #include "dabun/log.hpp"
 #include "dabun/math.hpp"
 #include "dabun/x86/address_packer.hpp"
 #include "dabun/x86/arithmetic_operation.hpp"
 #include "dabun/x86/configuration.hpp"
+#include "dabun/x86/denormals.hpp"
 #include "dabun/x86/elementwise_operation.hpp"
 #include "dabun/x86/multi_vmm.hpp"
 
@@ -3889,3 +3891,5 @@ public:
 
 } // namespace x86
 } // namespace dabun
+
+#endif

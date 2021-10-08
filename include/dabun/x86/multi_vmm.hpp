@@ -2,9 +2,12 @@
 
 #pragma once
 
-#include <cassert>
+#include "dabun/isa.hpp"
+#ifdef DABUN_ARCH_X86_64
 
 #include "dabun/x86/arithmetic_operation.hpp"
+
+#include <cassert>
 
 namespace dabun
 {
@@ -116,3 +119,5 @@ public:
 
 } // namespace x86
 } // namespace dabun
+
+#endif

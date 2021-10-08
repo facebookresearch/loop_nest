@@ -2,8 +2,10 @@
 
 #pragma once
 
-#include "dabun/common.hpp"
 #include "dabun/isa.hpp"
+#ifdef DABUN_ARCH_X86_64
+
+#include "dabun/common.hpp"
 #include "dabun/x86/xbyak.hpp"
 
 #include <map>
@@ -51,7 +53,7 @@ public:
         access_kind,                       // C access kind (strided/packed)
         avx512,
         std::optional<Xbyak::Opmask> // tail mask register
-        ) const = 0;
+    ) const = 0;
 
     virtual void
     process_batch(Xbyak::CodeGenerator&,
@@ -61,7 +63,7 @@ public:
                   access_kind, // C access kind (strided/packed)
                   avx2,
                   std::optional<Xbyak::Ymm> // tail maks register
-                  ) const = 0;
+    ) const = 0;
 
     // scalar processing
     virtual void process_batch(
@@ -687,3 +689,5 @@ compose(std::shared_ptr<elementwise_operation<ISA>> const& first,
 
 } // namespace x86
 } // namespace dabun
+
+#endif

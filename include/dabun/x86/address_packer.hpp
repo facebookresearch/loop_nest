@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "dabun/isa.hpp"
+#ifdef DABUN_ARCH_X86_64
 /*
 
 The sizes were experimentally obtained.
@@ -475,3 +477,5 @@ public:
 
 } // namespace x86
 } // namespace dabun
+
+#endif

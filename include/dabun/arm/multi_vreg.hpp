@@ -1,4 +1,8 @@
+// Copyright 2004-present Facebook. All Rights Reserved.
+
 #pragma once
+
+#include "dabun/float.hpp"
 
 #include <cassert>
 #include <type_traits>

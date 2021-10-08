@@ -4,6 +4,7 @@
 
 #if defined(__APPLE__)
 
+#include <cstdlib>
 #include <sys/sysctl.h>
 
 #ifndef MAP_JIT
