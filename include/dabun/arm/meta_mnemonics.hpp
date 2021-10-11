@@ -2,6 +2,9 @@
 
 #pragma once
 
+#include "dabun/isa.hpp"
+#ifdef DABUN_ARCH_AARCH64
+
 #include "dabun/core.hpp"
 #include "dabun/xbyak.hpp"
 
@@ -333,3 +336,5 @@ public:
 
 } // namespace arm
 } // namespace dabun
+
+#endif

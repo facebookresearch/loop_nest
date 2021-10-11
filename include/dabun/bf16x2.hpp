@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <ostream>
+#include <type_traits>
 
 namespace dabun
 {

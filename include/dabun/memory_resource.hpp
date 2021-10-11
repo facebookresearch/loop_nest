@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <new>
+#include <stdexcept>
 #include <unordered_map>
 
 #if defined(__GNUC__)
@@ -164,7 +165,6 @@ inline memory_resource* memory_resource::default_resource()
     static mmap_memory_resource mmap_resource;
     if (detail::get_macOS_version() >= detail::mojave_version)
     {
-
         return &mmap_resource;
     }
 #endif

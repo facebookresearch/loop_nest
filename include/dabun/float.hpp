@@ -1,7 +1,8 @@
 #pragma once
 
-#if !defined(__aarch64__) // Should also somehow detect whether _Float16 is
-                          // available
+#if !defined(__aarch64__) ||                                                   \
+    !defined(__APPLE__) // Should also somehow detect whether _Float16 is
+                        // available
 #include "dabun/third_party/half.hpp"
 
 #endif
@@ -31,8 +32,9 @@ struct is_fp16_t : std::false_type
 {
 };
 
-#if defined(__aarch64__) // Should also somehow detect whether _Float16 is
-                         // available
+#if defined(__aarch64__) &&                                                    \
+    defined(__APPLE__) // Should also somehow detect whether _Float16 is
+                       // available
 
 using fp16 = _Float16;
 

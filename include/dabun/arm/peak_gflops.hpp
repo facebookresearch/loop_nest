@@ -1,4 +1,9 @@
+// Copyright 2004-present Facebook. All Rights Reserved.
+
 #pragma once
+
+#include "dabun/isa.hpp"
+#ifdef DABUN_ARCH_AARCH64
 
 #include "dabun/code_generator.hpp"
 #include "dabun/isa.hpp"
@@ -85,3 +90,5 @@ public:
 
 } // namespace arm
 } // namespace dabun
+
+#endif

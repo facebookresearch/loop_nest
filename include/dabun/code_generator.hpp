@@ -34,7 +34,7 @@ public:
 
     xbyak_buffer_type* alloc(std::size_t size) final override
     {
-        auto ptr = resource_->allocate_bytes(size);
+        auto ptr = resource_->allocate_bytes(size * sizeof(xbyak_buffer_type));
         if (!resource_->is_inplace())
         {
             managed_.insert(ptr);

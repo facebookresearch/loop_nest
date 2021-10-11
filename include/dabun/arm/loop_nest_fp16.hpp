@@ -12,6 +12,9 @@
 
 #pragma once
 
+#include "dabun/isa.hpp"
+#ifdef DABUN_ARCH_AARCH64
+
 #include "dabun/LN_arguments.hpp"
 #include "dabun/arm/arithmetic_operation.hpp"
 #include "dabun/arm/configuration.hpp"
@@ -3615,3 +3618,5 @@ public:
 
 } // namespace arm
 } // namespace dabun
+
+#endif

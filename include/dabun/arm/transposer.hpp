@@ -2,6 +2,9 @@
 
 #pragma once
 
+#include "dabun/isa.hpp"
+#ifdef DABUN_ARCH_AARCH64
+
 #include "dabun/arm/meta_mnemonics.hpp"
 #include "dabun/code_generator.hpp"
 #include "dabun/common.hpp"
@@ -810,3 +813,5 @@ public:
 
 } // namespace arm
 } // namespace dabun
+
+#endif
