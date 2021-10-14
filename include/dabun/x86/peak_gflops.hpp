@@ -6,10 +6,11 @@
 
 #ifdef DABUN_ARCH_X86_64
 
-#include "dabun/code_generator.hpp"
+#include "dabun/x86/xbyak.hpp"
+
+#include "dabun/code_generator/code_generator.hpp"
 #include "dabun/math.hpp"
 #include "dabun/measure.hpp"
-#include "dabun/xbyak.hpp"
 
 namespace dabun
 {

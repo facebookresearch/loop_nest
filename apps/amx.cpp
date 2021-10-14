@@ -1,5 +1,5 @@
 #include "dabun/bf16x2.hpp"
-#include "dabun/code_generator.hpp"
+#include "dabun/code_generator/code_generator.hpp"
 #include "dabun/isa.hpp"
 #include "dabun/qvec4.hpp"
 

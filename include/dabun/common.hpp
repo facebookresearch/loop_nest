@@ -1,7 +1,7 @@
 #pragma once
 
+#include "dabun/code_generator/xbyak.hpp"
 #include "dabun/core.hpp"
-#include "dabun/xbyak.hpp"
 
 #include <cassert>
 #include <cstdint>

@@ -9,7 +9,7 @@
 #ifdef DABUN_ARCH_X86_64
 
 #include "dabun/LN_arguments.hpp"
-#include "dabun/code_generator.hpp"
+#include "dabun/code_generator/code_generator.hpp"
 #include "dabun/common.hpp"
 #include "dabun/core.hpp"
 #include "dabun/detail/most_frequent_queue.hpp"

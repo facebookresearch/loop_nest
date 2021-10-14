@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "dabun/aot_fn.hpp"
+#include "dabun/code_generator/aot_fn.hpp"
 #include "dabun/configuration.hpp"
 #include "dabun/detail/tmp_file_name.hpp"
 #include "dabun/isa.hpp"

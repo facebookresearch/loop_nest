@@ -5,8 +5,8 @@
 #include "dabun/isa.hpp"
 #ifdef DABUN_ARCH_AARCH64
 
+#include "dabun/code_generator/xbyak.hpp"
 #include "dabun/core.hpp"
-#include "dabun/xbyak.hpp"
 
 namespace dabun
 {

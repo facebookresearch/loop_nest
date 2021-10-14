@@ -1,7 +1,7 @@
-#include "dabun/code_generator.hpp"
+#include "dabun/bf16x2.hpp"
+#include "dabun/code_generator/code_generator.hpp"
 #include "dabun/isa.hpp"
 #include "dabun/qvec4.hpp"
-#include "dabun/bf16x2.hpp"
 
 #include "dabun/random_vector.hpp"
 
@@ -36,7 +36,8 @@ inline void print_tile_config(tile_config_t const& tc)
     }
 }
 
-class test : public dabun::code_generator<void(void*, void*, void*, void*, void*)>
+class test
+    : public dabun::code_generator<void(void*, void*, void*, void*, void*)>
 {
 public:
     test()
@@ -77,7 +78,7 @@ int main()
 
     std::cout << l << "\n";
 
-    auto          t = test().get_shared();
+    auto t = test().get_shared();
 
     auto A  = dabun::get_random_vector<dabun::bf16x2_t>(16 * 16);
     auto B  = dabun::get_random_vector<dabun::bf16x2_t>(16 * 16);

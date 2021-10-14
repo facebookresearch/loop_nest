@@ -21,7 +21,7 @@
 #include "dabun/arm/elementwise_operation.hpp"
 #include "dabun/arm/meta_mnemonics.hpp"
 #include "dabun/arm/multi_vreg.hpp"
-#include "dabun/code_generator.hpp"
+#include "dabun/code_generator/code_generator.hpp"
 #include "dabun/common.hpp"
 #include "dabun/core.hpp"
 #include "dabun/isa.hpp"

@@ -2,8 +2,9 @@
 
 #pragma once
 
+#include "dabun/code_generator/xbyak.hpp"
+
 #include "dabun/isa.hpp"
-#include "dabun/xbyak.hpp"
 
 #if !defined(DABUN_ARCH_AARCH64)
 #include "dabun/x86/aot_perf.hpp"

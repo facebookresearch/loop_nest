@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "dabun/code_generator.hpp"
+#include "dabun/code_generator/code_generator.hpp"
 
 #include <cstddef>
 #include <cstdint>

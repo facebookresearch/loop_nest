@@ -5,7 +5,7 @@
 #include "dabun/isa.hpp"
 #ifdef DABUN_ARCH_AARCH64
 
-#include "dabun/code_generator.hpp"
+#include "dabun/code_generator/code_generator.hpp"
 #include "dabun/isa.hpp"
 #include "dabun/math.hpp"
 #include "dabun/measure.hpp"

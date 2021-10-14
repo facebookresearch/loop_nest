@@ -6,7 +6,7 @@
 #ifdef DABUN_ARCH_AARCH64
 
 #include "dabun/arm/meta_mnemonics.hpp"
-#include "dabun/code_generator.hpp"
+#include "dabun/code_generator/code_generator.hpp"
 #include "dabun/common.hpp"
 #include "dabun/core.hpp"
 #include "dabun/isa.hpp"
