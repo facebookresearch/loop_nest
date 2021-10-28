@@ -52,6 +52,8 @@ struct compiled_loop_nest_node_info
     access_kind B_access_kind;
     access_kind C_access_kind;
 
+    std::pair<int, int> register_blocking_info;
+
     std::string const extra = "";
 
     std::string to_string() const
@@ -61,7 +63,10 @@ struct compiled_loop_nest_node_info
                ", effective FLOPs: " + std::to_string(effective_flops) +
                ", A access: " + dabun::to_string(A_access_kind) +
                ", B access: " + dabun::to_string(B_access_kind) +
-               ", C access: " + dabun::to_string(C_access_kind) + ", extra\"" +
+               ", C access: " + dabun::to_string(C_access_kind) +
+               ", register blocking: " +
+               std::to_string(register_blocking_info.first) + ":" +
+               std::to_string(register_blocking_info.second) + ", extra\"" +
                extra + "\"";
     }
 };
@@ -146,9 +151,8 @@ inline void print_report_helper(std::ostringstream&  oss,
     for (auto const& r : report)
     {
         std::visit(
-            [&](auto const& i) {
-                oss << std::string(indent, '|') << i.to_string() << '\n';
-            },
+            [&](auto const& i)
+            { oss << std::string(indent, '|') << i.to_string() << '\n'; },
             r->info);
         print_report_helper(oss, r->children, indent + 2);
     }
@@ -165,11 +169,9 @@ inline std::string print_report(std::shared_ptr<node_report> const& node,
                                 int                                 indent = 0)
 {
     std::ostringstream oss;
-    std::visit(
-        [&](auto const& i) {
-            oss << std::string(indent, '|') << i.to_string() << '\n';
-        },
-        node->info);
+    std::visit([&](auto const& i)
+               { oss << std::string(indent, '|') << i.to_string() << '\n'; },
+               node->info);
     print_report_helper(oss, node->children, indent + 2);
     return oss.str();
 }

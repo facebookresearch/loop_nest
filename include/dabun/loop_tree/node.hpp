@@ -307,7 +307,8 @@ public:
                  input_idx_1 = tensors_idx.at(inputs[1]),
                  output_idx =
                      tensors_idx.at(output)](std::vector<Arithmetic*>& tensors,
-                                             std::vector<int>& alpha_offsets) {
+                                             std::vector<int>& alpha_offsets)
+                {
                     Arithmetic* A = tensors[input_idx_0];
                     Arithmetic* B = tensors[input_idx_1];
                     Arithmetic* C = tensors[output_idx];
@@ -411,7 +412,8 @@ public:
         return {[input = this->input, output = this->output,
                  input_idx  = tensors_idx.at(input),
                  output_idx = tensors_idx.at(output)](
-                    std::vector<Arithmetic*>& tensors, std::vector<int>&) {
+                    std::vector<Arithmetic*>& tensors, std::vector<int>&)
+                {
                     strong_assert(tensors[input_idx]);
                     strong_assert(tensors[output_idx]);
 
@@ -498,7 +500,8 @@ private:
             }
         }
 
-        return [=](std::vector<Arithmetic*>& tensors, int delta = 1) {
+        return [=](std::vector<Arithmetic*>& tensors, int delta = 1)
+        {
             for (auto const& p : to_advance)
             {
                 tensors[p.first] += p.second * delta;
@@ -522,7 +525,8 @@ private:
             }
         }
 
-        return [=](std::vector<int>& alpha_offsets, int adjustment) {
+        return [=](std::vector<int>& alpha_offsets, int adjustment)
+        {
             for (auto const& idx : to_adjust)
             {
                 alpha_offsets[idx] += adjustment;
@@ -620,7 +624,8 @@ public:
 
         return {[full, full_fns, advancer, alpha_offsets_adjuster,
                  tail_fns](std::vector<Arithmetic*>& tensors,
-                           std::vector<int>&         alpha_offsets) {
+                           std::vector<int>&         alpha_offsets)
+                {
                     for (int i = 0; i < full; ++i)
                     {
                         for (auto const& fn : full_fns)
@@ -853,14 +858,15 @@ public:
             ", input_idx_1: " + std::to_string(tensors_idx.at(inputs[1])) +
             ", outut_idx: " + std::to_string(tensors_idx.at(output));
 
-        compiled_loop_nest_node_info info{generated.get_effective_flops() +
-                                              generated.get_masked_out_flops(),
-                                          generated.get_effective_flops(),
-                                          asm_dump,
-                                          generated.get_A_access_kind(),
-                                          generated.get_B_access_kind(),
-                                          generated.get_C_access_kind(),
-                                          extra_string};
+        compiled_loop_nest_node_info info{
+            generated.get_effective_flops() + generated.get_masked_out_flops(),
+            generated.get_effective_flops(),
+            asm_dump,
+            generated.get_A_access_kind(),
+            generated.get_B_access_kind(),
+            generated.get_C_access_kind(),
+            generated.get_register_blocking_info(),
+            extra_string};
 
         if (extra_tensors.size() == 0)
         {
@@ -869,7 +875,8 @@ public:
                      input_idx_1 = tensors_idx.at(inputs[1]),
                      output_idx  = tensors_idx.at(output)](
                         std::vector<Arithmetic*>& tensors,
-                        std::vector<int>&         alpha_offsets) {
+                        std::vector<int>&         alpha_offsets)
+                    {
                         auto last_iter_mask =
                             alpha_offsets[output_idx] == last_iteration ? 0b0
                                                                         : 0b10;
@@ -895,7 +902,8 @@ public:
                      output_idx       = tensors_idx.at(output),
                      extra_tensor_idx = tensors_idx.at(extra_tensors[0])](
                         std::vector<Arithmetic*>& tensors,
-                        std::vector<int>&         alpha_offsets) {
+                        std::vector<int>&         alpha_offsets)
+                    {
                         aot_casted(
                             tensors[output_idx], tensors[input_idx_0],
                             tensors[input_idx_1],
@@ -920,7 +928,8 @@ public:
                      extra_tensor_idx_0 = tensors_idx.at(extra_tensors[0]),
                      extra_tensor_idx_1 = tensors_idx.at(extra_tensors[1])](
                         std::vector<Arithmetic*>& tensors,
-                        std::vector<int>&         alpha_offsets) {
+                        std::vector<int>&         alpha_offsets)
+                    {
                         aot_casted(
                             tensors[output_idx], tensors[input_idx_0],
                             tensors[input_idx_1],
@@ -1062,9 +1071,8 @@ public:
 
         return {[aot_fn, output_idx = tensors_idx.at(output),
                  input_idx = tensors_idx.at(input)](
-                    std::vector<Arithmetic*>& tensors, std::vector<int>&) {
-                    aot_fn(tensors[output_idx], tensors[input_idx]);
-                },
+                    std::vector<Arithmetic*>& tensors, std::vector<int>&)
+                { aot_fn(tensors[output_idx], tensors[input_idx]); },
                 {std::make_shared<node_report>(info)}};
     }
 

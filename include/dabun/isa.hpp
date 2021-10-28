@@ -103,15 +103,15 @@ enum class extension : int
 {
     unknown = 0,
 
-// #if defined(DABUN_ARCH_X86_64)
+    // #if defined(DABUN_ARCH_X86_64)
     avx        = 1001,
     avx2       = 1002,
     avx512_ymm = 1003,
     avx512     = 1004,
-// #elif defined(DABUN_ARCH_AARCH64)
+    // #elif defined(DABUN_ARCH_AARCH64)
     neon      = 2001,
     neon_fp16 = 2002
-// #endif
+    // #endif
 };
 
 template <extension E>

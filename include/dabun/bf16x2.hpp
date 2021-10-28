@@ -89,7 +89,7 @@ public:
 
 static_assert(sizeof(bf16x2_t) == 4);
 
-inline constexpr float fmadd(bf16x2_t left, bf16x2_t right, float v)
+inline float fmadd(bf16x2_t left, bf16x2_t right, float v)
 {
     for (std::size_t i = 0; i < 2; ++i)
     {
