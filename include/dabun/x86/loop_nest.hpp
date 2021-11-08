@@ -288,6 +288,10 @@ private:
     // visiting methods.  Keeps the current coordinate.
     std::map<std::string, int> current_coordinate_cursor;
 
+    // Register blocking info (total registers, redundant ones - which
+    // get horizontally summed)
+    std::pair<int, int> register_blocking_info_;
+
 private:
     void allocate_elementwise_addressing_registers()
     {
@@ -1337,7 +1341,8 @@ private:
         {
             std::visit(
                 overloaded{
-                    [&](load_instruction const& i) {
+                    [&](load_instruction const& i)
+                    {
                         if (i.does_broadcast)
                         {
                             vbroadcastss(
@@ -1353,7 +1358,8 @@ private:
                                         ->get_address(i.tensor_loc.offset)]);
                         }
                     },
-                    [&](fmla_instruction const& fml) {
+                    [&](fmla_instruction const& fml)
+                    {
                         if (std::holds_alternative<int>(fml.right_src))
                         {
                             int rreg = std::get<int>(fml.right_src);
@@ -1477,7 +1483,8 @@ private:
         int mask_size = -1;
 
         // TODO(zi) issue mask only when required (for avx512 as well)
-        auto const ensure_initalized_mask = [&](int mask) {
+        auto const ensure_initalized_mask = [&](int mask)
+        {
             strong_assert(tail_mask && "Tail mask was not detected");
             strong_assert(mask == *tail_mask);
 
@@ -1627,13 +1634,11 @@ private:
                 }
             }
 
-            issue_delayed_ops[current % cycle] = [arg1_reg, addr,
-                                                  delayed_fma_operations,
-                                                  &addressers, temp_k_mask,
-                                                  full_k_mask, tail_k_mask,
-                                                  this, &ensure_initalized_mask,
-                                                  arg2_register,
-                                                  &tensor_strides]() {
+            issue_delayed_ops[current % cycle] =
+                [arg1_reg, addr, delayed_fma_operations, &addressers,
+                 temp_k_mask, full_k_mask, tail_k_mask, this,
+                 &ensure_initalized_mask, arg2_register, &tensor_strides]()
+            {
                 bool first = true;
                 for (auto const& op : delayed_fma_operations)
                 {
@@ -1832,7 +1837,8 @@ private:
         int mask_size = -1;
 
         // TODO(zi) issue mask only when required (for avx512 as well)
-        auto const ensure_initalized_mask = [&](int mask) {
+        auto const ensure_initalized_mask = [&](int mask)
+        {
             strong_assert(tail_mask && "Tail mask was not detected");
             strong_assert(mask == *tail_mask);
 
@@ -1972,14 +1978,11 @@ private:
                 }
             }
 
-            issue_delayed_ops[current % cycle] = [arg1_reg, addr,
-                                                  delayed_fma_operations,
-                                                  &addressers,
-                                                  ymm_temp_register,
-                                                  ymm_tail_mask, ymm_full_mask,
-                                                  this, &ensure_initalized_mask,
-                                                  arg2_register,
-                                                  &tensor_strides]() {
+            issue_delayed_ops[current % cycle] =
+                [arg1_reg, addr, delayed_fma_operations, &addressers,
+                 ymm_temp_register, ymm_tail_mask, ymm_full_mask, this,
+                 &ensure_initalized_mask, arg2_register, &tensor_strides]()
+            {
                 bool first = true;
                 for (auto const& op : delayed_fma_operations)
                 {
@@ -2096,7 +2099,8 @@ private:
     {
         std::optional<int> tail_mask;
 
-        auto update_tail_mask = [&](int m) {
+        auto update_tail_mask = [&](int m)
+        {
             if (m != vector_size)
             {
                 strong_assert(!tail_mask || *tail_mask == m);
@@ -2474,7 +2478,8 @@ private:
         std::int64_t total_required_fma_operations =
             std::accumulate(padded_sizes.begin(), padded_sizes.end(),
                             (std::int64_t)1,
-                            [&](std::int64_t v, auto const& s) {
+                            [&](std::int64_t v, auto const& s)
+                            {
                                 // std::cout << v << " :: " << s.second << "\n";
                                 return (B_strides.count(s.first) ||
                                         A_strides.count(s.first) ||
@@ -2685,6 +2690,9 @@ private:
 
             strong_assert(next <= isa_traits<ISA>::total_vector_registers);
 
+            register_blocking_info_ = {next - auxiliary_registers,
+                                       per_register};
+
             return next;
         }
     }
@@ -2710,6 +2718,9 @@ private:
             }
         }
 
+        // Check that all loops along the vectorized var are multiple
+        // of the vector_size (except for the first one, which can be
+        // equal to the actual size of the inputs).
         bool first = true;
         for (int i = 0; i < loops.size() - 1; ++i)
         {
@@ -2721,8 +2732,6 @@ private:
                 }
                 else
                 {
-                    // std::cout << loops[i].var << " :: " << loops[i].end
-                    //          << std::endl;
                     strong_assert((loops[i].end % vector_size) == 0);
                 }
             }
@@ -2845,11 +2854,10 @@ private:
 
                     if (diff != 0)
                     {
-                        auto it = std::find_if(patterns.begin(), patterns.end(),
-                                               [&](auto const& p) {
-                                                   return (diff %
-                                                           p.first.offset) == 0;
-                                               });
+                        auto it = std::find_if(
+                            patterns.begin(), patterns.end(),
+                            [&](auto const& p)
+                            { return (diff % p.first.offset) == 0; });
 
                         if (it != patterns.end())
                         {
@@ -3247,8 +3255,9 @@ private:
 
         std::vector<instruction_t> instructions;
 
-        auto add_load_instruction = [&](int vmm_idx, int tensor_idx, int offset,
-                                        int does_broadcast) {
+        auto add_load_instruction =
+            [&](int vmm_idx, int tensor_idx, int offset, int does_broadcast)
+        {
             load_instruction insn{
                 vmm_idx, does_broadcast, {tensor_idx, offset}};
 
@@ -3262,7 +3271,8 @@ private:
             instructions.push_back(insn);
         };
 
-        auto free_a_register = [&](std::set<int> const& to_avoid) {
+        auto free_a_register = [&](std::set<int> const& to_avoid)
+        {
             auto nu_it = next_usage_index.begin();
             strong_assert(nu_it != next_usage_index.end());
 
@@ -3285,7 +3295,8 @@ private:
         };
 
         auto maybe_issue_load = [&](tensor_location_t const& mem_location,
-                                    bool does_broadcast, bool folding_allowed) {
+                                    bool does_broadcast, bool folding_allowed)
+        {
             if (auto it = tensor_location_index.find(mem_location);
                 it == tensor_location_index.end())
             {
@@ -3305,7 +3316,8 @@ private:
             }
         };
 
-        auto mark_usage = [&](tensor_location_t const& mem_location) {
+        auto mark_usage = [&](tensor_location_t const& mem_location)
+        {
             remaining_usages[mem_location].pop_front();
             if (auto it = tensor_location_index.find(mem_location);
                 it != tensor_location_index.end())
@@ -3325,8 +3337,9 @@ private:
             }
         };
 
-        auto needs_a_reg = [&](tensor_location_t const& mem_location,
-                               bool                     folding_allowed) {
+        auto needs_a_reg =
+            [&](tensor_location_t const& mem_location, bool folding_allowed)
+        {
             if (auto it = tensor_location_index.find(mem_location);
                 it == tensor_location_index.end())
             {
@@ -3567,9 +3580,8 @@ private:
         // compute the bound for the innermost loop, since this determines the
         // number of elements vectorized identify bound by looking at stride for
         // prior split (if any)
-        auto matches_innermost = [&innermost](auto const& dim) {
-            return dim.first == innermost.first;
-        };
+        auto matches_innermost = [&innermost](auto const& dim)
+        { return dim.first == innermost.first; };
         auto parent_iter =
             std::find_if(++order.rbegin(), order.rend(), matches_innermost);
 
@@ -3642,6 +3654,11 @@ public:
     std::int64_t get_masked_out_flops() const { return masked_out_flops_; }
 
     std::int64_t get_total_memory() const { return total_memory_; }
+
+    std::pair<int, int> const& get_register_blocking_info() const
+    {
+        return register_blocking_info_;
+    }
 
     access_kind get_A_access_kind() const { return A_traits.access; }
     access_kind get_B_access_kind() const { return B_traits.access; }

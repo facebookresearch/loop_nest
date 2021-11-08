@@ -150,6 +150,34 @@ double measure_mean_time_limited(Fn&& fn, unsigned iterations = 1,
 }
 
 template <class Fn>
+double measure_mean_timed(Fn&& fn, double seconds = 1.0)
+{
+    using namespace std::chrono;
+
+    std::size_t n_iter = 1;
+    auto        start  = high_resolution_clock::now();
+
+    while (1)
+    {
+        for (std::size_t i = 0; i < n_iter; ++i)
+        {
+            fn();
+        }
+
+        auto end   = high_resolution_clock::now();
+        auto nsecs = duration_cast<nanoseconds>(end - start).count();
+        if (static_cast<double>(nsecs) / 1e9 > seconds / 2)
+        {
+            break;
+        }
+
+        n_iter *= 2;
+    }
+
+    return measure_mean(fn, n_iter * 2);
+}
+
+template <class Fn>
 double measure_median(Fn&& fn, unsigned iterations = 1,
                       unsigned warmup_iterations = 1)
 {
