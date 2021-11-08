@@ -98,7 +98,7 @@ inline float fmadd(bf16x2_t left, bf16x2_t right, float v)
     return v;
 }
 
-inline constexpr float dot(bf16x2_t left, bf16x2_t right)
+inline float dot(bf16x2_t left, bf16x2_t right)
 {
     return fmadd(left, right, 0.f);
 }
