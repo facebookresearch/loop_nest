@@ -33,7 +33,8 @@ inline double measure_single_run(Fn&& fn)
 }
 
 template <class Fn>
-__attribute__((always_inline)) void warmup_run(Fn&& fn, unsigned iterations = 0)
+__attribute__((always_inline)) inline void warmup_run(Fn&& fn,
+                                                      unsigned iterations = 0)
 {
     for (unsigned i = 0; i < iterations; ++i)
     {
@@ -42,7 +43,7 @@ __attribute__((always_inline)) void warmup_run(Fn&& fn, unsigned iterations = 0)
 }
 
 template <class Fn>
-__attribute__((always_inline)) void
+__attribute__((always_inline)) inline void
 warmup_run_time_limited(Fn&& fn, unsigned iterations = 0, double seconds = 1.0)
 {
     double total_time = 0.0;
@@ -176,6 +177,41 @@ double measure_mean_timed(Fn&& fn, double seconds = 1.0)
 
     return measure_mean(fn, n_iter * 2);
 }
+
+template <class Fn>
+double measure_mean_timed_and_bounded(Fn&& fn, double seconds = 1.0,
+                                      std::size_t min_iterations = 1,
+                                      std::size_t max_iterations =
+                                      std::numeric_limits<std::size_t>::max())
+{
+    using namespace std::chrono;
+
+    std::size_t n_iter = 1;
+    auto        start  = high_resolution_clock::now();
+
+    while (1)
+    {
+        for (std::size_t i = 0; i < n_iter; ++i)
+        {
+            fn();
+        }
+
+        auto end   = high_resolution_clock::now();
+        auto nsecs = duration_cast<nanoseconds>(end - start).count();
+        if (static_cast<double>(nsecs) / 1e9 > seconds / 2)
+        {
+            break;
+        }
+
+        n_iter *= 2;
+    }
+
+    n_iter = std::max(min_iterations, n_iter);
+    n_iter = std::min(max_iterations, n_iter);
+
+    return measure_mean(fn, n_iter * 2);
+}
+
 
 template <class Fn>
 double measure_median(Fn&& fn, unsigned iterations = 1,

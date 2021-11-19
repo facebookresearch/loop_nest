@@ -92,10 +92,10 @@ private:
 
     void restore_stack()
     {
-        ldp(q14, q15, pre_ptr(stack_reg, 64));
-        ldp(q12, q13, pre_ptr(stack_reg, 64));
-        ldp(q10, q11, pre_ptr(stack_reg, 64));
-        ldp(q8, q9, pre_ptr(stack_reg, 64));
+        ldp(q14, q15, pre_ptr(stack_reg, -64));
+        ldp(q12, q13, pre_ptr(stack_reg, -64));
+        ldp(q10, q11, pre_ptr(stack_reg, -64));
+        ldp(q8, q9, pre_ptr(stack_reg, -64));
         add(sp, sp, 1024);
         add(sp, sp, 1024);
     }
