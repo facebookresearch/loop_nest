@@ -226,7 +226,7 @@ public:
 
     void meta_cmp(Xbyak_aarch64::XReg const& xreg, int imm)
     {
-        if (imm >= -256 || imm < 256)
+        if (imm >= -256 && imm < 256)
         {
             self().cmp(xreg, imm);
         }
