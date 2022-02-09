@@ -1185,7 +1185,7 @@ private:
                    std::optional<int> tail_mask, int max_alpha,
                    bool issue_max_alpha_logic)
     {
-        Ymm arg_C_strides;
+        // Ymm arg_C_strides;
         Ymm ymm_tail_mask;
         int next_vector_register = 0;
 
@@ -1341,8 +1341,7 @@ private:
         {
             std::visit(
                 overloaded{
-                    [&](load_instruction const& i)
-                    {
+                    [&](load_instruction const& i) {
                         if (i.does_broadcast)
                         {
                             vbroadcastss(
@@ -1358,8 +1357,7 @@ private:
                                         ->get_address(i.tensor_loc.offset)]);
                         }
                     },
-                    [&](fmla_instruction const& fml)
-                    {
+                    [&](fmla_instruction const& fml) {
                         if (std::holds_alternative<int>(fml.right_src))
                         {
                             int rreg = std::get<int>(fml.right_src);
@@ -1483,8 +1481,7 @@ private:
         int mask_size = -1;
 
         // TODO(zi) issue mask only when required (for avx512 as well)
-        auto const ensure_initalized_mask = [&](int mask)
-        {
+        auto const ensure_initalized_mask = [&](int mask) {
             strong_assert(tail_mask && "Tail mask was not detected");
             strong_assert(mask == *tail_mask);
 
@@ -1526,9 +1523,9 @@ private:
             arg1_registers.resize(5);
         }
 
-        int cycle   = optim_config.delay_innermost_operations()
-                          ? arg1_registers.size()
-                          : 1;
+        int cycle = optim_config.delay_innermost_operations()
+                        ? arg1_registers.size()
+                        : 1;
         int current = 0;
 
         std::vector<std::function<void()>> issue_delayed_ops(cycle, []() {});
@@ -1634,11 +1631,13 @@ private:
                 }
             }
 
-            issue_delayed_ops[current % cycle] =
-                [arg1_reg, addr, delayed_fma_operations, &addressers,
-                 temp_k_mask, full_k_mask, tail_k_mask, this,
-                 &ensure_initalized_mask, arg2_register, &tensor_strides]()
-            {
+            issue_delayed_ops[current % cycle] = [arg1_reg, addr,
+                                                  delayed_fma_operations,
+                                                  &addressers, temp_k_mask,
+                                                  full_k_mask, tail_k_mask,
+                                                  this, &ensure_initalized_mask,
+                                                  arg2_register,
+                                                  &tensor_strides]() {
                 bool first = true;
                 for (auto const& op : delayed_fma_operations)
                 {
@@ -1837,8 +1836,7 @@ private:
         int mask_size = -1;
 
         // TODO(zi) issue mask only when required (for avx512 as well)
-        auto const ensure_initalized_mask = [&](int mask)
-        {
+        auto const ensure_initalized_mask = [&](int mask) {
             strong_assert(tail_mask && "Tail mask was not detected");
             strong_assert(mask == *tail_mask);
 
@@ -1864,9 +1862,9 @@ private:
             arg1_registers.resize(5);
         }
 
-        int cycle   = optim_config.delay_innermost_operations()
-                          ? arg1_registers.size()
-                          : 1;
+        int cycle = optim_config.delay_innermost_operations()
+                        ? arg1_registers.size()
+                        : 1;
         int current = 0;
 
         std::vector<std::function<void()>> issue_delayed_ops(cycle, []() {});
@@ -1978,11 +1976,14 @@ private:
                 }
             }
 
-            issue_delayed_ops[current % cycle] =
-                [arg1_reg, addr, delayed_fma_operations, &addressers,
-                 ymm_temp_register, ymm_tail_mask, ymm_full_mask, this,
-                 &ensure_initalized_mask, arg2_register, &tensor_strides]()
-            {
+            issue_delayed_ops[current % cycle] = [arg1_reg, addr,
+                                                  delayed_fma_operations,
+                                                  &addressers,
+                                                  ymm_temp_register,
+                                                  ymm_tail_mask, ymm_full_mask,
+                                                  this, &ensure_initalized_mask,
+                                                  arg2_register,
+                                                  &tensor_strides]() {
                 bool first = true;
                 for (auto const& op : delayed_fma_operations)
                 {
@@ -2099,8 +2100,7 @@ private:
     {
         std::optional<int> tail_mask;
 
-        auto update_tail_mask = [&](int m)
-        {
+        auto update_tail_mask = [&](int m) {
             if (m != vector_size)
             {
                 strong_assert(!tail_mask || *tail_mask == m);
@@ -2478,8 +2478,7 @@ private:
         std::int64_t total_required_fma_operations =
             std::accumulate(padded_sizes.begin(), padded_sizes.end(),
                             (std::int64_t)1,
-                            [&](std::int64_t v, auto const& s)
-                            {
+                            [&](std::int64_t v, auto const& s) {
                                 // std::cout << v << " :: " << s.second << "\n";
                                 return (B_strides.count(s.first) ||
                                         A_strides.count(s.first) ||
@@ -2854,10 +2853,11 @@ private:
 
                     if (diff != 0)
                     {
-                        auto it = std::find_if(
-                            patterns.begin(), patterns.end(),
-                            [&](auto const& p)
-                            { return (diff % p.first.offset) == 0; });
+                        auto it = std::find_if(patterns.begin(), patterns.end(),
+                                               [&](auto const& p) {
+                                                   return (diff %
+                                                           p.first.offset) == 0;
+                                               });
 
                         if (it != patterns.end())
                         {
@@ -3077,7 +3077,10 @@ private:
                     add(alpha_reg_, 2);
                 }
 
-                dec(loop_reg_.cvt32());
+                auto loop_reg_32_ = loop_reg_.cvt32();
+                // dec(loop_reg_.cvt32());
+                // dec(loop_reg_);
+                dec(loop_reg_32_);
                 jnz(loopLabel);
             }
             else if (full_iterations == 1)
@@ -3255,9 +3258,8 @@ private:
 
         std::vector<instruction_t> instructions;
 
-        auto add_load_instruction =
-            [&](int vmm_idx, int tensor_idx, int offset, int does_broadcast)
-        {
+        auto add_load_instruction = [&](int vmm_idx, int tensor_idx, int offset,
+                                        int does_broadcast) {
             load_instruction insn{
                 vmm_idx, does_broadcast, {tensor_idx, offset}};
 
@@ -3271,8 +3273,7 @@ private:
             instructions.push_back(insn);
         };
 
-        auto free_a_register = [&](std::set<int> const& to_avoid)
-        {
+        auto free_a_register = [&](std::set<int> const& to_avoid) {
             auto nu_it = next_usage_index.begin();
             strong_assert(nu_it != next_usage_index.end());
 
@@ -3295,8 +3296,7 @@ private:
         };
 
         auto maybe_issue_load = [&](tensor_location_t const& mem_location,
-                                    bool does_broadcast, bool folding_allowed)
-        {
+                                    bool does_broadcast, bool folding_allowed) {
             if (auto it = tensor_location_index.find(mem_location);
                 it == tensor_location_index.end())
             {
@@ -3316,8 +3316,7 @@ private:
             }
         };
 
-        auto mark_usage = [&](tensor_location_t const& mem_location)
-        {
+        auto mark_usage = [&](tensor_location_t const& mem_location) {
             remaining_usages[mem_location].pop_front();
             if (auto it = tensor_location_index.find(mem_location);
                 it != tensor_location_index.end())
@@ -3337,9 +3336,8 @@ private:
             }
         };
 
-        auto needs_a_reg =
-            [&](tensor_location_t const& mem_location, bool folding_allowed)
-        {
+        auto needs_a_reg = [&](tensor_location_t const& mem_location,
+                               bool                     folding_allowed) {
             if (auto it = tensor_location_index.find(mem_location);
                 it == tensor_location_index.end())
             {
@@ -3580,8 +3578,9 @@ private:
         // compute the bound for the innermost loop, since this determines the
         // number of elements vectorized identify bound by looking at stride for
         // prior split (if any)
-        auto matches_innermost = [&innermost](auto const& dim)
-        { return dim.first == innermost.first; };
+        auto matches_innermost = [&innermost](auto const& dim) {
+            return dim.first == innermost.first;
+        };
         auto parent_iter =
             std::find_if(++order.rbegin(), order.rend(), matches_innermost);
 
@@ -3683,11 +3682,11 @@ private:
         std::optional<int> user_fma_unroll_limit = std::nullopt,
         std::shared_ptr<elementwise_operation<ISA>> elementwise_preop = nullptr,
         std::vector<std::map<std::string, int>> const&
-            elementwise_preop_strides = {},
+                                                    elementwise_preop_strides = {},
         std::shared_ptr<elementwise_operation<ISA>> elementwise_postop =
             nullptr,
         std::vector<std::map<std::string, int>> const&
-            elementwise_postop_strides                        = {},
+                                                 elementwise_postop_strides = {},
         std::optional<OptimizationConfiguration> optim_config = std::nullopt)
         : order(_order)
         , sizes(sizes)
@@ -3867,11 +3866,11 @@ public:
         std::optional<int> user_fma_unroll_limit = std::nullopt,
         std::shared_ptr<elementwise_operation<ISA>> elementwise_preop = nullptr,
         std::vector<std::map<std::string, int>> const&
-            elementwise_preop_strides = {},
+                                                    elementwise_preop_strides = {},
         std::shared_ptr<elementwise_operation<ISA>> elementwise_postop =
             nullptr,
         std::vector<std::map<std::string, int>> const&
-            elementwise_postop_strides                        = {},
+                                                 elementwise_postop_strides = {},
         std::optional<OptimizationConfiguration> optim_config = std::nullopt)
         : loop_nest_code_generator(
               not_depricated_tag(), _order, sizes, C_formula, A_formula,
@@ -3888,11 +3887,11 @@ public:
         std::optional<int> user_fma_unroll_limit = std::nullopt,
         std::shared_ptr<elementwise_operation<ISA>> elementwise_preop = nullptr,
         std::vector<std::map<std::string, int>> const&
-            elementwise_preop_strides = {},
+                                                    elementwise_preop_strides = {},
         std::shared_ptr<elementwise_operation<ISA>> elementwise_postop =
             nullptr,
         std::vector<std::map<std::string, int>> const&
-            elementwise_postop_strides                        = {},
+                                                 elementwise_postop_strides = {},
         std::optional<OptimizationConfiguration> optim_config = std::nullopt)
         : loop_nest_code_generator(
               arguments.get_order(), arguments.get_sizes(),
@@ -3905,6 +3904,15 @@ public:
     {
     }
 };
+
+#ifdef DABUN_NOT_HEADER_ONLY
+
+extern template class loop_nest_code_generator<avx2>;
+extern template class loop_nest_code_generator<avx512>;
+// TODO(zi) avx2_plus support
+// extern template struct dabun::x86::loop_nest_code_generator<avx2_plus>;
+
+#endif
 
 } // namespace x86
 } // namespace dabun

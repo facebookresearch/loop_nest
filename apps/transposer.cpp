@@ -38,7 +38,7 @@ int main()
             {{"R", 1}, {"C", R}});
 
         auto transpose_jit =
-            transposer_code_generator<DABUN_ISA, float_t>(
+            transposer_compiler<DABUN_VEX, float_t>(
                 {{"C", 13}, {"R", 16}, {"C", 9}, {"R", 16}, {"C", 1}, {"R", 1}},
                 // Sizes
                 {{"R", R}, {"C", C}},

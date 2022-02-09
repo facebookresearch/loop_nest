@@ -81,7 +81,7 @@ int main()
                 // in's strides for each variable
                 {{"ArCr", 1}, {"AcBr", ArCr}});
 
-            auto fn = transposer_code_generator<DABUN_ISA, float_t>(
+            auto fn = transposer_compiler<DABUN_VEX, float_t>(
                           full_order, // The second argument is a map of the
                                       // dimension sizes
                           {{"AcBr", AcBr}, {"ArCr", ArCr}},

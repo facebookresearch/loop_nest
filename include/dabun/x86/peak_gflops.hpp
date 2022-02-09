@@ -12,17 +12,20 @@
 #include "dabun/math.hpp"
 #include "dabun/measure.hpp"
 
+#include <utility>
+
 namespace dabun
 {
 namespace x86
 {
 
-template <class ISA, class = float>
+template <class ISA, class Float = float>
 struct bench_gflops
 {
 private:
     static_assert(std::is_same_v<ISA, avx2> || std::is_same_v<ISA, avx512> ||
                   std::is_same_v<ISA, avx2_plus>);
+    static_assert(std::is_same_v<Float, float>);
 
     using Vmm =
         std::conditional_t<std::is_same_v<ISA, avx512>, Xbyak::Zmm, Xbyak::Ymm>;
@@ -59,7 +62,7 @@ private:
     };
 
 public:
-    static double do_bench(int iterations = 10000000)
+    static std::pair<double, double> do_bench(int iterations = 10000000)
     {
         auto  fn      = test(iterations).get_shared();
         float data[1] = {0};
@@ -69,9 +72,17 @@ public:
         double gflops = 2.0 * iterations * 10 * (num_vector_regs - 2) *
                         vector_size / 1000000000;
 
-        return gflops / secs;
+        return {gflops, secs};
     }
 };
+
+#ifdef DABUN_NOT_HEADER_ONLY
+
+extern template struct dabun::x86::bench_gflops<avx2, float>;
+extern template struct dabun::x86::bench_gflops<avx512, float>;
+extern template struct dabun::x86::bench_gflops<avx2_plus, float>;
+
+#endif
 
 } // namespace x86
 } // namespace dabun

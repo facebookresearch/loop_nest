@@ -84,7 +84,7 @@ private:
     void check_representation()
     {
         // Make sure strides (and sizes) exist for each order variable
-        for (auto const& o : order)
+        for ([[maybe_unused]] auto const& o : order)
         {
             assert(out_strides.count(o.first) > 0);
             assert(in_strides.count(o.first) > 0);
@@ -103,7 +103,7 @@ private:
             last_step[o.first] = o.second;
         }
 
-        for (auto const& o : order)
+        for ([[maybe_unused]] auto const& o : order)
         {
             assert(last_step[o.first] == 1 &&
                    "Last step in order not equal to 1");
@@ -832,6 +832,14 @@ public:
         issue_embedded_constants();
     }
 };
+
+#ifdef DABUN_NOT_HEADER_ONLY
+
+extern template class transposer_code_generator<avx2>;
+extern template class transposer_code_generator<avx2_plus>;
+extern template class transposer_code_generator<avx512>;
+
+#endif
 
 } // namespace x86
 } // namespace dabun

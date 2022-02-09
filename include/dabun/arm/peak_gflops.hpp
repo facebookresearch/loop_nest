@@ -6,9 +6,12 @@
 #ifdef DABUN_ARCH_AARCH64
 
 #include "dabun/code_generator/code_generator.hpp"
+#include "dabun/float.hpp"
 #include "dabun/isa.hpp"
 #include "dabun/math.hpp"
 #include "dabun/measure.hpp"
+
+#include <utility>
 
 namespace dabun
 {
@@ -75,18 +78,25 @@ private:
     };
 
 public:
-    static double do_bench(int iterations = 10000000)
+    static std::pair<double, double> do_bench(int iterations = 10000000)
     {
         auto fn = test().get_shared();
 
-        auto secs = measure_fastest([&]() { fn(iterations); }, 100);
+        double secs = measure_fastest([&]() { fn(iterations); }, 100);
 
         double gflops = 2.0 * iterations * 10 * (16 + 6) *
                         (vector_size * 4 / sizeof(Arithmetic)) / 1000000000;
 
-        return gflops / secs;
+        return {gflops, secs};
     }
 };
+
+#ifdef DABUN_NOT_HEADER_ONLY
+
+extern template struct bench_gflops<aarch64, fp32>;
+extern template struct bench_gflops<aarch64, fp16>;
+
+#endif
 
 } // namespace arm
 } // namespace dabun

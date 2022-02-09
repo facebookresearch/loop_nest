@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "dabun/arm/loop_nest_fp16.hpp"
+
 #include "dabun/isa.hpp"
 #ifdef DABUN_ARCH_AARCH64
 
@@ -46,11 +48,11 @@ namespace dabun
 namespace arm
 {
 
-template <class>
+template <class, bool = false /* is neon_fp16 */>
 class loop_nest_code_generator;
 
 template <>
-class loop_nest_code_generator<aarch64>
+class loop_nest_code_generator<aarch64, false>
     : public code_generator<void(float* C, float const* A, float const* B,
                                  int alpha)>,
       public meta_mnemonics<loop_nest_code_generator<aarch64>>
@@ -1580,20 +1582,6 @@ private:
         }
     }
 
-    void issue_C_elementwise_preop(std::set<memory_argument> const& loads)
-    {
-        switch (C_traits.access)
-        {
-        case VECTOR_STRIDED:
-            /* fall through to vector packed case */
-        case VECTOR_PACKED:
-            break;
-
-        case SCALAR:
-            break;
-        }
-    }
-
     void issue_C_loads(std::set<memory_argument> const& loads,
                        bool                             issue_first_alpha_logic)
     {
@@ -1632,8 +1620,8 @@ private:
     }
 
     void issue_C_stores(std::set<memory_argument> const& stores,
-                        std::optional<int> tail_mask, int max_alpha,
-                        bool issue_max_alpha_logic)
+                        std::optional<int> /* tail_mask */, int max_alpha,
+                        bool /* issue_max_alpha_logic */)
     {
         std::vector<memory_argument> ordered_stores;
 
@@ -1797,8 +1785,8 @@ private:
     }
 
     void issue_unrolled_operations_vector_vector(
-        std::vector<operation_operation> operations,
-        std::function<void()> const&     epilogue_fn)
+        std::vector<operation_operation> /* operations */,
+        std::function<void()> const& epilogue_fn)
     {
         auto instructions = std::move(instruction_IRs.front());
         instruction_IRs.pop_front();
@@ -1928,8 +1916,8 @@ private:
     }
 
     void issue_unrolled_operations_scalar_scalar(
-        std::vector<operation_operation> operations,
-        std::function<void()> const&     epilogue_fn)
+        std::vector<operation_operation> /* operations */,
+        std::function<void()> const& epilogue_fn)
     {
         auto instructions = std::move(instruction_IRs.front());
         instruction_IRs.pop_front();
@@ -3775,6 +3763,24 @@ public:
     {
     }
 };
+
+template <>
+class loop_nest_code_generator<aarch64, true>
+    : public loop_nest_fp16_code_generator<aarch64>
+{
+private:
+    using impl_class = loop_nest_fp16_code_generator<aarch64>;
+
+public:
+    using impl_class::impl_class;
+};
+
+#ifdef DABUN_NOT_HEADER_ONLY
+
+extern template class loop_nest_code_generator<aarch64, false>;
+extern template class loop_nest_code_generator<aarch64, true>;
+
+#endif
 
 } // namespace arm
 } // namespace dabun

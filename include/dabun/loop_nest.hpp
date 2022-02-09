@@ -8,7 +8,6 @@
 
 #if defined(DABUN_ARCH_AARCH64)
 #include "dabun/arm/loop_nest.hpp"
-#include "dabun/arm/loop_nest_fp16.hpp"
 #else
 #include "dabun/x86/loop_nest.hpp"
 #endif
@@ -25,8 +24,8 @@ using DABUN_ISA_NAMESPACE ::loop_nest_fp16_code_generator;
 template <extension VEX, class Arithmetic>
 using loop_nest_compiler = std::conditional_t<
     std::is_same_v<Arithmetic, float>,
-    loop_nest_code_generator<extension_to_deprecated_ISA_t<VEX>>,
-    loop_nest_fp16_code_generator<extension_to_deprecated_ISA_t<VEX>>>;
+    loop_nest_code_generator<extension_to_deprecated_ISA_t<VEX>, false>,
+    loop_nest_code_generator<extension_to_deprecated_ISA_t<VEX>, true>>;
 
 #else
 

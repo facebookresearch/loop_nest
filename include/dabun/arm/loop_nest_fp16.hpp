@@ -1488,8 +1488,8 @@ private:
                 .push_back(i);
         }
 
-        auto num_regs = isa_traits<aarch64>::total_vector_registers -
-                        first_unused_vmm_register;
+        // auto num_regs = isa_traits<aarch64>::total_vector_registers -
+        //                 first_unused_vmm_register;
 
         std::deque<int> free_regs;
 
@@ -2499,8 +2499,8 @@ private:
     }
 
     void issue_C_stores(std::set<memory_argument> const& stores,
-                        std::optional<int> tail_mask, int max_alpha,
-                        bool issue_max_alpha_logic)
+                        std::optional<int> /* tail_mask */, int max_alpha,
+                        bool /* issue_max_alpha_logic */)
     {
         std::vector<memory_argument> ordered_stores;
 
@@ -2851,7 +2851,7 @@ private:
     }
 
     void issue_unrolled_operations_vector_vector(
-        std::vector<operation_operation> operations,
+        std::vector<operation_operation> /* operations */,
         std::function<void()> const&     epilogue_fn)
     {
         auto instructions = std::move(instruction_IRs.front());
@@ -3108,7 +3108,7 @@ private:
     }
 
     void issue_unrolled_operations_scalar_scalar(
-        std::vector<operation_operation> operations,
+        std::vector<operation_operation> /* operations */,
         std::function<void()> const&     epilogue_fn)
     {
         auto instructions = std::move(instruction_IRs.front());
@@ -3120,7 +3120,7 @@ private:
         {
             std::visit(
                 overloaded{
-                    [&](load_pair_instruction const& i) {
+                    [&](load_pair_instruction const&) {
                         strong_assert(
                             false &&
                             "No load pair instructions should be present");

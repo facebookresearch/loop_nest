@@ -9,6 +9,7 @@
 #include "dabun/code_generator/code_generator.hpp"
 #include "dabun/common.hpp"
 #include "dabun/core.hpp"
+#include "dabun/float.hpp"
 #include "dabun/isa.hpp"
 #include "dabun/log.hpp"
 #include "dabun/math.hpp"
@@ -449,7 +450,8 @@ private:
     {
         std::map<int, int> reg_to_location;
 
-        auto process = [&](int reg_id, auto& loc) {
+        auto process = [&](int reg_id, auto& loc)
+        {
             if (reg_to_location.count(reg_id))
             {
                 auto delta = reg_to_location[reg_id] - loc.offset;
@@ -496,7 +498,8 @@ private:
         int src_loc  = 0;
         int dest_loc = 0;
 
-        auto issue_read = [&](auto const& loc) {
+        auto issue_read = [&](auto const& loc)
+        {
             auto delta = loc.offset;
 
             LN_LOG(INFO) << tabs.back() << "READ in["
@@ -565,7 +568,8 @@ private:
             }
         };
 
-        auto issue_write = [&](auto const& loc) {
+        auto issue_write = [&](auto const& loc)
+        {
             auto delta = loc.offset;
 
             LN_LOG(INFO) << tabs.back() << "WRITE out["
@@ -810,6 +814,13 @@ public:
         ret();
     }
 };
+
+#ifdef DABUN_NOT_HEADER_ONLY
+
+extern template class transposer_code_generator<aarch64, float>;
+extern template class transposer_code_generator<aarch64, fp16>;
+
+#endif
 
 } // namespace arm
 } // namespace dabun

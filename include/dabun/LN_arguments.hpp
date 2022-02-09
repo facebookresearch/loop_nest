@@ -214,112 +214,115 @@ public:
     }
 };
 
-LN_arguments LN_loop(std::string const& d, int s)
+inline LN_arguments LN_loop(std::string const& d, int s)
 {
     LN_arguments ret;
     ret.append_loop(d, s);
     return ret;
 }
 
-LN_arguments LN_loops(std::vector<std::pair<std::string, int>> const& ds)
+inline LN_arguments LN_loops(std::vector<std::pair<std::string, int>> const& ds)
 {
     LN_arguments ret;
     ret.append_loops(ds);
     return ret;
 }
 
-LN_arguments LN_size(std::string const& d, int s)
+inline LN_arguments LN_size(std::string const& d, int s)
 {
     LN_arguments ret;
     ret.size(d, s);
     return ret;
 }
 
-LN_arguments LN_sizes(std::vector<std::pair<std::string, int>> const& ds)
+inline LN_arguments LN_sizes(std::vector<std::pair<std::string, int>> const& ds)
 {
     LN_arguments ret;
     ret.sizes(ds);
     return ret;
 }
 
-LN_arguments LN_C_axis(std::string const& d)
+inline LN_arguments LN_C_axis(std::string const& d)
 {
     LN_arguments ret;
     ret.C_axis(d);
     return ret;
 }
 
-LN_arguments C_axes(std::vector<std::string> const& ds)
+inline LN_arguments C_axes(std::vector<std::string> const& ds)
 {
     LN_arguments ret;
     ret.C_axes(ds);
     return ret;
 }
 
-LN_arguments A_axis(std::string const& d)
+inline LN_arguments A_axis(std::string const& d)
 {
     LN_arguments ret;
     ret.A_axis(d);
     return ret;
 }
 
-LN_arguments A_axes(std::vector<std::string> const& ds)
+inline LN_arguments A_axes(std::vector<std::string> const& ds)
 {
     LN_arguments ret;
     ret.A_axes(ds);
     return ret;
 }
 
-LN_arguments B_axis(std::string const& d)
+inline LN_arguments B_axis(std::string const& d)
 {
     LN_arguments ret;
     ret.B_axis(d);
     return ret;
 }
 
-LN_arguments B_axes(std::vector<std::string> const& ds)
+inline LN_arguments B_axes(std::vector<std::string> const& ds)
 {
     LN_arguments ret;
     ret.B_axes(ds);
     return ret;
 }
 
-LN_arguments C_stride(std::string const& d, int s)
+inline LN_arguments C_stride(std::string const& d, int s)
 {
     LN_arguments ret;
     ret.C_stride(d, s);
     return ret;
 }
 
-LN_arguments C_strides(std::vector<std::pair<std::string, int>> const& ds)
+inline LN_arguments
+C_strides(std::vector<std::pair<std::string, int>> const& ds)
 {
     LN_arguments ret;
     ret.C_strides(ds);
     return ret;
 }
 
-LN_arguments A_stride(std::string const& d, int s)
+inline LN_arguments A_stride(std::string const& d, int s)
 {
     LN_arguments ret;
     ret.A_stride(d, s);
     return ret;
 }
 
-LN_arguments A_strides(std::vector<std::pair<std::string, int>> const& ds)
+inline LN_arguments
+A_strides(std::vector<std::pair<std::string, int>> const& ds)
 {
     LN_arguments ret;
     ret.A_strides(ds);
     return ret;
 }
 
-LN_arguments B_stride(std::string const& d, int s)
+inline LN_arguments B_stride(std::string const& d, int s)
 {
     LN_arguments ret;
     ret.B_stride(d, s);
     return ret;
 }
 
-LN_arguments B_strides(std::vector<std::pair<std::string, int>> const& ds)
+inline LN_arguments
+B_strides(std::vector<std::pair<std::string, int>> const& ds)
 {
     LN_arguments ret;
     ret.B_strides(ds);

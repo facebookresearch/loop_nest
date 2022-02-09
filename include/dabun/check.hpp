@@ -29,7 +29,7 @@ template <class Float>
 printable_fp_t<Float> max_abs_difference(Float const* LBegin, Float const* LEnd,
                                          Float const* RBegin)
 {
-    Float res = 0;
+    Float res = static_cast<Float>(0);
     for (; LBegin != LEnd; ++LBegin, ++RBegin)
     {
         if constexpr (std::is_same_v<Float, fp16>)

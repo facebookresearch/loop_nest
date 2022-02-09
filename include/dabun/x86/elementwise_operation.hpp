@@ -105,7 +105,8 @@ public:
                   std::vector<std::pair<memory_argument, Xbyak::Zmm>> const&
                                                  mems_and_regs,
                   std::vector<Xbyak::Zmm> const& auxiliary,
-                  std::vector<Xbyak::Opmask> const&, access_kind access, avx512,
+                  std::vector<Xbyak::Opmask> const&,
+                  [[maybe_unused]] access_kind access, avx512,
                   std::optional<Xbyak::Opmask> = std::nullopt) const override
     {
         assert(access == VECTOR_PACKED || access == VECTOR_STRIDED);
@@ -125,7 +126,8 @@ public:
         Xbyak::CodeGenerator& cg,
         std::vector<std::pair<memory_argument, Xbyak::Ymm>> const&
                                        mems_and_regs,
-        std::vector<Xbyak::Ymm> const& auxiliary, access_kind access, avx2,
+        std::vector<Xbyak::Ymm> const& auxiliary,
+        [[maybe_unused]] access_kind   access, avx2,
         std::optional<Xbyak::Ymm> /* tail_mask */ = std::nullopt) const override
     {
         assert(access == VECTOR_PACKED || access == VECTOR_STRIDED);
@@ -145,8 +147,8 @@ public:
     process_batch(Xbyak::CodeGenerator& cg,
                   std::vector<std::pair<memory_argument, Xbyak::Xmm>> const&
                                                  mems_and_regs,
-                  std::vector<Xbyak::Xmm> const& auxiliary, access_kind kind,
-                  avx512) const override
+                  std::vector<Xbyak::Xmm> const& auxiliary,
+                  [[maybe_unused]] access_kind   kind, avx512) const override
     {
 
         assert(kind == SCALAR);
@@ -257,8 +259,8 @@ public:
         std::vector<std::pair<memory_argument, Xbyak::Zmm>> const&
                                           mems_and_regs,
         std::vector<Xbyak::Zmm> const&    auxillaries,
-        std::vector<Xbyak::Opmask> const& in_kregs, access_kind C_access,
-        avx512,
+        std::vector<Xbyak::Opmask> const& in_kregs,
+        [[maybe_unused]] access_kind      C_access, avx512,
         std::optional<Xbyak::Opmask> tail_mask = std::nullopt) const override
     {
         auto auxiliary = auxillaries;
@@ -354,8 +356,9 @@ public:
         Xbyak::CodeGenerator& cg,
         std::vector<std::pair<memory_argument, Xbyak::Ymm>> const&
                                        mems_and_regs,
-        std::vector<Xbyak::Ymm> const& auxiliary, access_kind C_access, avx2,
-        std::optional<Xbyak::Ymm> tail_mask = std::nullopt) const override
+        std::vector<Xbyak::Ymm> const& auxiliary,
+        [[maybe_unused]] access_kind   C_access, avx2,
+        std::optional<Xbyak::Ymm>      tail_mask = std::nullopt) const override
     {
 
         assert(C_access == VECTOR_PACKED || C_access == VECTOR_STRIDED);
@@ -508,12 +511,12 @@ public:
                   std::vector<std::pair<memory_argument, Xbyak::Xmm>> const&
                       mems_and_regs,
                   std::vector<Xbyak::Xmm> const& /* auxiliary */,
-                  access_kind C_access, avx512) const override
+                  [[maybe_unused]] access_kind C_access, avx512) const override
     {
-        tensor_traits              other_traits   = t_traits[0];
-        access_kind                other_access   = other_traits.access;
-        Xbyak::Reg64               other_addr_reg = other_traits.reg;
-        std::map<std::string, int> other_strides  = t_strides[0];
+        tensor_traits                other_traits   = t_traits[0];
+        [[maybe_unused]] access_kind other_access   = other_traits.access;
+        Xbyak::Reg64                 other_addr_reg = other_traits.reg;
+        std::map<std::string, int>   other_strides  = t_strides[0];
 
         assert(C_access == SCALAR && other_access == SCALAR);
 
@@ -534,12 +537,12 @@ public:
                   std::vector<std::pair<memory_argument, Xbyak::Xmm>> const&
                       mems_and_regs,
                   std::vector<Xbyak::Xmm> const& /* auxiliary */,
-                  access_kind C_access, avx2) const override
+                  [[maybe_unused]] access_kind C_access, avx2) const override
     {
-        tensor_traits              other_traits   = t_traits[0];
-        access_kind                other_access   = other_traits.access;
-        Xbyak::Reg64               other_addr_reg = other_traits.reg;
-        std::map<std::string, int> other_strides  = t_strides[0];
+        tensor_traits                other_traits   = t_traits[0];
+        [[maybe_unused]] access_kind other_access   = other_traits.access;
+        Xbyak::Reg64                 other_addr_reg = other_traits.reg;
+        std::map<std::string, int>   other_strides  = t_strides[0];
 
         assert(C_access == SCALAR && other_access == SCALAR);
 
@@ -565,22 +568,22 @@ inline std::shared_ptr<elementwise_operation<ISA>> const elementwise_bias =
     std::make_shared<single_tensor_elementwise_operation<ISA>>(
         "Add Bias",
         [](Xbyak::CodeGenerator& cg, const Xbyak::Xmm& dest,
-           const Xbyak::Operand& o1,
-           const Xbyak::Operand& o2) { cg.vaddps(dest, o1, o2); },
+           const Xbyak::Operand& o1, const Xbyak::Operand& o2)
+        { cg.vaddps(dest, o1, o2); },
         [](Xbyak::CodeGenerator& cg, const Xbyak::Xmm& dest,
-           const Xbyak::Operand& o1,
-           const Xbyak::Operand& o2) { cg.vaddss(dest, o1, o2); });
+           const Xbyak::Operand& o1, const Xbyak::Operand& o2)
+        { cg.vaddss(dest, o1, o2); });
 
 template <class ISA>
 inline std::shared_ptr<elementwise_operation<ISA>> const elementwise_multiply =
     std::make_shared<single_tensor_elementwise_operation<ISA>>(
         "Multiply by Other",
         [](Xbyak::CodeGenerator& cg, const Xbyak::Xmm& dest,
-           const Xbyak::Operand& o1,
-           const Xbyak::Operand& o2) { cg.vmulps(dest, o1, o2); },
+           const Xbyak::Operand& o1, const Xbyak::Operand& o2)
+        { cg.vmulps(dest, o1, o2); },
         [](Xbyak::CodeGenerator& cg, const Xbyak::Xmm& dest,
-           const Xbyak::Operand& o1,
-           const Xbyak::Operand& o2) { cg.vmulss(dest, o1, o2); });
+           const Xbyak::Operand& o1, const Xbyak::Operand& o2)
+        { cg.vmulss(dest, o1, o2); });
 
 template <class ISA, class... ISAs>
 class composed_elementwise : public elementwise_operation<ISA>

@@ -1,3 +1,5 @@
+// Copyright 2004-present Facebook. All Rights Reserved.
+
 #pragma once
 
 #if !defined(__aarch64__) ||                                                   \
@@ -11,6 +13,8 @@
 
 namespace dabun
 {
+
+using fp32 = float;
 
 template <class>
 struct printable_fp;

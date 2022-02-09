@@ -15,6 +15,6 @@ using namespace dabun;
 
 int main()
 {
-    std::cout << peak_gflops<DABUN_ISA, DABUN_ARITHMETIC>(10000000) << "\n";
+    std::cout << measure_peak_gflops<DABUN_ISA, DABUN_ARITHMETIC>(1) << "\n";
     // std::cout << fn() << "\n";
 }
