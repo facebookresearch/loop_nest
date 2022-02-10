@@ -8,7 +8,7 @@ function(dabun_app name vex float isa)
     PRIVATE "-DDABUN_ISA=${isa}"
     PRIVATE "-DDABUN_VEX=extension::${vex}"
     PRIVATE "-DDABUN_ARITHMETIC=dabun::${float}")
-ndfunction(dabun_app)
+endfunction(dabun_app)
 
 function(dabun_x86_apps vex float isa)
   dabun_app(gflops ${vex} ${float} ${isa})
