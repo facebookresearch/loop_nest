@@ -15,7 +15,7 @@ run_halide() {
     g++ ${SRC_DIR}/translate_to_halide_arm.cpp -g  \
     -I ${HALIDE_PATH}/include -I${SRC_DIR}/xbyak_aarch64  \
     -L ${HALIDE_PATH}/bin -lHalide -lpthread -ldl -DLOOP_NEST_ARM -std=c++17   \
-    -DCT_ISA="${avx}" \
+    -DDABUN_ISA="${avx}" \
     -O3 \
     -o "translate_to_halide_${avx}.out" \
     && numactl -C 5 "./translate_to_halide_${avx}.out" > "halide_${avx}_results.txt"
@@ -31,7 +31,7 @@ run_loop_nest() {
     -std=c++17 ${SRC_DIR}/loop_nest_arm.cpp \
     -I${SRC_DIR}/xbyak_aarch64 \
     -Wno-sign-compare \
-    -DCT_ISA="${avx}" \
+    -DDABUN_ISA="${avx}" \
     -DNDEBUG=1 \
     -DLOOP_NEST_ARM \
     -O3 \

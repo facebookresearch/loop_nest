@@ -18,8 +18,8 @@
 #include <string>
 #include <vector>
 
-#ifndef CT_ISA
-#define CT_ISA avx2
+#ifndef DABUN_ISA
+#define DABUN_ISA avx2
 #endif
 
 #ifndef PLUS_OP
@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
         std::make_shared<operation_pair<PLUS_OP, MULTIPLIES_OP>>();
 
     auto gen_loop_nest = [&]() {
-      return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+      return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                  schedule, {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
                  {"ArCr", "BcCc"}, {"ArCr", "AcBr"}, {"AcBr", "BcCc"},
                  {{"ArCr", BcCc}, {"BcCc", 1}}, {{"ArCr", AcBr}, {"AcBr", 1}},
@@ -74,10 +74,10 @@ int main(int argc, char *argv[]) {
     auto fn = aot_fn_cast<void(float *, float const *, float const *, int)>(
         std::move(fny));
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     fn(CJ.data(), A.data(), B.data(), 0);

@@ -21,7 +21,7 @@ def run_loop_nest(loop_nest_root, size, arch, op_pair, input_path,
     cmd = [
         "g++", "-Wall", "-Wpedantic", "-Wno-sign-compare", "-std=c++17",
         "-I {}/xbyak".format(loop_nest_root), "-I {}".format(loop_nest_root),
-        "-O3", "-DNDEBUG=1", "-DCT_ISA={}".format(arch),
+        "-O3", "-DNDEBUG=1", "-DDABUN_ISA={}".format(arch),
         "-DPLUS_OP={}".format(get_op(op_pair[0])),
         "-DMULTIPLIES_OP={}".format(get_op(op_pair[1])), input_path, "-o",
         "test.out", "&&", "./test.out",

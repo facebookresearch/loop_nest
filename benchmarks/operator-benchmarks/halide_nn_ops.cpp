@@ -8,8 +8,8 @@
 #include "translate_to_halide.h"
 #include "utils.h"
 
-#ifndef CT_ISA
-#define CT_ISA avx2
+#ifndef DABUN_ISA
+#define DABUN_ISA avx2
 #endif
 
 int main() {
@@ -25,7 +25,7 @@ int main() {
     int AcBr = 256;
     int BcCc = 256;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         // The first argument is the loop order in the form of
         // {dimension, stride}.  For now the outer dimension
         // has to divide the stride.  This is effectively the
@@ -60,10 +60,10 @@ int main() {
         // B's strides for each variable
         {{"AcBr", BcCc}, {"BcCc", 1}}, 1024);
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     baseline_MM(ArCr, AcBr, BcCc, 1, ArCr, 1, AcBr, 1, ArCr, A.data(), B.data(),
@@ -76,7 +76,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -95,7 +95,7 @@ int main() {
     int AcBr = 512;
     int BcCc = 512;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         // The first argument is the loop order in the form of
         // {dimension, stride}.  For now the outer dimension
         // has to divide the stride.  This is effectively the
@@ -130,10 +130,10 @@ int main() {
         // B's strides for each variable
         {{"AcBr", BcCc}, {"BcCc", 1}}, 1024);
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     baseline_MM(ArCr, AcBr, BcCc, 1, ArCr, 1, AcBr, 1, ArCr, A.data(), B.data(),
@@ -146,7 +146,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -170,7 +170,7 @@ int main() {
     int k = AcBr;
     int r = ArCr;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         {{"r", 16}, //
          {"r", 1},  //
          {"k", 64},
@@ -189,10 +189,10 @@ int main() {
         // B's strides for each variable
         {{"k", 2}}, 1024);
 
-    auto A = getRandomVector<float>(AcBr * ArCr * 2);
-    auto B = getRandomVector<float>(AcBr * BcCc * 2);
+    auto A = get_random_vector<float>(AcBr * ArCr * 2);
+    auto B = get_random_vector<float>(AcBr * BcCc * 2);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     baseline_MM(ArCr, AcBr, BcCc, k * 2, 2, 2, 2, 1, 1, A.data(), B.data(),
@@ -205,7 +205,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -228,7 +228,7 @@ int main() {
     int k = AcBr;
     int c = BcCc;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         {{"k", 4},  //
          {"k", 1},  //
          {"c", 1}}, //
@@ -246,10 +246,10 @@ int main() {
         // B's strides for each variable
         {{"k", c}, {"c", 1}});
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     baseline_MM(ArCr, AcBr, BcCc, 0, 1, c, 1, 0, 1, A.data(), B.data(),
@@ -262,7 +262,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -288,7 +288,7 @@ int main() {
     int KS = 3;
     int IS = OS + KS - 1;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         {{"g_out", 1}, //
          {"o_w", 28},
          {"o_h", 1},
@@ -339,9 +339,9 @@ int main() {
          {"k_w", COUT},
          {"c_out", 1}});
 
-    auto A = getRandomVector<float>(GIN * CIN * IS * IS);
-    auto B = getRandomVector<float>(GOUT * GIN * COUT * CIN * KS * KS);
-    auto CN = getRandomVector<float>(GOUT * COUT * OS * OS);
+    auto A = get_random_vector<float>(GIN * CIN * IS * IS);
+    auto B = get_random_vector<float>(GOUT * GIN * COUT * CIN * KS * KS);
+    auto CN = get_random_vector<float>(GOUT * COUT * OS * OS);
     auto CJ = CN;
 
     baseline_Conv_NCHW8c(GOUT, COUT, GIN, CIN, OS, OS, KS, KS, A.data(),
@@ -354,7 +354,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + COUT * OS * OS, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -383,7 +383,7 @@ int main() {
     int IY = OY + KY - 1;
     int IZ = OZ + KZ - 1;
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         // have arbitray number of splits.
         {{"OX", 1},  // To block B in L2 cache
          {"OY", 10}, // This and the next are for the register
@@ -424,10 +424,10 @@ int main() {
         // B's strides for each variable
         {{"KX", KY * KZ}, {"KY", KZ}, {"KZ", 1}}, 1024);
 
-    auto A = getRandomVector<float>(IX * IY * IZ);
-    auto B = getRandomVector<float>(KX * KY * KZ);
+    auto A = get_random_vector<float>(IX * IY * IZ);
+    auto B = get_random_vector<float>(KX * KY * KZ);
 
-    auto CN = getRandomVector<float>(OX * OY * OZ);
+    auto CN = get_random_vector<float>(OX * OY * OZ);
     auto CJ = CN;
 
     baseline_3DConv(OX, OY, OZ, KX, KY, KZ, A.data(), B.data(), CN.data());
@@ -439,7 +439,7 @@ int main() {
     fn.run_on_aligned_data(CJ.data(), A.data(), B.data());
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + OX * OY * OZ, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + OX * OY * OZ, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(

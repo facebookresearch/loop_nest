@@ -30,7 +30,7 @@ def run_loop_nest(loop_nest_root, arch, case, input_path, output_path):
         "-I {}".format(loop_nest_root),
         "-O3",
         "-DNDEBUG=1",
-        "-DCT_ISA={}".format(arch),
+        "-DDABUN_ISA={}".format(arch),
         "-DOPTIM_LEVEL='{}'".format(get_optimization_config(case)),
         input_path,
         "-o",

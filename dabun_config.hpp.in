@@ -1,0 +1,5 @@
+#pragma once
+
+#define DABUN_VERSION_MAJOR @dabun_VERSION_MAJOR@
+#define DABUN_VERSION_MINOR @dabun_VERSION_MINOR@
+#define DABUN_VERSION_PATCH @dabun_VERSION_PATCH@

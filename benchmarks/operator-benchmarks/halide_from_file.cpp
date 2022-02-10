@@ -10,8 +10,8 @@
 #include <string>
 #include <vector>
 
-#ifndef CT_ISA
-#define CT_ISA avx2
+#ifndef DABUN_ISA
+#define DABUN_ISA avx2
 #endif
 
 std::int64_t compute_size(std::map<std::string, int> sizes,
@@ -74,7 +74,7 @@ int main(int argc, char* argv[])
     auto B_strides    = serialized.get_strides("B");
     auto unroll_limit = serialized.get_unroll_limit();
 
-    auto fn = facebook::sysml::aot::LoopNestToHalide<CT_ISA>(
+    auto fn = facebook::sysml::aot::LoopNestToHalide<DABUN_ISA>(
         order, sizes, C_formula, A_formula, B_formula, C_strides, A_strides,
         B_strides, unroll_limit);
 
@@ -82,9 +82,9 @@ int main(int argc, char* argv[])
     auto compile_secs = measureFastestWithWarmup(compile, 0, 1);
     std::cout << "Compile: " << compile_secs << std::endl;
 
-    auto A = getRandomVector<float>(compute_size(sizes, A_strides));
-    auto B = getRandomVector<float>(compute_size(sizes, B_strides));
-    auto C = getRandomVector<float>(compute_size(sizes, C_strides));
+    auto A = get_random_vector<float>(compute_size(sizes, A_strides));
+    auto B = get_random_vector<float>(compute_size(sizes, B_strides));
+    auto C = get_random_vector<float>(compute_size(sizes, C_strides));
 
     auto secs = measureFastestWithWarmup(
         [&]() { fn.run_on_aligned_data(C.data(), A.data(), B.data()); }, 10,

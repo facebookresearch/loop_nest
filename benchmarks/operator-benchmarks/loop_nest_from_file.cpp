@@ -9,8 +9,8 @@
 #include <string>
 #include <vector>
 
-#ifndef CT_ISA
-#define CT_ISA avx2
+#ifndef DABUN_ISA
+#define DABUN_ISA avx2
 #endif
 
 std::int64_t compute_size(std::map<std::string, int> sizes,
@@ -74,7 +74,7 @@ int main(int argc, char* argv[])
     auto unroll_limit = serialized.get_unroll_limit();
 
     auto gen_loop_nest = [&]() {
-        return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+        return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                    order, sizes, C_formula, A_formula, B_formula, C_strides,
                    A_strides, B_strides, facebook::sysml::aot::fma,
                    unroll_limit)
@@ -89,9 +89,9 @@ int main(int argc, char* argv[])
     auto fn  = aot_fn_cast<void(float*, float const*, float const*, int)>(
         std::move(fny));
 
-    auto A = getRandomVector<float>(compute_size(sizes, A_strides));
-    auto B = getRandomVector<float>(compute_size(sizes, B_strides));
-    auto C = getRandomVector<float>(compute_size(sizes, C_strides));
+    auto A = get_random_vector<float>(compute_size(sizes, A_strides));
+    auto B = get_random_vector<float>(compute_size(sizes, B_strides));
+    auto C = get_random_vector<float>(compute_size(sizes, C_strides));
 
     auto secs = measureFastestWithWarmup(
         [&]() { fn(C.data(), A.data(), B.data(), 0); }, 10, 1000);

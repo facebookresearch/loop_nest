@@ -16,8 +16,8 @@
 #include <string>
 #include <vector>
 
-#ifndef CT_ISA
-#define CT_ISA avx2
+#ifndef DABUN_ISA
+#define DABUN_ISA avx2
 #endif
 
 int main() {
@@ -43,7 +43,7 @@ int main() {
     int BcCc = 256;
 
     auto gen_loop_nest = [&]() {
-      return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+      return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                  // The first argument is the loop order in the form of
                  // {dimension, stride}.  For now the outer dimension
                  // has to divide the stride.  This is effectively the
@@ -91,10 +91,10 @@ int main() {
     fn.save_to_file("zi.asm");
     // fn.register_perf("fn1");
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     baseline_MM(ArCr, AcBr, BcCc, AcBr, 1, BcCc, 1, ArCr, 1, A.data(), B.data(),
@@ -104,7 +104,7 @@ int main() {
     fn(CJ.data(), A.data(), B.data(), 0);
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -137,7 +137,7 @@ int main() {
     int IS = OS + KS - 1;
 
     auto gen_loop_nest = [&]() {
-      return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+      return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                  {{"g_out", 1}, //
                   {"o_w", 28},
                   {"o_h", 1},
@@ -196,8 +196,8 @@ int main() {
     fn.save_to_file("zi.asm");
     // fn.register_perf("fn9");
 
-    auto A = getRandomVector<float>(GIN * CIN * IS * IS);
-    auto B = getRandomVector<float>(GOUT * GIN * COUT * CIN * KS * KS);
+    auto A = get_random_vector<float>(GIN * CIN * IS * IS);
+    auto B = get_random_vector<float>(GOUT * GIN * COUT * CIN * KS * KS);
     auto CN = std::vector<float>(GOUT * COUT * OS * OS);
     auto CJ = std::vector<float>(GOUT * COUT * OS * OS);
 
@@ -208,7 +208,7 @@ int main() {
 
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + COUT * OS * OS, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -235,9 +235,9 @@ int main() {
     int BcCc = 333;
 
     auto gen_loop_nest = [&]() {
-      return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+      return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                  {{"AcBr", 512},
-                  {"BcCc", (std::is_same_v<CT_ISA, avx2> ? 8 : 16) * 10},
+                  {"BcCc", (std::is_same_v<DABUN_ISA, avx2> ? 8 : 16) * 10},
                   {"AcBr", 1},
                   {"ArCr", 1},
                   {"BcCc", 1}},
@@ -272,7 +272,7 @@ int main() {
 
     auto baseline_fn = facebook::sysml::aot::loop_nest_slow_baseline(
         {{"AcBr", 512},
-         {"BcCc", (std::is_same_v<CT_ISA, avx2> ? 8 : 16) * 10},
+         {"BcCc", (std::is_same_v<DABUN_ISA, avx2> ? 8 : 16) * 10},
          {"AcBr", 1},
          {"ArCr", 1},
          {"BcCc", 1}},
@@ -303,8 +303,8 @@ int main() {
 
     // float A = 1.f;
 
-    auto B = getRandomVector<float>(AcBr * BcCc);
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto B = get_random_vector<float>(AcBr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     // baseline_MM(ArCr, AcBr, BcCc, 0, 0, BcCc, 1, BcCc, 1, &A, B.data(),
@@ -316,7 +316,7 @@ int main() {
     baseline_fn(CN.data(), one_constant<float>, B.data(), 1);
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -340,9 +340,9 @@ int main() {
     int BcCc = 333;
 
     auto gen_loop_nest = [&]() {
-      return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+      return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                  {{"AcBr", 512},
-                  {"BcCc", (std::is_same_v<CT_ISA, avx2> ? 8 : 16) * 10},
+                  {"BcCc", (std::is_same_v<DABUN_ISA, avx2> ? 8 : 16) * 10},
                   {"AcBr", 1},
                   {"ArCr", 1},
                   {"BcCc", 1}},
@@ -380,8 +380,8 @@ int main() {
 
     float A = 1.f;
 
-    auto B = getRandomVector<float>(AcBr * BcCc);
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto B = get_random_vector<float>(AcBr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     baseline_MM(ArCr, AcBr, BcCc, 0, 0, 1, AcBr, BcCc, 1, &A, B.data(),
@@ -390,7 +390,7 @@ int main() {
     fn(CJ.data(), &A, B.data(), 1);
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -420,15 +420,15 @@ int main() {
     // int BcCc = 333;
 
     auto gen_loop_nest = [&]() {
-      return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+      return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                  // The first argument is the loop order in the form of
                  // {dimension, stride}.  For now the outer dimension
                  // has to divide the stride.  This is effectively the
                  // same as Halide's split into outer and inner
                  // variable, but can have arbitray number of splits.
                  {{"AcBr", 128},
-                  {"ArCr", std::is_same_v<CT_ISA, avx2> ? 12 : 28},
-                  {"BcCc", std::is_same_v<CT_ISA, avx2> ? 8 : 16},
+                  {"ArCr", std::is_same_v<DABUN_ISA, avx2> ? 12 : 28},
+                  {"BcCc", std::is_same_v<DABUN_ISA, avx2> ? 8 : 16},
                   {"AcBr", 1},
                   {"ArCr", 1},
                   {"BcCc", 1}},
@@ -464,10 +464,10 @@ int main() {
     fn.save_to_file("zi.asm");
     // fn.register_perf("fn1");
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     baseline_MM(ArCr, AcBr, BcCc, 1, ArCr, 1, AcBr, 1, ArCr, A.data(), B.data(),
@@ -476,7 +476,7 @@ int main() {
     fn(CJ.data(), A.data(), B.data(), 1);
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -506,7 +506,7 @@ int main() {
     int r = ArCr;
 
     auto gen_loop_nest = [&]() {
-      return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+      return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                  {{"r", 16}, //
                   {"r", 1},  //
                   {"k", 64},
@@ -534,8 +534,8 @@ int main() {
     fn.save_to_file("zi.asm");
     // fn.register_perf("fn3");
 
-    auto A = getRandomVector<float>(AcBr * ArCr * 2);
-    auto B = getRandomVector<float>(AcBr * BcCc * 2);
+    auto A = get_random_vector<float>(AcBr * ArCr * 2);
+    auto B = get_random_vector<float>(AcBr * BcCc * 2);
 
     auto CN = std::vector<float>(ArCr * BcCc);
     auto CJ = std::vector<float>(ArCr * BcCc);
@@ -546,7 +546,7 @@ int main() {
     fn(CJ.data(), A.data(), B.data(), 0);
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -571,7 +571,7 @@ int main() {
     int BcCc = 333;
 
     auto gen_loop_nest = [&]() {
-      return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+      return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                  // The first argument is the loop order in the form of
                  // {dimension, stride}.  For now the outer dimension
                  // has to divide the stride.  This is effectively the
@@ -625,10 +625,10 @@ int main() {
     fn.save_to_file("zi.asm");
     // fn.register_perf("fn1");
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
-    auto CN = getRandomVector<float>(ArCr * BcCc);
+    auto CN = get_random_vector<float>(ArCr * BcCc);
     auto CJ = CN;
 
     baseline_MM(ArCr, AcBr, BcCc, AcBr, BcCc, BcCc, A.data(), B.data(),
@@ -637,7 +637,7 @@ int main() {
     fn(CJ.data(), A.data(), B.data(), 1);
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -665,7 +665,7 @@ int main() {
     int BcCc = 133;
 
     auto gen_loop_nest = [&]() {
-      return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+      return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                  // The first argument is the loop order in the form of
                  // {dimension, stride}.  For now the outer dimension
                  // has to divide the stride.  This is effectively the
@@ -715,8 +715,8 @@ int main() {
     fn.save_to_file("zi.asm");
     // fn.register_perf("fn2");
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
     auto CN = std::vector<float>(ArCr * BcCc);
     auto CJ = std::vector<float>(ArCr * BcCc);
@@ -727,7 +727,7 @@ int main() {
     fn(CJ.data(), A.data(), B.data(), 0);
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -753,7 +753,7 @@ int main() {
     int r = ArCr;
 
     auto gen_loop_nest = [&]() {
-      return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+      return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                  {{"r", 16}, //
                   {"r", 1},  //
                   {"k", 64},
@@ -781,8 +781,8 @@ int main() {
     fn.save_to_file("zi.asm");
     // fn.register_perf("fn3");
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
     auto CN = std::vector<float>(ArCr * BcCc);
     auto CJ = std::vector<float>(ArCr * BcCc);
@@ -793,7 +793,7 @@ int main() {
     fn(CJ.data(), A.data(), B.data(), 0);
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -817,7 +817,7 @@ int main() {
     int BcCc = 256 + 3;
 
     auto gen_loop_nest = [&]() {
-      return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+      return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                  // The first argument is the loop order in the form of
                  // {dimension, stride}.  For now the outer dimension
                  // has to divide the stride.  This is effectively the
@@ -862,8 +862,8 @@ int main() {
     fn.save_to_file("zi.asm");
     // fn.register_perf("fn4");
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
     auto CN = std::vector<float>(ArCr * BcCc);
     auto CJ = std::vector<float>(ArCr * BcCc);
@@ -874,7 +874,7 @@ int main() {
     fn(CJ.data(), A.data(), B.data(), 0);
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -900,7 +900,7 @@ int main() {
     int BcCc = 256 + 251;
 
     auto gen_loop_nest = [&]() {
-      return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+      return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                  // The first argument is the loop order in the form
                  // of {dimension, stride}.  For now the outer
                  // dimension has to divide the stride.  This is
@@ -944,8 +944,8 @@ int main() {
     fn.save_to_file("zi.asm");
     // fn.register_perf("fn5");
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
     auto CN = std::vector<float>(ArCr * BcCc + 16);
     auto CJ = std::vector<float>(ArCr * BcCc + 16);
@@ -956,7 +956,7 @@ int main() {
     fn(CJ.data(), A.data(), B.data(), 0);
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -980,7 +980,7 @@ int main() {
     int BcCc = 259;
 
     auto gen_loop_nest = [&]() {
-      return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+      return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                  // The first argument is the loop order in the form of
                  // {dimension, stride}.  For now the outer dimension
                  // has to divide the stride.  This is effectively the
@@ -1027,8 +1027,8 @@ int main() {
     fn.save_to_file("zi.asm");
     // fn.register_perf("fn6");
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
     auto CN = std::vector<float>(ArCr * BcCc);
     auto CJ = std::vector<float>(ArCr * BcCc);
@@ -1039,7 +1039,7 @@ int main() {
     fn(CJ.data(), A.data(), B.data(), 0);
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -1070,7 +1070,7 @@ int main() {
     int IZ = OZ + KZ - 1;
 
     auto gen_loop_nest = [&]() {
-      return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+      return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                  // The first argument is the loop order in the form of
                  // {dimension, stride}.  For now the outer dimension has
                  // to divide the stride.  This is effectively the same as
@@ -1129,8 +1129,8 @@ int main() {
     fn.save_to_file("zi.asm");
     // fn.register_perf("fn7");
 
-    auto A = getRandomVector<float>(IX * IY * IZ);
-    auto B = getRandomVector<float>(KX * KY * KZ);
+    auto A = get_random_vector<float>(IX * IY * IZ);
+    auto B = get_random_vector<float>(KX * KY * KZ);
 
     auto CN = std::vector<float>(OX * OY * OZ);
     auto CJ = std::vector<float>(OX * OY * OZ);
@@ -1140,7 +1140,7 @@ int main() {
     fn(CJ.data(), A.data(), B.data(), 0);
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + OX * OY * OZ, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + OX * OY * OZ, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -1171,7 +1171,7 @@ int main() {
     int c = BcCc;
 
     auto gen_loop_nest = [&]() {
-      return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+      return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                  {{"k", 64}, //
                   {"k", 1},  //
                   {"c", 1}}, //
@@ -1198,8 +1198,8 @@ int main() {
     fn.save_to_file("zi.asm");
     // fn.register_perf("fn8");
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
     auto CJ = std::vector<float>(ArCr * BcCc);
     auto CN = CJ;
@@ -1210,7 +1210,7 @@ int main() {
     fn(CJ.data(), A.data(), B.data(), 0);
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -1237,7 +1237,7 @@ int main() {
     int c = BcCc;
 
     auto gen_loop_nest = [&]() {
-      return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+      return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                  {{"k", 4},  //
                   {"k", 1},  //
                   {"c", 1}}, //
@@ -1262,8 +1262,8 @@ int main() {
 
     auto fn = gen_loop_nest();
 
-    auto A = getRandomVector<float>(AcBr * ArCr);
-    auto B = getRandomVector<float>(AcBr * BcCc);
+    auto A = get_random_vector<float>(AcBr * ArCr);
+    auto B = get_random_vector<float>(AcBr * BcCc);
 
     auto CJ = std::vector<float>(ArCr * BcCc);
     auto CN = CJ;
@@ -1274,7 +1274,7 @@ int main() {
     fn(CJ.data(), A.data(), B.data(), 0);
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + ArCr * BcCc, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(
@@ -1300,7 +1300,7 @@ int main() {
     int IS = OS + KS - 1;
 
     auto gen_loop_nest = [&]() {
-      return facebook::sysml::aot::FMA_loop_nest_jitter<CT_ISA>(
+      return facebook::sysml::aot::loop_nest_code_generator<DABUN_ISA>(
                  {{"c_out", 16}, //
                   {"o_h", 1},
                   {"o_w", 28},
@@ -1351,8 +1351,8 @@ int main() {
     fn.save_to_file("zi.asm");
     // fn.register_perf("fn10");
 
-    auto A = getRandomVector<float>(CIN * IS * IS);
-    auto B = getRandomVector<float>(COUT * CIN * KS * KS);
+    auto A = get_random_vector<float>(CIN * IS * IS);
+    auto B = get_random_vector<float>(COUT * CIN * KS * KS);
     auto CN = std::vector<float>(COUT * OS * OS);
     auto CJ = std::vector<float>(COUT * OS * OS);
 
@@ -1361,7 +1361,7 @@ int main() {
     fn(CJ.data(), A.data(), B.data(), 0);
 
     std::cout << "MAXABSDIFF: "
-              << maxAbsDiff(CJ.data(), CJ.data() + COUT * OS * OS, CN.data())
+              << max_abs_difference(CJ.data(), CJ.data() + COUT * OS * OS, CN.data())
               << "\n";
 
     auto secs = measureFastestWithWarmup(

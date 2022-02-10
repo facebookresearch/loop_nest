@@ -22,7 +22,7 @@ def compile_loop_nest(loop_nest_root, arch, input_path, output_path, exec_name=N
         "-I {}".format(loop_nest_root),
         "-O3",
         "-DNDEBUG=1",
-        "-DCT_ISA={}".format(arch),
+        "-DDABUN_ISA={}".format(arch),
         input_path,
         "-o",
         "test.out",
