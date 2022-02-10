@@ -8,12 +8,7 @@ function(dabun_app name vex float isa)
     PRIVATE "-DDABUN_ISA=${isa}"
     PRIVATE "-DDABUN_VEX=extension::${vex}"
     PRIVATE "-DDABUN_ARITHMETIC=dabun::${float}")
-
-#  add_executable(demo.${name} ${name}.cpp)
-#  target_link_libraries(ftxui_example.${name} PUBLIC ${DIRECTORY_LIB})
-#  file(RELATIVE_PATH dir ${EXAMPLES_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
-#  set_property(GLOBAL APPEND PROPERTY FTXUI::EXAMPLES ${dir}/${name})
-endfunction(dabun_app)
+ndfunction(dabun_app)
 
 function(dabun_x86_apps vex float isa)
   dabun_app(gflops ${vex} ${float} ${isa})
