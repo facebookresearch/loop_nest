@@ -34,8 +34,7 @@ public:
     void meta_add_or_sub_imm(Xbyak_aarch64::XReg const& srcdst, T imm,
                              Xbyak_aarch64::XReg const& tmpreg)
     {
-        std::cout << "ZZZ: " << srcdst.getIdx() << " :: " << tmpreg.getIdx()
-                  << "\n";
+        strong_assert(srcdst.getIdx() != tmpreg.getIdx());
 
         if (imm == 0)
             return;
@@ -232,7 +231,10 @@ public:
         }
         else
         {
-            meta_mov_imm(tmp_register, imm);
+            strong_assert((imm & 0xffff) ==
+                          imm); // Add support for larger values
+            // meta_mov_imm(tmp_register, imm);
+            self().mov(tmp_register, imm);
             self().cmp(xreg, tmp_register);
         }
     }
@@ -280,6 +282,7 @@ public:
     template <typename T>
     void meta_mov_imm(const Xbyak_aarch64::XReg& dst, T imm)
     {
+        strong_assert(dst.getIdx() != tmp_register.getIdx());
         meta_mov_imm(dst, imm, tmp_register);
     }
 

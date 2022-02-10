@@ -31,9 +31,24 @@ else()
 endif()
 
 ##
+## Find Boost
+##
+set(Boost_USE_STATIC_LIBS        ON)  # only find static libs
+set(Boost_USE_DEBUG_LIBS        ${DABUN_DEBUG})  # ignore debug libs and
+set(Boost_USE_RELEASE_LIBS       ON)  # only find release libs
+set(Boost_USE_MULTITHREADED      ON)
+set(Boost_USE_STATIC_RUNTIME    OFF)
+find_package(Boost 1.66.0)
+if(Boost_FOUND)
+  include_directories(${Boost_INCLUDE_DIRS})
+else()
+  message(FATAL_ERROR "Can't find boost libraries")
+endif()
+
+##
 ## Detect host architecture
 ##
-set(DABUN_HOST_ARCHITECTURE_SUPPORTED x86_64 aarch64)
+set(DABUN_HOST_ARCHITECTURE_SUPPORTED x86_64 aarch64 arm64)
 
 execute_process(COMMAND uname -m
   COMMAND tr -d '\n'
@@ -44,6 +59,8 @@ message(STATUS "Host architecture detected: ${DABUN_HOST_ARCHITECTURE}")
 if("${DABUN_HOST_ARCHITECTURE}" STREQUAL "x86_64")
   include(cmake/x86_64/dabun.cmake)
 elseif("${DABUN_HOST_ARCHITECTURE}" STREQUAL "aarch64")
+  include(cmake/aarch64/dabun.cmake)
+elseif("${DABUN_HOST_ARCHITECTURE}" STREQUAL "arm64")
   include(cmake/aarch64/dabun.cmake)
 else()
   message(FATAL_ERROR "Host architecture ${DABUN_HOST_ARCHITECTURE} not supported.")
