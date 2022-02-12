@@ -8,6 +8,26 @@
 #define DABUN_STRINGIFY_0(s) #s
 #define DABUN_STRINGIFY(s) DABUN_STRINGIFY_0(s)
 
+#if defined(DABUN_REQUIES_TEMPLATE_DEFINITION) ||                              \
+    defined(DABUN_MAYBE_EXTN_TPL_INSTNTON)
+#    error The macros above cannot be defined at this stage!
+#endif
+
+#if defined(DABUN_HEADER_ONLY)
+#    if defined(DABUN_COMPILING_LIBDABUN)
+#        error Unsupported combination of defines
+#    else
+#        define DABUN_REQUIES_TEMPLATE_DEFINITION
+#    endif
+#else
+#    if defined(DABUN_COMPILING_LIBDABUN)
+#        define DABUN_REQUIES_TEMPLATE_DEFINITION
+#        define DABUN_MAYBE_EXTN_TPL_INSTNTON template
+#    else
+#        define DABUN_MAYBE_EXTN_TPL_INSTNTON extern template
+#    endif
+#endif
+
 #define strong_assert(condition)                                               \
     if (!(condition))                                                          \
     {                                                                          \
@@ -55,7 +75,7 @@ typename std::enable_if_t<sizeof(To) == sizeof(From) &&
                               std::is_trivially_copyable_v<To>,
                           To>
 // constexpr support needs compiler magic
-bit_cast(const From& src) noexcept
+bit_cast(const From &src) noexcept
 {
     static_assert(std::is_trivially_constructible_v<To>,
                   "This implementation additionally requires destination type "

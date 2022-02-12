@@ -4,7 +4,7 @@ IndentWidth: 4
 Language: Cpp
 # Force pointers to the type for C++.
 DerivePointerAlignment: false
-PointerAlignment: Left
+# PointerAlignment: Left
 
 UseTab: Never
 IndentWidth: 4
@@ -19,3 +19,4 @@ AlignOperands: true
 BreakBeforeBraces: Allman
 AlwaysBreakTemplateDeclarations: true
 BreakConstructorInitializersBeforeComma: true
+IndentPPDirectives: AfterHash

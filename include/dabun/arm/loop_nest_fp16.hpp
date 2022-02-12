@@ -15,7 +15,7 @@
 #include "dabun/isa.hpp"
 #ifdef DABUN_ARCH_AARCH64
 
-#include "dabun/LN_arguments.hpp"
+#include "dabun/loop_nest_descriptor.hpp"
 #include "dabun/arm/arithmetic_operation.hpp"
 #include "dabun/arm/configuration.hpp"
 #include "dabun/arm/elementwise_operation.hpp"
@@ -3630,7 +3630,7 @@ public:
     }
 
     loop_nest_fp16_code_generator(
-        LN_arguments const&                         arguments,
+        loop_nest_descriptor const&                         arguments,
         std::shared_ptr<operation_pair_base> const& op_pair,
         std::optional<int> user_operation_unroll_limit = std::nullopt,
         std::shared_ptr<elementwise_operation<aarch64>> elementwise_preop

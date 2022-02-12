@@ -13,35 +13,35 @@
 #include "dabun/isa.hpp"
 #ifdef DABUN_ARCH_AARCH64
 
-#include "dabun/LN_arguments.hpp"
-#include "dabun/arm/arithmetic_operation.hpp"
-#include "dabun/arm/configuration.hpp"
-#include "dabun/arm/elementwise_operation.hpp"
-#include "dabun/arm/meta_mnemonics.hpp"
-#include "dabun/arm/multi_vreg.hpp"
-#include "dabun/code_generator/code_generator.hpp"
-#include "dabun/common.hpp"
-#include "dabun/core.hpp"
-#include "dabun/isa.hpp"
-#include "dabun/log.hpp"
-#include "dabun/math.hpp"
+#    include "dabun/arm/arithmetic_operation.hpp"
+#    include "dabun/arm/configuration.hpp"
+#    include "dabun/arm/elementwise_operation.hpp"
+#    include "dabun/arm/meta_mnemonics.hpp"
+#    include "dabun/arm/multi_vreg.hpp"
+#    include "dabun/code_generator/code_generator.hpp"
+#    include "dabun/common.hpp"
+#    include "dabun/core.hpp"
+#    include "dabun/isa.hpp"
+#    include "dabun/log.hpp"
+#    include "dabun/loop_nest_descriptor.hpp"
+#    include "dabun/math.hpp"
 
-#include <boost/multi_index/composite_key.hpp>
-#include <boost/multi_index/member.hpp>
-#include <boost/multi_index/ordered_index.hpp>
-#include <boost/multi_index_container.hpp>
+#    include <boost/multi_index/composite_key.hpp>
+#    include <boost/multi_index/member.hpp>
+#    include <boost/multi_index/ordered_index.hpp>
+#    include <boost/multi_index_container.hpp>
 
-#include <any>
-#include <cstdint>
-#include <limits>
-#include <map>
-#include <numeric>
-#include <optional>
-#include <set>
-#include <tuple>
-#include <type_traits>
-#include <variant>
-#include <vector>
+#    include <any>
+#    include <cstdint>
+#    include <limits>
+#    include <map>
+#    include <numeric>
+#    include <optional>
+#    include <set>
+#    include <tuple>
+#    include <type_traits>
+#    include <variant>
+#    include <vector>
 
 namespace dabun
 {
@@ -53,7 +53,7 @@ class loop_nest_code_generator;
 
 template <>
 class loop_nest_code_generator<aarch64, false>
-    : public code_generator<void(float* C, float const* A, float const* B,
+    : public code_generator<void(float *C, float const *A, float const *B,
                                  int alpha)>,
       public meta_mnemonics<loop_nest_code_generator<aarch64>>
 {
@@ -63,8 +63,8 @@ private:
         int idx;
         int offset;
 
-        friend bool operator<(tensor_location_t const& lhs,
-                              tensor_location_t const& rhs)
+        friend bool operator<(tensor_location_t const &lhs,
+                              tensor_location_t const &rhs)
         {
             return std::tie(lhs.idx, lhs.offset) <
                    std::tie(rhs.idx, rhs.offset);
@@ -73,7 +73,7 @@ private:
 
 private:
     using base =
-        code_generator<void(float* C, float const* A, float const* B, int)>;
+        code_generator<void(float *C, float const *A, float const *B, int)>;
     using meta_base   = meta_mnemonics<loop_nest_code_generator<aarch64>>;
     using Vmm         = VReg;
     using multi_vregs = multi_vreg<Vmm, SReg, HReg>;
@@ -107,8 +107,8 @@ private:
         int number = 0;
         int lane   = vector_size;
 
-        friend bool operator<(instruction_register const& lhs,
-                              instruction_register const& rhs)
+        friend bool operator<(instruction_register const &lhs,
+                              instruction_register const &rhs)
         {
             return std::tie(lhs.number, lhs.lane) <
                    std::tie(rhs.number, rhs.lane);
@@ -121,8 +121,8 @@ private:
         instruction_register left_src;
         instruction_register right_src;
 
-        friend bool operator<(fmla_instruction const& lhs,
-                              fmla_instruction const& rhs)
+        friend bool operator<(fmla_instruction const &lhs,
+                              fmla_instruction const &rhs)
         {
             return std::tie(lhs.dst, lhs.left_src, lhs.right_src) <
                    std::tie(rhs.dst, rhs.left_src, rhs.right_src);
@@ -136,8 +136,8 @@ private:
 
         tensor_location_t tensor_location;
 
-        friend bool operator<(load_instruction const& lhs,
-                              load_instruction const& rhs)
+        friend bool operator<(load_instruction const &lhs,
+                              load_instruction const &rhs)
         {
             return std::tie(lhs.vreg, lhs.num_lanes, lhs.tensor_location) <
                    std::tie(rhs.vreg, rhs.num_lanes, rhs.tensor_location);
@@ -150,8 +150,8 @@ private:
 
         tensor_location_t tensor_location;
 
-        friend bool operator<(load_xreg_instruction const& lhs,
-                              load_xreg_instruction const& rhs)
+        friend bool operator<(load_xreg_instruction const &lhs,
+                              load_xreg_instruction const &rhs)
         {
             return std::tie(lhs.reg, lhs.tensor_location) <
                    std::tie(rhs.reg, rhs.tensor_location);
@@ -164,8 +164,8 @@ private:
 
         tensor_location_t tensor_location;
 
-        friend bool operator<(load_wreg_instruction const& lhs,
-                              load_wreg_instruction const& rhs)
+        friend bool operator<(load_wreg_instruction const &lhs,
+                              load_wreg_instruction const &rhs)
         {
             return std::tie(lhs.reg, lhs.tensor_location) <
                    std::tie(rhs.reg, rhs.tensor_location);
@@ -178,8 +178,8 @@ private:
         int vreg;
         int lane;
 
-        friend bool operator<(ins_xreg_instruction const& lhs,
-                              ins_xreg_instruction const& rhs)
+        friend bool operator<(ins_xreg_instruction const &lhs,
+                              ins_xreg_instruction const &rhs)
         {
             return std::tie(lhs.reg, lhs.vreg, lhs.lane) <
                    std::tie(rhs.reg, rhs.vreg, rhs.lane);
@@ -192,8 +192,8 @@ private:
         int vreg;
         int lane;
 
-        friend bool operator<(ins_wreg_instruction const& lhs,
-                              ins_wreg_instruction const& rhs)
+        friend bool operator<(ins_wreg_instruction const &lhs,
+                              ins_wreg_instruction const &rhs)
         {
             return std::tie(lhs.reg, lhs.vreg, lhs.lane) <
                    std::tie(rhs.reg, rhs.vreg, rhs.lane);
@@ -209,8 +209,8 @@ private:
 
         tensor_location_t tensor_location;
 
-        friend bool operator<(load_pair_instruction const& lhs,
-                              load_pair_instruction const& rhs)
+        friend bool operator<(load_pair_instruction const &lhs,
+                              load_pair_instruction const &rhs)
         {
             return std::tie(lhs.vreg1, lhs.vreg2, lhs.num_lanes,
                             lhs.tensor_location) <
@@ -252,7 +252,7 @@ private:
 
     VReg ZeroVector_ = v0;
 
-    static void print_ld(loop_descriptor const& l)
+    static void print_ld(loop_descriptor const &l)
     {
         LN_LOG(INFO) << "Loop over " << l.var << " from 0 to " << l.end
                      << " by " << l.delta << "\n";
@@ -278,11 +278,11 @@ private:
 
 private:
     std::vector<std::pair<std::string, int>> order;
-    std::map<std::string, int> const&        sizes;
+    std::map<std::string, int> const        &sizes;
 
-    std::set<std::string> const& C_formula;
-    std::set<std::string> const& A_formula;
-    std::set<std::string> const& B_formula;
+    std::set<std::string> const &C_formula;
+    std::set<std::string> const &A_formula;
+    std::set<std::string> const &B_formula;
 
     std::map<std::string, int> C_strides;
     std::map<std::string, int> A_strides;
@@ -355,12 +355,12 @@ private:
     std::pair<int, int> register_blocking_info_;
 
 private:
-    static void move_loads(std::vector<instruction_t>& instructions,
+    static void move_loads(std::vector<instruction_t> &instructions,
                            int                         max_moves = 10)
     {
         for (int i = 1; i < instructions.size(); ++i)
         {
-            auto& insn = instructions[i];
+            auto &insn = instructions[i];
             strong_assert(std::holds_alternative<load_instruction>(insn) ||
                           std::holds_alternative<fmla_instruction>(insn) ||
                           std::holds_alternative<std::monostate>(insn));
@@ -403,11 +403,11 @@ private:
     {
         if constexpr (compiled_in_debug_mode)
         {
-            for (auto& insn : instructions_in)
+            for (auto &insn : instructions_in)
             {
                 if (std::holds_alternative<load_instruction>(insn))
                 {
-                    auto& load = std::get<load_instruction>(insn);
+                    auto &load = std::get<load_instruction>(insn);
                     strong_assert(load.vreg > -1 && load.vreg < 32);
                 }
             }
@@ -417,11 +417,11 @@ private:
 
         if constexpr (compiled_in_debug_mode)
         {
-            for (auto& insn : instructions_in)
+            for (auto &insn : instructions_in)
             {
                 if (std::holds_alternative<load_instruction>(insn))
                 {
-                    auto& load = std::get<load_instruction>(insn);
+                    auto &load = std::get<load_instruction>(insn);
                     strong_assert(load.vreg > -1 && load.vreg < 32);
                 }
             }
@@ -429,7 +429,7 @@ private:
 
         std::vector<instruction_t> instructions;
 
-        for (auto& insn : instructions_in)
+        for (auto &insn : instructions_in)
         {
             if (std::holds_alternative<load_instruction>(insn))
             {
@@ -450,7 +450,7 @@ private:
             }
             if (std::holds_alternative<load_instruction>(insn))
             {
-                auto& load = std::get<load_instruction>(insn);
+                auto &load = std::get<load_instruction>(insn);
                 if (load.num_lanes < vector_size)
                 {
                     load.num_lanes = 2;
@@ -486,11 +486,11 @@ private:
 
         if constexpr (compiled_in_debug_mode)
         {
-            for (auto& insn : instructions)
+            for (auto &insn : instructions)
             {
                 if (std::holds_alternative<load_instruction>(insn))
                 {
-                    auto& load = std::get<load_instruction>(insn);
+                    auto &load = std::get<load_instruction>(insn);
                     strong_assert(load.vreg > -1 && load.vreg < 32);
                 }
             }
@@ -513,9 +513,9 @@ private:
 
         for (int i = 0; i < instructions.size(); ++i)
         {
-            auto& insn = instructions[i];
+            auto &insn = instructions[i];
 
-            std::visit(overloaded{[&](fmla_instruction const& fmla)
+            std::visit(overloaded{[&](fmla_instruction const &fmla)
                                   {
                                       // for (int lane = 0; lane <
                                       // fmla.left_src.lane;
@@ -531,7 +531,7 @@ private:
                                           visit_vreg(fmla.right_src.number, i);
                                       }
                                   },
-                                  [&](load_instruction const& load)
+                                  [&](load_instruction const &load)
                                   {
                                       // for (int lane = 0; lane <
                                       // load.num_lanes; ++lane)
@@ -539,7 +539,7 @@ private:
                                           visit_vreg(load.vreg, i);
                                       }
                                   },
-                                  [&](load_pair_instruction const& load)
+                                  [&](load_pair_instruction const &load)
                                   {
                                       // for (int lane = 0; lane <
                                       // load.num_lanes; ++lane)
@@ -548,21 +548,21 @@ private:
                                           visit_vreg(load.vreg2, i);
                                       }
                                   },
-                                  [&](load_xreg_instruction const& load)
+                                  [&](load_xreg_instruction const &load)
                                   { visit_vreg(32 + load.reg, i); },
-                                  [&](load_wreg_instruction const& load)
+                                  [&](load_wreg_instruction const &load)
                                   { visit_vreg(32 + load.reg, i); },
-                                  [&](ins_xreg_instruction const& ins)
+                                  [&](ins_xreg_instruction const &ins)
                                   {
                                       visit_vreg(32 + ins.reg, i);
                                       visit_vreg(ins.vreg, i);
                                   },
-                                  [&](ins_wreg_instruction const& ins)
+                                  [&](ins_wreg_instruction const &ins)
                                   {
                                       visit_vreg(32 + ins.reg, i);
                                       visit_vreg(ins.vreg, i);
                                   },
-                                  [&](std::monostate const&) {}},
+                                  [&](std::monostate const &) {}},
                        insn);
         }
 
@@ -578,7 +578,7 @@ private:
 
         auto enqueue = [&](int i)
         {
-            auto const& insn = instructions[i];
+            auto const &insn = instructions[i];
 
             LN_LOG(INFO) << "  ENQUE: ";
             print_instruction(instructions[i]);
@@ -617,7 +617,7 @@ private:
             {
                 if (--num_prev_uses[r] == 0)
                 {
-                    auto const& insn = instructions[i];
+                    auto const &insn = instructions[i];
                     if (std::holds_alternative<load_instruction>(insn) ||
                         std::holds_alternative<load_pair_instruction>(insn) ||
                         std::holds_alternative<load_xreg_instruction>(insn) ||
@@ -654,7 +654,7 @@ private:
 
         while (ret.size() != instructions.size())
         {
-            for (auto const& f : to_enqueue[pattern_idx])
+            for (auto const &f : to_enqueue[pattern_idx])
             {
                 f();
             }
@@ -692,16 +692,16 @@ private:
         return ret; // instructions;
     }
 
-    void interleave_loads(std::vector<instruction_t>& instructions)
+    void interleave_loads(std::vector<instruction_t> &instructions)
     {
         std::map<int, int> pairity;
         std::map<int, int> temp_pair = {{BReg_.getIdx(), tmpBReg_.getIdx()},
                                         {AReg_.getIdx(), tmpAReg_.getIdx()}};
 
-        for (auto& insn : instructions)
+        for (auto &insn : instructions)
         {
             std::visit(
-                overloaded{[&](load_pair_instruction& load_pair)
+                overloaded{[&](load_pair_instruction &load_pair)
                            {
                                auto ridx = load_pair.tensor_location.idx;
                                if ((pairity[ridx]++) % 2)
@@ -710,7 +710,7 @@ private:
                                        temp_pair[ridx];
                                }
                            },
-                           [&](load_instruction& load)
+                           [&](load_instruction &load)
                            {
                                auto ridx = load.tensor_location.idx;
                                if ((pairity[ridx]++) % 2)
@@ -718,7 +718,7 @@ private:
                                    load.tensor_location.idx = temp_pair[ridx];
                                }
                            },
-                           [&](load_wreg_instruction& load)
+                           [&](load_wreg_instruction &load)
                            {
                                auto ridx = load.tensor_location.idx;
                                if ((pairity[ridx]++) % 2)
@@ -726,7 +726,7 @@ private:
                                    load.tensor_location.idx = temp_pair[ridx];
                                }
                            },
-                           [&](load_xreg_instruction& load)
+                           [&](load_xreg_instruction &load)
                            {
                                auto ridx = load.tensor_location.idx;
                                if ((pairity[ridx]++) % 2)
@@ -734,9 +734,9 @@ private:
                                    load.tensor_location.idx = temp_pair[ridx];
                                }
                            },
-                           [](ins_wreg_instruction const&) {},
-                           [](ins_xreg_instruction const&) {},
-                           [](fmla_instruction&) {}, [](std::monostate) {}},
+                           [](ins_wreg_instruction const &) {},
+                           [](ins_xreg_instruction const &) {},
+                           [](fmla_instruction &) {}, [](std::monostate) {}},
                 insn);
         }
     }
@@ -746,7 +746,7 @@ private:
     // ARM processors, this operations are optimized - so we can merge
     // loads of consecutive vectors
     static void
-    pair_loads(std::vector<instruction_t>& instructions,
+    pair_loads(std::vector<instruction_t> &instructions,
                int max_total_paired = std::numeric_limits<int>::max())
     {
         if (instructions.size() == 0)
@@ -762,7 +762,7 @@ private:
         {
             std::visit(
                 overloaded{
-                    [](load_pair_instruction const&)
+                    [](load_pair_instruction const &)
                     { strong_assert(false && "Load pair not expected"); },
                     [&](load_instruction load)
                     {
@@ -773,13 +773,13 @@ private:
 
                         mappings.erase(load.vreg);
 
-                        for (auto& m : mappings)
+                        for (auto &m : mappings)
                         {
                             strong_assert(
                                 std::holds_alternative<load_instruction>(
                                     instructions[m.second]));
 
-                            auto const& next_load = std::get<load_instruction>(
+                            auto const &next_load = std::get<load_instruction>(
                                 instructions[m.second]);
 
                             strong_assert(next_load.vreg == m.first);
@@ -807,16 +807,16 @@ private:
                             mappings[load.vreg] = i;
                         }
                     },
-                    [&](fmla_instruction const& fml)
+                    [&](fmla_instruction const &fml)
                     {
                         mappings.erase(fml.left_src.number);
                         mappings.erase(fml.right_src.number);
                         mappings.erase(fml.dst.number);
                     },
-                    [](load_wreg_instruction const&) { strong_assert(false); },
-                    [](load_xreg_instruction const&) { strong_assert(false); },
-                    [](ins_wreg_instruction const&) { strong_assert(false); },
-                    [](ins_xreg_instruction const&) { strong_assert(false); },
+                    [](load_wreg_instruction const &) { strong_assert(false); },
+                    [](load_xreg_instruction const &) { strong_assert(false); },
+                    [](ins_wreg_instruction const &) { strong_assert(false); },
+                    [](ins_xreg_instruction const &) { strong_assert(false); },
                     [](std::monostate) {}},
                 instructions[i]);
         }
@@ -831,7 +831,7 @@ private:
         {
             std::visit(
                 overloaded{
-                    [](load_pair_instruction const&)
+                    [](load_pair_instruction const &)
                     { strong_assert(false && "Load pair not expected"); },
                     [&](load_instruction load)
                     {
@@ -842,13 +842,13 @@ private:
 
                         mappings.erase(load.vreg);
 
-                        for (auto& m : mappings)
+                        for (auto &m : mappings)
                         {
                             strong_assert(
                                 std::holds_alternative<load_instruction>(
                                     instructions[m.second]));
 
-                            auto const& next_load = std::get<load_instruction>(
+                            auto const &next_load = std::get<load_instruction>(
                                 instructions[m.second]);
 
                             strong_assert(next_load.vreg == m.first);
@@ -885,25 +885,25 @@ private:
                             mappings[load.vreg] = i;
                         }
                     },
-                    [&](fmla_instruction const& fml)
+                    [&](fmla_instruction const &fml)
                     {
                         mappings.erase(fml.left_src.number);
                         mappings.erase(fml.right_src.number);
                         mappings.erase(fml.dst.number);
                     },
-                    [](load_wreg_instruction const&) { strong_assert(false); },
-                    [](load_xreg_instruction const&) { strong_assert(false); },
-                    [](ins_wreg_instruction const&) { strong_assert(false); },
-                    [](ins_xreg_instruction const&) { strong_assert(false); },
+                    [](load_wreg_instruction const &) { strong_assert(false); },
+                    [](load_xreg_instruction const &) { strong_assert(false); },
+                    [](ins_wreg_instruction const &) { strong_assert(false); },
+                    [](ins_xreg_instruction const &) { strong_assert(false); },
                     [](std::monostate) {}},
                 instructions[i]);
         }
     }
 
-    void print_instruction(instruction_t const& insn) const
+    void print_instruction(instruction_t const &insn) const
     {
         std::visit(
-            overloaded{[&](load_pair_instruction const& i)
+            overloaded{[&](load_pair_instruction const &i)
                        {
                            int ptr_reg_idx = i.tensor_location.idx;
                            int ptr_offset  = i.tensor_location.offset;
@@ -913,7 +913,7 @@ private:
                                         << i.num_lanes << "], X_" << ptr_reg_idx
                                         << "[" << ptr_offset << "]\n";
                        },
-                       [&](load_instruction const& i)
+                       [&](load_instruction const &i)
                        {
                            int ptr_reg_idx = i.tensor_location.idx;
                            int ptr_offset  = i.tensor_location.offset;
@@ -923,7 +923,7 @@ private:
                                << ")[" << i.num_lanes << "], X_" << ptr_reg_idx
                                << "[" << ptr_offset << "]\n";
                        },
-                       [&](fmla_instruction const& fml)
+                       [&](fmla_instruction const &fml)
                        {
                            LN_LOG(INFO) << tabs.back() << "::FMLA Vreg("
                                         << fml.dst.number << "), Vreg("
@@ -931,21 +931,21 @@ private:
                                         << fml.right_src.number << ") ["
                                         << fml.right_src.lane << "]\n";
                        },
-                       [&](load_wreg_instruction const& i) {
+                       [&](load_wreg_instruction const &i) {
                            LN_LOG(INFO)
                                << tabs.back() << "::LOADW W(" << i.reg << ")\n";
                        },
-                       [&](load_xreg_instruction const& i) {
+                       [&](load_xreg_instruction const &i) {
                            LN_LOG(INFO)
                                << tabs.back() << "::LOADX X(" << i.reg << ")\n";
                        },
-                       [&](ins_wreg_instruction const& i)
+                       [&](ins_wreg_instruction const &i)
                        {
                            LN_LOG(INFO) << tabs.back() << "::INSW W(" << i.reg
                                         << ") -> VReg(" << i.vreg << ")["
                                         << i.lane << "]\n";
                        },
-                       [&](ins_xreg_instruction const& i)
+                       [&](ins_xreg_instruction const &i)
                        {
                            LN_LOG(INFO) << tabs.back() << "::INSX X(" << i.reg
                                         << ") -> VReg(" << i.vreg << ")["
@@ -957,20 +957,20 @@ private:
     }
 
     void
-    print_instructions(std::vector<instruction_t> const& instructions) const
+    print_instructions(std::vector<instruction_t> const &instructions) const
     {
-        for (auto const& insn : instructions)
+        for (auto const &insn : instructions)
         {
             print_instruction(insn);
         }
     }
 
-    void offsets_to_post_increment(std::vector<instruction_t>& instructions,
+    void offsets_to_post_increment(std::vector<instruction_t> &instructions,
                                    int                         num_iterations)
     {
         std::map<int, int> reg_to_location;
 
-        auto process = [&](auto& load)
+        auto process = [&](auto &load)
         {
             if (reg_to_location.count(load.tensor_location.idx))
             {
@@ -993,7 +993,7 @@ private:
 
         for (auto it = instructions.rbegin(); it != instructions.rend(); ++it)
         {
-            auto& insn = *it;
+            auto &insn = *it;
             if (std::holds_alternative<load_instruction>(insn))
             {
                 process(std::get<load_instruction>(insn));
@@ -1014,10 +1014,10 @@ private:
     }
 
     bool
-    is_inside_current_limits(std::map<std::string, int> const& coordinate) const
+    is_inside_current_limits(std::map<std::string, int> const &coordinate) const
     {
         bool is_inside = true;
-        for (auto const& [var, val] : coordinate)
+        for (auto const &[var, val] : coordinate)
         {
             is_inside =
                 is_inside && limits.count(var) && (val < limits.at(var).back());
@@ -1025,20 +1025,20 @@ private:
         return is_inside;
     }
 
-    int get_cursor_offset(std::map<std::string, int> const& strides)
+    int get_cursor_offset(std::map<std::string, int> const &strides)
     {
         int off = 0;
-        for (auto const& s : strides)
+        for (auto const &s : strides)
         {
             off += current_coordinate_cursor[s.first] * s.second;
         }
         return off;
     }
 
-    void collect_loads_and_stores_below_helper(std::set<memory_argument>& ret,
+    void collect_loads_and_stores_below_helper(std::set<memory_argument> &ret,
                                                int                        depth)
     {
-        auto const& loop             = loops[depth];
+        auto const &loop             = loops[depth];
         auto        saved_coordinate = current_coordinate_cursor[loop.var];
 
         if (depth == loops.size() - 1)
@@ -1110,7 +1110,7 @@ private:
     }
 
     void
-    collect_default_loads_and_stores_at_helper(std::set<memory_argument>& ret,
+    collect_default_loads_and_stores_at_helper(std::set<memory_argument> &ret,
                                                int cur_depth, int req_depth)
     {
         if (cur_depth == req_depth)
@@ -1119,7 +1119,7 @@ private:
         }
         else
         {
-            auto const& loop = loops[cur_depth];
+            auto const &loop = loops[cur_depth];
             limits[loop.var].push_back(loop.delta);
             collect_default_loads_and_stores_at_helper(ret, cur_depth + 1,
                                                        req_depth);
@@ -1139,9 +1139,9 @@ private:
     }
 
     void collect_unrolled_operations_below_helper(
-        std::vector<operation_operation>& ret, int depth)
+        std::vector<operation_operation> &ret, int depth)
     {
-        auto const& loop             = loops[depth];
+        auto const &loop             = loops[depth];
         auto        saved_coordinate = current_coordinate_cursor[loop.var];
 
         if (depth == nest_depth - 1) // last, vectorized loop
@@ -1216,7 +1216,7 @@ private:
     }
 
     void collect_default_unrolled_operations_at_helper(
-        std::vector<operation_operation>& ret, int cur_depth, int req_depth)
+        std::vector<operation_operation> &ret, int cur_depth, int req_depth)
     {
         if (cur_depth == req_depth)
         {
@@ -1224,7 +1224,7 @@ private:
         }
         else
         {
-            auto const& loop = loops[cur_depth];
+            auto const &loop = loops[cur_depth];
             limits[loop.var].push_back(loop.delta);
             collect_default_unrolled_operations_at_helper(ret, cur_depth + 1,
                                                           req_depth);
@@ -1248,11 +1248,11 @@ private:
     // Pushes the "followed" pointers (C, A or B, and any extra ons
     // that will be used by the future arbitrary innermost operations)
     // that have strides along the dimension dim.
-    void push_pointers(std::string const& dim)
+    void push_pointers(std::string const &dim)
     {
         std::vector<Reg64> to_push;
 
-        for (auto const& ptr : in_register_tensor_pointers)
+        for (auto const &ptr : in_register_tensor_pointers)
         {
             if (ptr.strides.count(dim) && ptr.strides.at(dim) != 0)
             {
@@ -1266,11 +1266,11 @@ private:
     }
 
     // Similarly pops the pointers
-    void pop_pointers(std::string const& dim)
+    void pop_pointers(std::string const &dim)
     {
         std::vector<Reg64> to_pop;
 
-        for (auto const& ptr : in_register_tensor_pointers)
+        for (auto const &ptr : in_register_tensor_pointers)
         {
             if (ptr.strides.count(dim) && ptr.strides.at(dim) != 0)
             {
@@ -1289,9 +1289,9 @@ private:
 
     // Similarly advances the pointers by delta elements along the
     // given dimension
-    void advance_pointers(std::string const& dim, int delta)
+    void advance_pointers(std::string const &dim, int delta)
     {
-        for (auto const& ptr : in_register_tensor_pointers)
+        for (auto const &ptr : in_register_tensor_pointers)
         {
             if (ptr.strides.count(dim) && ptr.strides.at(dim) != 0)
             {
@@ -1304,7 +1304,7 @@ private:
         }
     };
 
-    void load_scalar(VReg const& vreg, Reg64 const& base, int offset,
+    void load_scalar(VReg const &vreg, Reg64 const &base, int offset,
                      int increment = 0)
     {
         if (offset)
@@ -1337,7 +1337,7 @@ private:
         }
     }
 
-    void store_scalar(VReg const& vreg, Reg64 const& base, int offset,
+    void store_scalar(VReg const &vreg, Reg64 const &base, int offset,
                       int increment = 0)
     {
         if (offset)
@@ -1365,7 +1365,7 @@ private:
         }
     }
 
-    void load_vector(VReg const& vreg, Reg64 const& base, int offset, int mask,
+    void load_vector(VReg const &vreg, Reg64 const &base, int offset, int mask,
                      int increment = 0)
     {
         if (offset)
@@ -1375,7 +1375,7 @@ private:
 
         strong_assert(mask > 0 && mask <= vector_size);
 
-        auto issue_the_load_instruction = [&](auto const& r)
+        auto issue_the_load_instruction = [&](auto const &r)
         {
             if (increment && increment < 256)
             {
@@ -1411,7 +1411,7 @@ private:
         }
     }
 
-    void store_vector(VReg const& vreg, Reg64 const& base, int offset, int mask,
+    void store_vector(VReg const &vreg, Reg64 const &base, int offset, int mask,
                       int increment = 0)
     {
         if (offset)
@@ -1453,7 +1453,7 @@ private:
         }
     }
 
-    void scatter_vector(VReg const& vreg, Reg64 const& base, int offset,
+    void scatter_vector(VReg const &vreg, Reg64 const &base, int offset,
                         int mask, int stride, int increment = 0)
     {
         if (mask == 0)
@@ -1485,7 +1485,7 @@ private:
         }
     }
 
-    void gather_vector(VReg const& vreg, Reg64 const& base, int offset,
+    void gather_vector(VReg const &vreg, Reg64 const &base, int offset,
                        int mask, int stride, int increment = 0)
     {
         if (mask == 0)
@@ -1517,22 +1517,22 @@ private:
         }
     }
 
-    void issue_C_loads(std::set<memory_argument> const& loads)
+    void issue_C_loads(std::set<memory_argument> const &loads)
     {
         std::vector<memory_argument> ordered_loads;
-        for (auto const& c : loads)
+        for (auto const &c : loads)
         {
             ordered_loads.emplace_back(c);
         }
 
         std::sort(ordered_loads.begin(), ordered_loads.end(),
-                  [](const memory_argument& a, const memory_argument& b)
+                  [](const memory_argument &a, const memory_argument &b)
                   { return a.offset < b.offset; });
 
         std::vector<int> incrs;
         int              prev_off = -1;
 
-        for (auto const& c : ordered_loads)
+        for (auto const &c : ordered_loads)
         {
             if (prev_off != -1)
             {
@@ -1545,7 +1545,7 @@ private:
         strong_assert(ordered_loads.size());
         meta_add_imm(tmpCReg_, ordered_loads.front().offset * bytes_per_float);
 
-        for (auto const& c : ordered_loads)
+        for (auto const &c : ordered_loads)
         {
             LN_LOG(INFO) << tabs.back() << "LOAD " << c.readable() << "\n";
 
@@ -1582,10 +1582,10 @@ private:
         }
     }
 
-    void issue_C_loads(std::set<memory_argument> const& loads,
+    void issue_C_loads(std::set<memory_argument> const &loads,
                        bool                             issue_first_alpha_logic)
     {
-        for (auto& CVmm : C_VMMs)
+        for (auto &CVmm : C_VMMs)
         {
             CVmm.second.reset();
         }
@@ -1597,7 +1597,7 @@ private:
 
             cbnz(alpha_reg_, *loadDataLabel);
 
-            for (auto const& c : loads)
+            for (auto const &c : loads)
             {
                 LN_LOG(INFO) << tabs.back() << "ZERO " << c.readable() << "\n";
                 for (int s = 0; s < C_VMMs[c].size(); ++s)
@@ -1619,25 +1619,25 @@ private:
         }
     }
 
-    void issue_C_stores(std::set<memory_argument> const& stores,
+    void issue_C_stores(std::set<memory_argument> const &stores,
                         std::optional<int> /* tail_mask */, int max_alpha,
                         bool /* issue_max_alpha_logic */)
     {
         std::vector<memory_argument> ordered_stores;
 
-        for (auto const& c : stores)
+        for (auto const &c : stores)
         {
             ordered_stores.emplace_back(c);
         }
 
         std::sort(ordered_stores.begin(), ordered_stores.end(),
-                  [](const memory_argument& a, const memory_argument& b)
+                  [](const memory_argument &a, const memory_argument &b)
                   { return a.offset < b.offset; });
 
         std::vector<int> incrs;
         int              prev_off = -1;
 
-        for (auto const& c : ordered_stores)
+        for (auto const &c : ordered_stores)
         {
             if (prev_off != -1)
             {
@@ -1650,7 +1650,7 @@ private:
         strong_assert(ordered_stores.size());
         meta_add_imm(tmpCReg_, ordered_stores.front().offset * bytes_per_float);
 
-        for (auto const& c : ordered_stores)
+        for (auto const &c : ordered_stores)
         {
             LN_LOG(INFO) << tabs.back() << "STORE " << c.readable() << " [["
                          << C_VMMs[c][0].getIdx() << "-"
@@ -1659,7 +1659,7 @@ private:
 
             C_VMMs[c].reduce<float>(*this);
         }
-        for (auto const& c : ordered_stores)
+        for (auto const &c : ordered_stores)
         {
             if (C_traits.access == SCALAR && vectorized_var != "NONE")
             {
@@ -1675,7 +1675,7 @@ private:
             b(Xbyak::LT, *donePostOpLabel);
             tbnz(skip_postop_reg_, 1, *donePostOpLabel);
 
-            for (auto const& c : ordered_stores)
+            for (auto const &c : ordered_stores)
             {
                 if (C_traits.access == SCALAR)
                 {
@@ -1707,7 +1707,7 @@ private:
 
             L_aarch64(*donePostOpLabel);
 
-            for (auto const& c : ordered_stores)
+            for (auto const &c : ordered_stores)
             {
                 auto incr = 0;
                 if (incrs.size())
@@ -1736,7 +1736,7 @@ private:
         }
         else
         {
-            for (auto const& c : ordered_stores)
+            for (auto const &c : ordered_stores)
             {
                 LN_LOG(INFO) << tabs.back() << "STORE " << c.readable() << "\n";
 
@@ -1767,12 +1767,12 @@ private:
         }
     }
 
-    void issue_C_stores(std::set<memory_argument> const& stores, int max_alpha,
+    void issue_C_stores(std::set<memory_argument> const &stores, int max_alpha,
                         bool issue_max_alpha_logic)
     {
         std::optional<int> tail_mask;
 
-        for (auto const& c : stores)
+        for (auto const &c : stores)
         {
             if (c.mask != vector_size)
             {
@@ -1786,18 +1786,18 @@ private:
 
     void issue_unrolled_operations_vector_vector(
         std::vector<operation_operation> /* operations */,
-        std::function<void()> const& epilogue_fn)
+        std::function<void()> const &epilogue_fn)
     {
         auto instructions = std::move(instruction_IRs.front());
         instruction_IRs.pop_front();
 
         std::map<int, int> tensor_offsets;
 
-        for (auto const& insn : instructions)
+        for (auto const &insn : instructions)
         {
             std::visit(
                 overloaded{
-                    [&](load_pair_instruction const& i)
+                    [&](load_pair_instruction const &i)
                     {
                         strong_assert(i.num_lanes != 3);
 
@@ -1837,7 +1837,7 @@ private:
                             strong_assert(false && "Unknown number of lanes");
                         }
                     },
-                    [&](load_instruction const& i)
+                    [&](load_instruction const &i)
                     {
                         int ptr_reg_idx = i.tensor_location.idx;
                         int delta       = i.tensor_location.offset;
@@ -1875,7 +1875,7 @@ private:
                             strong_assert(false && "Unknown number of lanes");
                         }
                     },
-                    [&](fmla_instruction const& fml)
+                    [&](fmla_instruction const &fml)
                     {
                         switch (fml.left_src.lane)
                         {
@@ -1897,17 +1897,17 @@ private:
                             strong_assert(false && "Unknown number of lanes");
                         }
                     },
-                    [](load_wreg_instruction const&) { strong_assert(false); },
-                    [](load_xreg_instruction const&) { strong_assert(false); },
-                    [](ins_wreg_instruction const&) { strong_assert(false); },
-                    [](ins_xreg_instruction const&) { strong_assert(false); },
+                    [](load_wreg_instruction const &) { strong_assert(false); },
+                    [](load_xreg_instruction const &) { strong_assert(false); },
+                    [](ins_wreg_instruction const &) { strong_assert(false); },
+                    [](ins_xreg_instruction const &) { strong_assert(false); },
                     [](std::monostate) {}},
                 insn);
         }
 
         print_instructions(instructions);
 
-        for (auto const& offs : tensor_offsets)
+        for (auto const &offs : tensor_offsets)
         {
             meta_sadd_imm(XReg(offs.first), -offs.second);
         }
@@ -1917,18 +1917,18 @@ private:
 
     void issue_unrolled_operations_scalar_scalar(
         std::vector<operation_operation> /* operations */,
-        std::function<void()> const& epilogue_fn)
+        std::function<void()> const &epilogue_fn)
     {
         auto instructions = std::move(instruction_IRs.front());
         instruction_IRs.pop_front();
 
         std::map<int, int> tensor_offsets;
 
-        for (auto const& insn : instructions)
+        for (auto const &insn : instructions)
         {
             std::visit(
                 overloaded{
-                    [&](load_pair_instruction const& i)
+                    [&](load_pair_instruction const &i)
                     {
                         int ptr_reg_idx = i.tensor_location.idx;
                         int delta       = i.tensor_location.offset;
@@ -1939,7 +1939,7 @@ private:
                         meta_ldp_post_ptr(SReg(i.vreg1), SReg(i.vreg2),
                                           XReg(ptr_reg_idx), delta);
                     },
-                    [&](load_instruction const& i)
+                    [&](load_instruction const &i)
                     {
                         int ptr_reg_idx = i.tensor_location.idx;
                         int delta       = i.tensor_location.offset;
@@ -1950,16 +1950,16 @@ private:
                         meta_ldr_post_ptr(SReg(i.vreg), XReg(ptr_reg_idx),
                                           delta);
                     },
-                    [&](fmla_instruction const& fml)
+                    [&](fmla_instruction const &fml)
                     {
                         fmla(VReg(fml.dst.number).s2,
                              VReg(fml.left_src.number).s2,
                              VReg(fml.right_src.number).s2);
                     },
-                    [](load_wreg_instruction const&) { strong_assert(false); },
-                    [](load_xreg_instruction const&) { strong_assert(false); },
-                    [](ins_wreg_instruction const&) { strong_assert(false); },
-                    [](ins_xreg_instruction const&) { strong_assert(false); },
+                    [](load_wreg_instruction const &) { strong_assert(false); },
+                    [](load_xreg_instruction const &) { strong_assert(false); },
+                    [](ins_wreg_instruction const &) { strong_assert(false); },
+                    [](ins_xreg_instruction const &) { strong_assert(false); },
 
                     [](std::monostate) {}},
                 insn);
@@ -1967,7 +1967,7 @@ private:
 
         print_instructions(instructions);
 
-        for (auto const& offs : tensor_offsets)
+        for (auto const &offs : tensor_offsets)
         {
             meta_sadd_imm(XReg(offs.first), -offs.second);
         }
@@ -1977,7 +1977,7 @@ private:
 
     void issue_unrolled_operations_scalar_vector(
         std::vector<operation_operation> /* operations */,
-        std::function<void()> const& epilogue_fn)
+        std::function<void()> const &epilogue_fn)
     {
 
         auto instructions = std::move(instruction_IRs.front());
@@ -2000,7 +2000,7 @@ private:
 
         auto full_epilogue = [&]()
         {
-            for (auto const& offs : tensor_offsets)
+            for (auto const &offs : tensor_offsets)
             {
                 if (offs.first == BReg_.getIdx() ||
                     offs.first == AReg_.getIdx())
@@ -2012,7 +2012,7 @@ private:
             epilogue_fn();
         };
 
-        for (auto const& insn : instructions)
+        for (auto const &insn : instructions)
         {
             if (till_epilogue-- == 0)
             {
@@ -2021,7 +2021,7 @@ private:
 
             std::visit(
                 overloaded{
-                    [&](load_pair_instruction const& i)
+                    [&](load_pair_instruction const &i)
                     {
                         strong_assert(i.num_lanes != 3);
 
@@ -2054,7 +2054,7 @@ private:
                             strong_assert(false && "Unknown number of lanes");
                         }
                     },
-                    [&](load_instruction const& i)
+                    [&](load_instruction const &i)
                     {
                         int ptr_reg_idx = i.tensor_location.idx;
                         int delta       = i.tensor_location.offset;
@@ -2077,7 +2077,7 @@ private:
                                               delta);
                         }
                     },
-                    [&](fmla_instruction const& fml)
+                    [&](fmla_instruction const &fml)
                     {
                         if (fml.right_src.lane != vector_size)
                         {
@@ -2093,7 +2093,7 @@ private:
                                  VReg(fml.right_src.number).s4);
                         }
                     },
-                    [&](load_wreg_instruction const& i)
+                    [&](load_wreg_instruction const &i)
                     {
                         int ptr_reg_idx = i.tensor_location.idx;
                         int delta       = i.tensor_location.offset;
@@ -2103,7 +2103,7 @@ private:
                         meta_ldr_post_ptr(WReg(i.reg), XReg(ptr_reg_idx),
                                           delta);
                     },
-                    [&](load_xreg_instruction const& i)
+                    [&](load_xreg_instruction const &i)
                     {
                         int ptr_reg_idx = i.tensor_location.idx;
                         int delta       = i.tensor_location.offset;
@@ -2113,9 +2113,9 @@ private:
                         meta_ldr_post_ptr(XReg(i.reg), XReg(ptr_reg_idx),
                                           delta);
                     },
-                    [&](ins_wreg_instruction const& i)
+                    [&](ins_wreg_instruction const &i)
                     { base::ins(VReg(i.vreg).s[i.lane], WReg(i.reg)); },
-                    [&](ins_xreg_instruction const& i)
+                    [&](ins_xreg_instruction const &i)
                     { base::ins(VReg(i.vreg).d[i.lane], XReg(i.reg)); },
 
                     [](std::monostate) {}},
@@ -2131,7 +2131,7 @@ private:
     }
 
     void issue_unrolled_operations(std::vector<operation_operation> operations,
-                                   std::function<void()> const&     epilogue_fn)
+                                   std::function<void()> const     &epilogue_fn)
     {
         if (operations.size())
         {
@@ -2145,7 +2145,7 @@ private:
             else if (operations[0].src1.traits->access == VECTOR_PACKED &&
                      operations[0].src2.traits->access == SCALAR)
             {
-                for (auto& f : operations)
+                for (auto &f : operations)
                 {
                     std::swap(f.src1, f.src2);
                 }
@@ -2281,14 +2281,14 @@ private:
             round_up(padded_sizes[order.back().first], vek_size);
 
         std::map<std::string, std::vector<int>> ranges;
-        for (auto const& p : padded_sizes)
+        for (auto const &p : padded_sizes)
         {
             ranges[p.first].push_back(p.second);
         }
 
         int registers_required =
             std::accumulate(padded_sizes.begin(), padded_sizes.end(), 1,
-                            [&](int v, auto const& s) {
+                            [&](int v, auto const &s) {
                                 return C_formula.count(s.first) ? v * s.second
                                                                 : v;
                             }) /
@@ -2297,7 +2297,7 @@ private:
         std::int64_t total_required_innermost_operations =
             std::accumulate(padded_sizes.begin(), padded_sizes.end(),
                             (std::int64_t)1,
-                            [&](std::int64_t v, auto const& s)
+                            [&](std::int64_t v, auto const &s)
                             {
                                 return (B_strides.count(s.first) ||
                                         A_strides.count(s.first) ||
@@ -2499,7 +2499,7 @@ private:
                 per_register = target_regs_for_C / collected_load_store.size();
             }
 
-            for (auto const& c : collected_load_store)
+            for (auto const &c : collected_load_store)
             {
                 LN_LOG(DEBUG) << "LOAD/STORE: " << c.readable() << " ("
                               << per_register << " VMMs)\n";
@@ -2518,7 +2518,7 @@ private:
     void initialize_loops_data()
     {
         // Initialize the outermost limits
-        for (auto const& p : sizes)
+        for (auto const &p : sizes)
         {
             limits[p.first].push_back(p.second);
         }
@@ -2526,7 +2526,7 @@ private:
         // Compute the ranges of all loops
         {
             auto sizes_copy = sizes;
-            for (auto const& o : order)
+            for (auto const &o : order)
             {
                 loops.push_back({o.first, sizes_copy[o.first], o.second});
                 sizes_copy[o.first] = o.second;
@@ -2561,7 +2561,7 @@ private:
         {
             --first_loop_that_can_hold_C;
             // TODO(zi) check math
-            auto const& loop      = loops[first_loop_that_can_hold_C];
+            auto const &loop      = loops[first_loop_that_can_hold_C];
             int         expansion = loop.end / loop.delta;
             innermost_operations *= expansion;
         }
@@ -2608,7 +2608,7 @@ private:
         }
         else
         {
-            auto const& loop = loops[depth];
+            auto const &loop = loops[depth];
 
             std::string var_name = loop.var + "_" + std::to_string(loop.delta);
 
@@ -2813,7 +2813,7 @@ private:
             if (operations[0].src1.traits->access == VECTOR_PACKED &&
                 operations[0].src2.traits->access == SCALAR)
             {
-                for (auto& f : operations)
+                for (auto &f : operations)
                 {
                     std::swap(f.src1, f.src2);
                 }
@@ -2897,9 +2897,9 @@ private:
 
         table_container table;
 
-        auto& tensor_location_index = table.get<0>();
-        auto& vreg_index            = table.get<1>();
-        auto& next_usage_index      = table.get<2>();
+        auto &tensor_location_index = table.get<0>();
+        auto &vreg_index            = table.get<1>();
+        auto &next_usage_index      = table.get<2>();
 
         std::vector<instruction_t> instructions;
 
@@ -2964,7 +2964,7 @@ private:
             instructions.push_back(insn);
         };
 
-        auto free_a_register = [&](std::set<int> const& to_avoid)
+        auto free_a_register = [&](std::set<int> const &to_avoid)
         {
             auto nu_it = next_usage_index.begin();
             strong_assert(nu_it != next_usage_index.end());
@@ -3191,9 +3191,9 @@ private:
 
         table_container table;
 
-        auto& tensor_location_index = table.get<0>();
-        auto& vreg_index            = table.get<1>();
-        auto& next_usage_index      = table.get<2>();
+        auto &tensor_location_index = table.get<0>();
+        auto &vreg_index            = table.get<1>();
+        auto &next_usage_index      = table.get<2>();
 
         std::vector<instruction_t> instructions;
 
@@ -3220,7 +3220,7 @@ private:
             instructions.push_back(insn);
         };
 
-        auto free_a_register = [&](std::set<int> const& to_avoid)
+        auto free_a_register = [&](std::set<int> const &to_avoid)
         {
             auto nu_it = next_usage_index.begin();
             strong_assert(nu_it != next_usage_index.end());
@@ -3377,7 +3377,7 @@ private:
         }
         else
         {
-            auto const& loop = loops[depth];
+            auto const &loop = loops[depth];
 
             std::string var_name = loop.var + "_" + std::to_string(loop.delta);
 
@@ -3437,7 +3437,7 @@ private:
         // result in values that are actually used (i.e. not masked out
         // operations)
         std::int64_t flops = 2;
-        for (auto const& s : sizes)
+        for (auto const &s : sizes)
         {
             if (C_strides.count(s.first) || B_strides.count(s.first) ||
                 A_strides.count(s.first))
@@ -3455,7 +3455,7 @@ private:
         // compute the bound for the innermost loop, since this
         // determines the number of elements vectorized identify bound
         // by looking at stride for prior split (if any)
-        auto matches_innermost = [&innermost](auto const& dim)
+        auto matches_innermost = [&innermost](auto const &dim)
         { return dim.first == innermost.first; };
         auto parent_iter =
             std::find_if(++order.rbegin(), order.rend(), matches_innermost);
@@ -3482,7 +3482,7 @@ private:
         std::string  vectorized_dimension = innermost.first;
         std::int64_t flops                = 2;
 
-        for (auto const& s : sizes)
+        for (auto const &s : sizes)
         {
             if (C_strides.count(s.first) || B_strides.count(s.first) ||
                 A_strides.count(s.first))
@@ -3507,7 +3507,7 @@ private:
         std::int64_t A_memory_approx = 1;
         std::int64_t B_memory_approx = 1;
 
-        for (auto const& s : sizes)
+        for (auto const &s : sizes)
         {
             if (C_strides.count(s.first))
                 C_memory_approx += (s.second - 1) * C_strides.at(s.first);
@@ -3548,7 +3548,7 @@ public:
     std::int64_t get_masked_out_flops() const { return masked_out_flops_; }
     std::int64_t get_total_memory() const { return total_memory_; }
 
-    std::pair<int, int> const& get_register_blocking_info() const
+    std::pair<int, int> const &get_register_blocking_info() const
     {
         return register_blocking_info_;
     }
@@ -3564,28 +3564,28 @@ private:
 
     loop_nest_code_generator(
         not_depricated_tag,
-        std::vector<std::pair<std::string, int>> const& _order,
-        std::map<std::string, int> const&               sizes,
-        std::set<std::string> const&                    C_formula,
-        std::set<std::string> const&                    A_formula,
-        std::set<std::string> const&                    B_formula,
-        std::map<std::string, int> const&               C_strides,
-        std::map<std::string, int> const&               A_strides,
-        std::map<std::string, int> const&               B_strides,
+        std::vector<std::pair<std::string, int>> const &_order,
+        std::map<std::string, int> const               &sizes,
+        std::set<std::string> const                    &C_formula,
+        std::set<std::string> const                    &A_formula,
+        std::set<std::string> const                    &B_formula,
+        std::map<std::string, int> const               &C_strides,
+        std::map<std::string, int> const               &A_strides,
+        std::map<std::string, int> const               &B_strides,
         std::shared_ptr<operation_pair_base> /*op_pair */,
         std::optional<int> user_operation_unroll_limit = std::nullopt,
         std::shared_ptr<elementwise_operation<aarch64>> /* elementwise_preop
                                                          */
         = nullptr,
-        std::vector<std::map<std::string, int>> const&
+        std::vector<std::map<std::string, int>> const &
         /* elementwise_preop_strides */
         = {},
         std::shared_ptr<elementwise_operation<aarch64>> elementwise_postop =
             nullptr,
-        std::vector<std::map<std::string, int>> const&
+        std::vector<std::map<std::string, int>> const &
         /* elementwise_postop_strides */
         = {},
-        std::optional<OptimizationConfiguration> const& /* optim_config */ =
+        std::optional<OptimizationConfiguration> const & /* optim_config */ =
             std::nullopt)
         : meta_base(x9, x5)
         , order(_order)
@@ -3672,7 +3672,7 @@ private:
         std::vector<int> available = {11, 12, 13, 14, 15};
         std::vector<std::pair<std::int64_t, int>> rev_freq;
 
-        for (auto const& f : sadd_freq)
+        for (auto const &f : sadd_freq)
         {
             if (f.first < -256 || f.first >= 256)
             {
@@ -3709,24 +3709,24 @@ private:
 public:
     // [[deprecated("Use the named argument constructor")]]
     loop_nest_code_generator(
-        std::vector<std::pair<std::string, int>> const& _order,
-        std::map<std::string, int> const&               sizes,
-        std::set<std::string> const&                    C_formula,
-        std::set<std::string> const&                    A_formula,
-        std::set<std::string> const&                    B_formula,
-        std::map<std::string, int> const&               C_strides,
-        std::map<std::string, int> const&               A_strides,
-        std::map<std::string, int> const&               B_strides,
-        std::shared_ptr<operation_pair_base> const&     op_pair,
+        std::vector<std::pair<std::string, int>> const &_order,
+        std::map<std::string, int> const               &sizes,
+        std::set<std::string> const                    &C_formula,
+        std::set<std::string> const                    &A_formula,
+        std::set<std::string> const                    &B_formula,
+        std::map<std::string, int> const               &C_strides,
+        std::map<std::string, int> const               &A_strides,
+        std::map<std::string, int> const               &B_strides,
+        std::shared_ptr<operation_pair_base> const     &op_pair,
         std::optional<int> user_operation_unroll_limit = std::nullopt,
         std::shared_ptr<elementwise_operation<aarch64>> elementwise_preop =
             nullptr,
-        std::vector<std::map<std::string, int>> const&
-            elementwise_preop_strides = {},
+        std::vector<std::map<std::string, int>> const
+            &elementwise_preop_strides = {},
         std::shared_ptr<elementwise_operation<aarch64>> elementwise_postop =
             nullptr,
-        std::vector<std::map<std::string, int>> const&
-            elementwise_postop_strides                        = {},
+        std::vector<std::map<std::string, int>> const
+            &elementwise_postop_strides                       = {},
         std::optional<OptimizationConfiguration> optim_config = std::nullopt)
         : loop_nest_code_generator(
               not_depricated_tag(), _order, sizes, C_formula, A_formula,
@@ -3738,19 +3738,19 @@ public:
     }
 
     loop_nest_code_generator(
-        LN_arguments const&                         arguments,
-        std::shared_ptr<operation_pair_base> const& op_pair,
+        loop_nest_verified_descriptor const        &arguments,
+        std::shared_ptr<operation_pair_base> const &op_pair,
         std::optional<int> user_operation_unroll_limit = std::nullopt,
         std::shared_ptr<elementwise_operation<aarch64>> elementwise_preop
 
         = nullptr,
-        std::vector<std::map<std::string, int>> const&
-            elementwise_preop_strides = {},
+        std::vector<std::map<std::string, int>> const
+            &elementwise_preop_strides = {},
         std::shared_ptr<elementwise_operation<aarch64>> elementwise_postop =
             nullptr,
-        std::vector<std::map<std::string, int>> const&
-            elementwise_postop_strides = {},
-        std::optional<OptimizationConfiguration> const& optim_config =
+        std::vector<std::map<std::string, int>> const
+            &elementwise_postop_strides = {},
+        std::optional<OptimizationConfiguration> const &optim_config =
             std::nullopt)
         : loop_nest_code_generator(
               arguments.get_order(), arguments.get_sizes(),
@@ -3775,12 +3775,12 @@ public:
     using impl_class::impl_class;
 };
 
-#ifdef DABUN_NOT_HEADER_ONLY
+#    ifndef DABUN_HEADER_ONLY
 
 extern template class loop_nest_code_generator<aarch64, false>;
 extern template class loop_nest_code_generator<aarch64, true>;
 
-#endif
+#    endif
 
 } // namespace arm
 } // namespace dabun

@@ -5,7 +5,7 @@
 #if !defined(__aarch64__) ||                                                   \
     !defined(__APPLE__) // Should also somehow detect whether _Float16 is
                         // available
-#include "dabun/third_party/half.hpp"
+#    include "dabun/third_party/half.hpp"
 
 #endif
 
@@ -69,6 +69,11 @@ template <class Float>
 inline printable_fp_t<Float> printable(Float f)
 {
     return static_cast<printable_fp_t<Float>>(f);
+}
+
+inline bool operator<(fp16 const &lhs, fp16 const &rhs)
+{
+    return static_cast<float>(lhs) < static_cast<float>(rhs);
 }
 
 } // namespace dabun

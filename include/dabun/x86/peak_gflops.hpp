@@ -6,13 +6,13 @@
 
 #ifdef DABUN_ARCH_X86_64
 
-#include "dabun/x86/xbyak.hpp"
+#    include "dabun/x86/xbyak.hpp"
 
-#include "dabun/code_generator/code_generator.hpp"
-#include "dabun/math.hpp"
-#include "dabun/measure.hpp"
+#    include "dabun/code_generator/code_generator.hpp"
+#    include "dabun/math.hpp"
+#    include "dabun/measure.hpp"
 
-#include <utility>
+#    include <utility>
 
 namespace dabun
 {
@@ -33,7 +33,7 @@ private:
     static constexpr int num_vector_regs =
         isa_traits<ISA>::total_vector_registers;
 
-    class test : public code_generator<void(float*)>
+    class test : public code_generator<void(float *)>
     {
     public:
         test(int iterations)
@@ -76,13 +76,13 @@ public:
     }
 };
 
-#ifdef DABUN_NOT_HEADER_ONLY
+#    ifndef DABUN_HEADER_ONLY
 
 extern template struct dabun::x86::bench_gflops<avx2, float>;
 extern template struct dabun::x86::bench_gflops<avx512, float>;
 extern template struct dabun::x86::bench_gflops<avx2_plus, float>;
 
-#endif
+#    endif
 
 } // namespace x86
 } // namespace dabun

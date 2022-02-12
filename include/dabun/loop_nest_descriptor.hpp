@@ -63,6 +63,7 @@ private:
 public:
     operator loop_nest_verified_descriptor() const
     {
+        // TODO(zi) Should do a full representation check here
         return loop_nest_verified_descriptor(this);
     }
 

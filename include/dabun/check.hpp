@@ -9,7 +9,7 @@ namespace dabun
 {
 
 template <class Float>
-void apply_relu(Float* Begin, Float* End)
+void apply_relu(Float *Begin, Float *End)
 {
     for (; Begin != End; ++Begin)
     {
@@ -26,8 +26,8 @@ void apply_relu(Float* Begin, Float* End)
 }
 
 template <class Float>
-printable_fp_t<Float> max_abs_difference(Float const* LBegin, Float const* LEnd,
-                                         Float const* RBegin)
+printable_fp_t<Float> max_abs_difference(Float const *LBegin, Float const *LEnd,
+                                         Float const *RBegin)
 {
     Float res = static_cast<Float>(0);
     for (; LBegin != LEnd; ++LBegin, ++RBegin)
@@ -47,9 +47,9 @@ printable_fp_t<Float> max_abs_difference(Float const* LBegin, Float const* LEnd,
 }
 
 template <class Float>
-printable_fp_t<Float> max_abs_difference_verbose(Float const* LBegin,
-                                                 Float const* LEnd,
-                                                 Float const* RBegin)
+printable_fp_t<Float> max_abs_difference_verbose(Float const *LBegin,
+                                                 Float const *LEnd,
+                                                 Float const *RBegin)
 {
     int   off = 0;
     Float res = 0;
@@ -80,8 +80,8 @@ printable_fp_t<Float> max_abs_difference_verbose(Float const* LBegin,
 
 template <class Float>
 printable_fp_t<Float>
-max_abs_difference_verbose(Float const* LBegin, Float const* LEnd,
-                           Float const* RBegin, float delta)
+max_abs_difference_verbose(Float const *LBegin, Float const *LEnd,
+                           Float const *RBegin, float delta)
 {
     int   off = 0;
     Float res = 0;

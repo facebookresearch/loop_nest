@@ -815,7 +815,7 @@ public:
     }
 };
 
-#ifdef DABUN_NOT_HEADER_ONLY
+#ifndef DABUN_HEADER_ONLY
 
 extern template class transposer_code_generator<aarch64, float>;
 extern template class transposer_code_generator<aarch64, fp16>;

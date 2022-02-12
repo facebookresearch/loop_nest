@@ -833,7 +833,7 @@ public:
     }
 };
 
-#ifdef DABUN_NOT_HEADER_ONLY
+#ifndef DABUN_HEADER_ONLY
 
 extern template class transposer_code_generator<avx2>;
 extern template class transposer_code_generator<avx2_plus>;

@@ -91,7 +91,7 @@ public:
     }
 };
 
-#ifdef DABUN_NOT_HEADER_ONLY
+#ifndef DABUN_HEADER_ONLY
 
 extern template struct bench_gflops<aarch64, fp32>;
 extern template struct bench_gflops<aarch64, fp16>;
