@@ -14,7 +14,7 @@ int main()
 
     using namespace dabun;
 
-    for (int i = 0; i < 10;)
+    // for (int i = 0; i < 10; ++i)
     {
 
         int R = 11;

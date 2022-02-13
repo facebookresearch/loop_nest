@@ -4,7 +4,9 @@ IndentWidth: 4
 Language: Cpp
 # Force pointers to the type for C++.
 DerivePointerAlignment: false
-# PointerAlignment: Left
+PointerAlignment: Left
+# QualifierAlignmentStyle: Right
+# ReferenceAlignmentStyle: Left
 
 UseTab: Never
 IndentWidth: 4

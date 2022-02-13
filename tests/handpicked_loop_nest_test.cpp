@@ -1,4 +1,4 @@
-#include "dabun/thread/operating_cpu_set.hpp"
+// #include "dabun/thread/operating_cpu_set.hpp"
 
 #include "baseline/loop_nest_baseline.hpp"
 #include "dabun/arithmetic_operation.hpp"
@@ -22,14 +22,14 @@ namespace dabun::tests::baseline
 
 template <class ISA>
 void loop_nest_against_slow_baseline(
-    std::vector<std::pair<std::string, int>> const &order,
-    std::map<std::string, int> const               &sizes,
-    std::set<std::string> const                    &C_formula,
-    std::set<std::string> const                    &A_formula,
-    std::set<std::string> const                    &B_formula,
-    std::map<std::string, int> const               &C_strides,
-    std::map<std::string, int> const               &A_strides,
-    std::map<std::string, int> const &B_strides, int max_unrolled_fmas = 512,
+    std::vector<std::pair<std::string, int>> const& order,
+    std::map<std::string, int> const&               sizes,
+    std::set<std::string> const&                    C_formula,
+    std::set<std::string> const&                    A_formula,
+    std::set<std::string> const&                    B_formula,
+    std::map<std::string, int> const&               C_strides,
+    std::map<std::string, int> const&               A_strides,
+    std::map<std::string, int> const& B_strides, int max_unrolled_fmas = 512,
     int alpha = 1)
 {
     loop_nest_descriptor args(order, sizes, C_formula, A_formula, B_formula,
