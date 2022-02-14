@@ -11,7 +11,8 @@ function(dabun_blanket_test name)
   add_executable(${name}_blanket ${name}.cpp)
   target_link_libraries(${name}_blanket
     PUBLIC dabun
-    PUBLIC dabun_tests_catch2_main)
+    PUBLIC dabun_tests_catch2_main
+    PUBLIC -lpthread)
 endfunction(dabun_blanket_test)
 
 dabun_blanket_test(sentinel)

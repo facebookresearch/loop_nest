@@ -67,13 +67,15 @@ public:
 class alignas(hardware_destructive_interference_size) default_barrier
 {
 private:
-    std::mutex              mutex_;
-    std::condition_variable cv_;
+    std::mutex              mutex_{};
+    std::condition_variable cv_{};
     std::size_t             num_arrived = 0;
     std::size_t             generation  = 0;
     std::size_t const       barrier_threshold;
 
 public:
+    std::size_t arrival_count() const { return num_arrived; }
+
     explicit default_barrier(std::size_t threshold)
         : barrier_threshold(threshold)
     {
@@ -90,6 +92,7 @@ public:
         {
             ++generation;
             num_arrived = 0;
+            lock.unlock();
             cv_.notify_all();
 
             return true;
