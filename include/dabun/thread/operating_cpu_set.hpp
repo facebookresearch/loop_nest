@@ -31,7 +31,7 @@ private:
     alignas(hardware_destructive_interference_size) std::size_t
         num_operating_cpus_;
 
-    alignas(hardware_destructive_interference_size) cpu_set_t old_set_;
+    // alignas(hardware_destructive_interference_size) cpu_set_t old_set_;
 
     alignas(hardware_destructive_interference_size)
         std::function<void()>* kernels_ = nullptr;
@@ -83,7 +83,7 @@ public:
         : spinning_barrier_(core_ids.size())
         , sleeping_barrier_(core_ids.size())
         , num_operating_cpus_(core_ids.size())
-        , old_set_()
+        // , old_set_()
 
     {
         sleep_function_ = [this]()
