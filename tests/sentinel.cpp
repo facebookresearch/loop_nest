@@ -32,7 +32,7 @@ TEST_CASE("Random threaded test", "[single-file]")
 
     // std::cin >> i;
 
-    for (int i = 0; i < 1000000; ++i)
+    for (int i = 0; i < 10000; ++i)
     {
         int x = rand() % 2;
         // std::cout << "Requesting: "

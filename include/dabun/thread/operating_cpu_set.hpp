@@ -31,17 +31,16 @@ private:
     alignas(hardware_destructive_interference_size) std::size_t
         num_operating_cpus_;
 
-    // alignas(hardware_destructive_interference_size) cpu_set_t old_set_;
-
     alignas(hardware_destructive_interference_size)
-        std::function<void()>* kernels_ = nullptr;
+        std::function<void()> const* kernels_ = nullptr;
 
-    alignas(hardware_destructive_interference_size)
-        std::function<void()> sleep_function_;
+    alignas(hardware_destructive_interference_size) std::function<void()> const
+        sleep_function_;
 
-    std::vector<std::function<void()>> sleep_function_kernels_;
+    std::vector<std::function<void()>> const sleep_function_kernels_;
 
     alignas(hardware_destructive_interference_size) bool is_sleeping_ = false;
+    // alignas(hardware_destructive_interference_size) cpu_set_t old_set_;
 
     void operating_cpu_loop(std::size_t idx, std::optional<int> core_id)
     {
@@ -83,18 +82,13 @@ public:
         : spinning_barrier_(core_ids.size())
         , sleeping_barrier_(core_ids.size())
         , num_operating_cpus_(core_ids.size())
-        // , old_set_()
+        , kernels_(nullptr)
+        , sleep_function_([this]()
+                          { this->sleeping_barrier_.arrive_and_wait(); })
+        , sleep_function_kernels_(core_ids.size(), sleep_function_)
+    // , old_set_()
 
     {
-        sleep_function_ = [this]()
-        { this->sleeping_barrier_.arrive_and_wait(); };
-
-        sleep_function_kernels_.reserve(core_ids.size());
-
-        for (std::size_t i = 0; i < core_ids.size(); ++i)
-        {
-            sleep_function_kernels_.push_back(sleep_function_);
-        }
 
         // Bind the main thread
         {
