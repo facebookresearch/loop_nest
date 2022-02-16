@@ -12,3 +12,6 @@
 	path = extern/Catch2
 	url = https://github.com/catchorg/Catch2
 	branch = v2.x
+[submodule "extern/cpuinfo"]
+	path = extern/cpuinfo
+	url = https://github.com/pytorch/cpuinfo

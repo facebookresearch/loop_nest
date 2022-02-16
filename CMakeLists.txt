@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.15.0)
 
 add_subdirectory(extern/Catch2)
 
-# SET (CMAKE_CXX_COMPILER             "/usr/bin/clang++")
+SET (CMAKE_CXX_COMPILER             "/usr/bin/clang++")
 
 project(dabun
   LANGUAGES CXX
@@ -28,6 +28,10 @@ else()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG -O3 -Wall -Wextra -Werror -Wno-sign-compare")
 endif()
 
+set(DABUN_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(DABUN_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
+set(DABUN_THIRDPARTY_DIR ${DABUN_BINARY_DIR}/extern)
+
 ##
 ## Find Boost
 ##
@@ -42,6 +46,30 @@ if(Boost_FOUND)
 else()
   message(FATAL_ERROR "Can't find boost libraries")
 endif()
+
+##
+## Find Cpuinfo
+##
+if(NOT TARGET cpuinfo)
+  #Download cpuinfo from github if CPUINFO_SOURCE_DIR is not specified.
+  if(NOT DEFINED CPUINFO_SOURCE_DIR)
+    set(CPUINFO_SOURCE_DIR "${DABUN_SOURCE_DIR}/extern/cpuinfo"
+      CACHE STRING "cpuinfo source directory from submodules")
+  endif()
+
+  #build cpuinfo
+  set(CPUINFO_BUILD_UNIT_TESTS OFF CACHE BOOL "Do not build cpuinfo unit tests")
+  set(CPUINFO_BUILD_MOCK_TESTS OFF CACHE BOOL "Do not build cpuinfo mock tests")
+  set(CPUINFO_BUILD_BENCHMARKS OFF CACHE BOOL "Do not build cpuinfo benchmarks")
+  set(CPUINFO_LIBRARY_TYPE static CACHE STRING "Set lib type to static")
+  #Select static runtime, needed for static build for MSVC
+  set(CPUINFO_RUNTIME_TYPE static CACHE STRING "Set runtime to static")
+
+  add_subdirectory("${CPUINFO_SOURCE_DIR}" "${DABUN_BINARY_DIR}/cpuinfo")
+  set_property(TARGET cpuinfo PROPERTY POSITION_INDEPENDENT_CODE ON)
+endif()
+
+include_directories(${CPUINFO_SOURCE_DIR}/include)
 
 ##
 ## Detect host architecture

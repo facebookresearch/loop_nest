@@ -24,24 +24,25 @@ TEST_CASE("Factorials of 1 and higher are computed (pass)", "[single-file]")
 
 TEST_CASE("Random threaded test", "[single-file]")
 {
-    dabun::thread::operating_cpu_set oset({0, 1, 2, 3, 4});
+    dabun::thread::operating_cpu_set oset({0, 1, 5, 12, 18});
     // int                              i;
     // std::cin >> i;
-    std::cout << "Was sleeping? "
-              << (oset.set_sleeping_mode(true) ? " Yes" : "No") << std::endl;
+    // std::cout << "Was sleeping? "
+    //           << (oset.set_sleeping_mode(true) ? " Yes" : "No") << std::endl;
 
     // std::cin >> i;
 
-    for (int i = 0; i < 10000; ++i)
-    {
-        int x = rand() % 2;
-        // std::cout << "Requesting: "
-        //           << (oset.set_sleeping_mode(x) ? " Yes" : "No") << ' ';
-        // std::cout << "Was sleeping? "
-        //           << (oset.set_sleeping_mode(x) ? " Yes" : "No") <<
-        //           std::endl;
-        oset.set_sleeping_mode(x);
-    }
+    // for (int i = 0; i < 10000000; ++i)
+    // {
+    //     int x = rand() % 2;
+    //     // std::cout << "Requesting: "
+    //     //           << (oset.set_sleeping_mode(x) ? " Yes" : "No") << ' ';
+    //     // std::cout << "Was sleeping? "
+    //     //           << (oset.set_sleeping_mode(x) ? " Yes" : "No") <<
+    //     //           std::endl;
+    //     oset.set_sleeping_mode(x);
+    // }
 
-    // std::cin >> i;
+    int i;
+    std::cin >> i;
 }

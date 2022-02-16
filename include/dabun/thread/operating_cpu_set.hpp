@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "dabun/thread/cpu_set.hpp"
+
 #include <iostream>
 
 #include "dabun/thread/barrier.hpp"
@@ -19,17 +21,32 @@
 namespace dabun::thread
 {
 
+class thread_owner_enforcer
+{
+private:
+    std::thread::id thread_id_;
+
+public:
+    thread_owner_enforcer()
+        : thread_id_(std::this_thread::get_id())
+    {
+    }
+
+    void enforce() { strong_assert(thread_id_ == std::this_thread::get_id()); }
+};
+
 class alignas(hardware_destructive_interference_size) operating_cpu_set
 {
 private:
+    alignas(hardware_destructive_interference_size) std::size_t const size_;
+    cpu_set               original_cpu_set_;
+    thread_owner_enforcer enforcer_;
+
     alignas(hardware_destructive_interference_size)
         spinning_barrier spinning_barrier_;
 
     alignas(hardware_destructive_interference_size)
         default_barrier sleeping_barrier_;
-
-    alignas(hardware_destructive_interference_size) std::size_t
-        num_operating_cpus_;
 
     alignas(hardware_destructive_interference_size)
         std::function<void()> const* kernels_ = nullptr;
@@ -46,6 +63,7 @@ private:
     {
         if (core_id) // Has to bind to a particular core
         {
+            bind_to_core(*core_id);
         }
 
         // Signal to the constructor that we are done initializing
@@ -78,27 +96,32 @@ private:
     }
 
 public:
+    std::size_t size() const noexcept { return size_; }
+
+public:
     explicit operating_cpu_set(std::vector<int> const& core_ids)
-        : spinning_barrier_(core_ids.size())
-        , sleeping_barrier_(core_ids.size())
-        , num_operating_cpus_(core_ids.size())
+        : size_(core_ids.size())
+        , spinning_barrier_(size_)
+        , sleeping_barrier_(size_)
         , kernels_(nullptr)
         , sleep_function_([this]()
                           { this->sleeping_barrier_.arrive_and_wait(); })
-        , sleep_function_kernels_(core_ids.size(), sleep_function_)
+        , sleep_function_kernels_(size_, sleep_function_)
     // , old_set_()
 
     {
 
         // Bind the main thread
         {
+            get_affinity(original_cpu_set_);
+            bind_to_core(core_ids[0]);
         }
 
         // Makes no sense to have a operating set with less than 2 workers.
         // TODO(zi) Special pathway for operating set with only one worker.
-        strong_assert(core_ids.size() > 1);
+        strong_assert(size() > 1);
 
-        for (std::size_t idx = 1; idx < core_ids.size(); ++idx)
+        for (std::size_t idx = 1; idx < size(); ++idx)
         {
             std::thread worker(&operating_cpu_set::operating_cpu_loop, this,
                                idx, core_ids[idx]);
@@ -109,14 +132,12 @@ public:
 
         // Wait for all workers to signal being initialized
         spinning_barrier_.arrive_and_wait();
-
-        // Restore main threads CPU set
-        {
-        }
     }
 
     bool set_sleeping_mode(bool sleep_mode)
     {
+        enforcer_.enforce();
+
         if (sleep_mode == is_sleeping_)
         {
             return sleep_mode;
@@ -165,9 +186,48 @@ public:
 
     ~operating_cpu_set()
     {
+        enforcer_.enforce();
+
         assert(kernels_ == nullptr);
         set_sleeping_mode(false);
         spinning_barrier_.arrive_and_wait();
+
+        // Restore main threads CPU set
+        {
+            set_affinity(original_cpu_set_);
+        }
+    }
+
+    bool in_spinning_mode() const { return !is_sleeping_; }
+
+    bool in_sleeping_mode() const { return !is_sleeping_; }
+
+    void execute(std::function<void()> const* kernels)
+    {
+        enforcer_.enforce();
+
+        bool was_sleeping = set_sleeping_mode(false);
+
+        assert(kernels_ == nullptr);
+        kernels_ = kernels;
+        assert(kernels_ != nullptr);
+
+        spinning_barrier_.arrive_and_wait();
+
+        if (kernels[0])
+        {
+            kernels[0]();
+        }
+
+        spinning_barrier_.arrive_and_wait();
+
+        set_sleeping_mode(was_sleeping);
+    }
+
+    void execute(std::vector<std::function<void()>> const& kernels)
+    {
+        assert(kernels.size() == size());
+        execute(kernels.data());
     }
 };
 
