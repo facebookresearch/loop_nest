@@ -5,20 +5,20 @@
 #include "dabun/isa.hpp"
 #ifdef DABUN_ARCH_X86_64
 
-#include "dabun/code_generator/code_generator.hpp"
-#include "dabun/common.hpp"
-#include "dabun/log.hpp"
-#include "dabun/math.hpp"
+#    include "dabun/code_generator/code_generator.hpp"
+#    include "dabun/common.hpp"
+#    include "dabun/log.hpp"
+#    include "dabun/math.hpp"
 
-#include <cassert>
-#include <iostream>
-#include <map>
-#include <numeric>
-#include <optional>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
+#    include <cassert>
+#    include <iostream>
+#    include <map>
+#    include <numeric>
+#    include <optional>
+#    include <string>
+#    include <type_traits>
+#    include <utility>
+#    include <vector>
 
 namespace dabun
 {
@@ -27,7 +27,9 @@ namespace x86
 
 template <class ISA>
 class transposer_code_generator
-    : public code_generator<void(float* Out, float const* In)>
+    : public basic_code_generator,
+      public with_signature<transposer_code_generator<ISA>,
+                            void(float* Out, float const* In)>
 {
 private:
     static constexpr int vector_size = isa_traits<ISA>::vector_size;
@@ -833,13 +835,13 @@ public:
     }
 };
 
-#ifndef DABUN_HEADER_ONLY
+#    ifndef DABUN_HEADER_ONLY
 
 extern template class transposer_code_generator<avx2>;
 extern template class transposer_code_generator<avx2_plus>;
 extern template class transposer_code_generator<avx512>;
 
-#endif
+#    endif
 
 } // namespace x86
 } // namespace dabun
