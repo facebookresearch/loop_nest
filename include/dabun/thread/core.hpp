@@ -27,7 +27,8 @@ constexpr std::size_t hardware_destructive_interference_size  = 64;
 template <class T>
 struct hardware_constructive_interference_padding
 {
-    char padding[hardware_constructive_interference_size - sizeof(T)] = {'\0'};
+    char padding[hardware_constructive_interference_size -
+                 sizeof(T)]; // = {'\0'};
 };
 
 } // namespace dabun::thread

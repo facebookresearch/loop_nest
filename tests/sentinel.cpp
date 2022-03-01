@@ -1,4 +1,5 @@
-#include "dabun/thread/operating_cpu_set.hpp"
+#include "dabun/thread/cpu_pool.hpp"
+#include "dabun/thread/parallel_for.hpp"
 
 #include <catch2/catch.hpp>
 #include <iostream>
@@ -24,11 +25,13 @@ TEST_CASE("Factorials of 1 and higher are computed (pass)", "[single-file]")
 
 TEST_CASE("Random threaded test", "[single-file]")
 {
-    dabun::thread::operating_cpu_set oset({0, 1, 5, 12, 18});
-    // int                              i;
-    // std::cin >> i;
-    // std::cout << "Was sleeping? "
-    //           << (oset.set_sleeping_mode(true) ? " Yes" : "No") << std::endl;
+    // dabun::thread::cpu_pool oset({0, 1, 5, 12, 18});
+    dabun::thread::cpu_pool oset(10);
+    //  int                              i;
+    //  std::cin >> i;
+    //  std::cout << "Was sleeping? "
+    //            << (oset.set_sleeping_mode(true) ? " Yes" : "No") <<
+    //            std::endl;
 
     // std::cin >> i;
 
@@ -43,6 +46,45 @@ TEST_CASE("Random threaded test", "[single-file]")
     //     oset.set_sleeping_mode(x);
     // }
 
-    int i;
-    std::cin >> i;
+    int const len = 100000000;
+
+    {
+        std::vector<int> all_zeros(len);
+
+        dabun::thread::naive_parallel_for(oset, 0, len, 1,
+                                          [&](int idx) { all_zeros[idx] = 1; });
+
+        REQUIRE(std::accumulate(all_zeros.begin(), all_zeros.end(), 0) == len);
+    }
+
+    {
+        std::vector<int> all_zeros(len);
+
+        dabun::thread::single_queue_parallel_for(
+            oset, 0, len, 1, [&](int idx) { all_zeros[idx] = 1; });
+
+        REQUIRE(std::accumulate(all_zeros.begin(), all_zeros.end(), 0) == len);
+    }
+
+    std::atomic<int> zi{0};
+
+    oset.execute_on_all_cpus(
+        [&]()
+        {
+            while (zi.fetch_add(1) < len)
+            {
+            }
+        });
+
+    REQUIRE(zi.load() == len + oset.size());
+
+    std::cout
+        << std::alignment_of_v<
+               dabun::detail::primitive_aligned_wrapper<int, 1024>> << "\n\n";
+
+    std::cout << sizeof(dabun::detail::primitive_aligned_wrapper<int, 1024>)
+              << "\n\n";
+
+    // int i;
+    // std::cin >> i;
 }
