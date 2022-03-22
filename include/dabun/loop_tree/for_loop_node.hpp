@@ -17,6 +17,7 @@ private:
 
     std::string var;
     int         delta;
+    bool        is_parallel;
 
     std::set<std::string> in_scope_tensor_names;
     std::set<std::string> in_scope_output_tensor_names;
@@ -83,6 +84,40 @@ private:
         };
     }
 
+    std::function<void(std::vector<Arithmetic*>&,
+                       std::vector<Arithmetic*> const&, int)>
+    get_tensor_advancer_setter(std::map<std::string, int> const& tensors_idx,
+                               std::set<std::string> const& tensor_names) const
+    {
+        std::vector<std::pair<int, std::int64_t>> to_advance;
+
+        for (auto const& name : tensor_names)
+        {
+            if (in_scope_tensor_strides.at(name).count(var))
+            {
+                std::int64_t offset =
+                    in_scope_tensor_strides.at(name).at(var) * delta;
+                if (offset != 0)
+                {
+                    int idx = tensors_idx.at(name);
+                    to_advance.push_back({idx, offset});
+                }
+            }
+        }
+
+        return [to_advance](std::vector<Arithmetic*>&       tensors_out,
+                            std::vector<Arithmetic*> const& tensors_in,
+                            int                             delta = 1)
+        {
+            std::copy(tensors_in.begin(), tensors_in.end(),
+                      tensors_out.begin());
+            for (auto const& p : to_advance)
+            {
+                tensors_out[p.first] += p.second * delta;
+            }
+        };
+    }
+
     std::function<void(std::vector<int>&, int)>
     get_alpha_offsets_adjuster(std::map<std::string, int> const& tensors_idx,
                                std::set<std::string> const& output_tensor_names,
@@ -94,11 +129,27 @@ private:
         {
             if (formulas.count(name) && formulas.at(name).count(var) == 0)
             {
+                strong_assert(!is_parallel);
                 // reduction variable, so adjust the tensor's alpha
                 to_adjust.push_back(tensors_idx.at(name));
             }
         }
 
+        // if (is_parallel)
+        // {
+        //     return [to_adjust](std::vector<int>& alpha_offsets, int
+        //     adjustment)
+        //     {
+        //         for (auto const& idx : to_adjust)
+        //         {
+        //             std::atomic_fetch_add_explicit(&alpha_offsets[idx],
+        //                                            adjustment,
+        //                                            std::memory_order_relaxed);
+        //         }
+        //     };
+        // }
+        // else
+        // {
         return [to_adjust](std::vector<int>& alpha_offsets, int adjustment)
         {
             for (auto const& idx : to_adjust)
@@ -106,6 +157,7 @@ private:
                 alpha_offsets[idx] += adjustment;
             }
         };
+        // }
     }
 
 public:
@@ -113,10 +165,12 @@ public:
     int                get_delta() const { return delta; }
 
     for_loop_node(std::string var, int delta,
-                  std::vector<node_ptr<VEX, Arithmetic>> const& children)
+                  std::vector<node_ptr<VEX, Arithmetic>> const& children,
+                  bool is_parallel_for = false)
         : super_type(node_kind::for_loop)
         , var(var)
         , delta(delta)
+        , is_parallel(is_parallel_for)
     {
         this->set_children(children);
         set_in_scope_tensor_info();
@@ -191,45 +245,76 @@ public:
 
         auto tensor_advancer =
             get_tensor_advancer(tensors_idx, get_tensors_used());
+        auto tensor_advancer_setter =
+            get_tensor_advancer_setter(tensors_idx, get_tensors_used());
         auto alpha_offsets_adjuster = get_alpha_offsets_adjuster(
             tensors_idx, get_output_tensors(), formulas);
 
         LN_LOG(DEBUG) << "loop_tree: Executing interpreted for(" << var << ","
                       << delta << ")\n";
-
-        return {[full, full_fns, tensor_advancer, alpha_offsets_adjuster,
-                 tail_fns](std::vector<Arithmetic*>& tensors,
-                           std::vector<int>&         alpha_offsets)
-                {
-                    for (int i = 0; i < full; ++i)
+        if (is_parallel)
+        {
+            return {[full, full_fns, tensor_advancer, alpha_offsets_adjuster,
+                     tail_fns](std::vector<Arithmetic*>& tensors,
+                               std::vector<int>&         alpha_offsets)
                     {
-                        for (auto const& fn : full_fns)
+                        for (int i = 0; i < full; ++i)
+                        {
+                            for (auto const& fn : full_fns)
+                            {
+                                fn(tensors, alpha_offsets);
+                            }
+                            tensor_advancer(tensors, 1);
+                            alpha_offsets_adjuster(alpha_offsets, 1);
+                        }
+
+                        for (auto const& fn : tail_fns)
                         {
                             fn(tensors, alpha_offsets);
                         }
-                        tensor_advancer(tensors, 1);
-                        alpha_offsets_adjuster(alpha_offsets, 1);
-                    }
 
-                    for (auto const& fn : tail_fns)
+                        tensor_advancer(tensors, -full);
+                        alpha_offsets_adjuster(alpha_offsets, -full);
+                    },
+                    report};
+        }
+        else
+        {
+            return {[full, full_fns, tensor_advancer, alpha_offsets_adjuster,
+                     tail_fns](std::vector<Arithmetic*>& tensors,
+                               std::vector<int>&         alpha_offsets)
                     {
-                        fn(tensors, alpha_offsets);
-                    }
+                        for (int i = 0; i < full; ++i)
+                        {
+                            for (auto const& fn : full_fns)
+                            {
+                                fn(tensors, alpha_offsets);
+                            }
+                            tensor_advancer(tensors, 1);
+                            alpha_offsets_adjuster(alpha_offsets, 1);
+                        }
 
-                    tensor_advancer(tensors, -full);
-                    alpha_offsets_adjuster(alpha_offsets, -full);
-                },
-                report};
+                        for (auto const& fn : tail_fns)
+                        {
+                            fn(tensors, alpha_offsets);
+                        }
+
+                        tensor_advancer(tensors, -full);
+                        alpha_offsets_adjuster(alpha_offsets, -full);
+                    },
+                    report};
+        }
     }
 };
 
 template <extension VEX, class Arithmetic>
 node_ptr<VEX, Arithmetic>
 make_for_loop_node(std::string var, int delta,
-                   std::vector<node_ptr<VEX, Arithmetic>> const& children)
+                   std::vector<node_ptr<VEX, Arithmetic>> const& children,
+                   bool is_parallel = false)
 {
     return node_ptr<VEX, Arithmetic>(
-        new for_loop_node<VEX, Arithmetic>(var, delta, children));
+        new for_loop_node<VEX, Arithmetic>(var, delta, children, is_parallel));
 }
 
 } // namespace loop_tree
