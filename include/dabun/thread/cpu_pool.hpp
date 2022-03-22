@@ -23,6 +23,11 @@
 namespace dabun::thread
 {
 
+struct cpu_context
+{
+    std::size_t cpu_index;
+};
+
 class thread_owner_enforcer
 {
 private:
@@ -49,6 +54,7 @@ private:
     cpu_set               original_cpu_set_;
     bool                  restore_original_cpu_set_ = false;
     thread_owner_enforcer enforcer_;
+    cpu_context           zeroth_cpu_context_{0};
 
     alignas(hardware_destructive_interference_size)
         spinning_barrier spinning_barrier_;
@@ -57,13 +63,14 @@ private:
         default_barrier sleeping_barrier_;
 
     alignas(hardware_destructive_interference_size)
-        std::function<void()> const* tasks_ = nullptr;
-    std::size_t tasks_size_                 = 0;
+        std::function<void(cpu_context const&)> const* tasks_ = nullptr;
+    std::size_t tasks_size_                                   = 0;
 
-    alignas(hardware_destructive_interference_size) std::function<void()> const
-        sleep_function_;
+    alignas(hardware_destructive_interference_size)
+        std::function<void(cpu_context const&)> const sleep_function_;
 
-    std::vector<std::function<void()>> const sleep_function_tasks_;
+    std::vector<std::function<void(cpu_context const&)>> const
+        sleep_function_tasks_;
 
     alignas(hardware_destructive_interference_size) bool is_sleeping_ = false;
 
@@ -73,6 +80,8 @@ private:
         {
             bind_to_core(*cpu_id);
         }
+
+        cpu_context working_cpu_context = {idx};
 
         // Signal to the constructor that we are done initializing
         spinning_barrier_.arrive_and_wait();
@@ -95,13 +104,13 @@ private:
             {
                 if (tasks_size_ == all_execute_the_same)
                 {
-                    tasks_[0]();
+                    tasks_[0](working_cpu_context);
                 }
                 else
                 {
                     for (std::size_t i = idx; i < tasks_size_; i += size_)
                     {
-                        tasks_[i]();
+                        tasks_[i](working_cpu_context);
                     }
                 }
             }
@@ -165,7 +174,7 @@ private:
         , spinning_barrier_(size_)
         , sleeping_barrier_(size_)
         , tasks_(nullptr)
-        , sleep_function_([this]()
+        , sleep_function_([this](cpu_context const&)
                           { this->sleeping_barrier_.arrive_and_wait(); })
         , sleep_function_tasks_(size_, sleep_function_)
     {
@@ -270,8 +279,8 @@ public:
 
     bool in_sleeping_mode() const { return !is_sleeping_; }
 
-    void execute(std::function<void()> const* tasks,
-                 std::size_t const            tasks_size)
+    void execute(std::function<void(cpu_context const&)> const* tasks,
+                 std::size_t const                              tasks_size)
     {
         enforcer_.enforce();
 
@@ -287,7 +296,7 @@ public:
 
         for (std::size_t i = 0; i < tasks_size_; i += size_)
         {
-            tasks[i]();
+            tasks[i](zeroth_cpu_context_);
         }
 
         spinning_barrier_.arrive_and_wait();
@@ -298,7 +307,8 @@ public:
         set_sleeping_mode(was_sleeping);
     }
 
-    void execute_on_all_cpus(std::function<void()> const& task)
+    void
+    execute_on_all_cpus(std::function<void(cpu_context const&)> const& task)
     {
         enforcer_.enforce();
 
@@ -312,7 +322,7 @@ public:
 
         spinning_barrier_.arrive_and_wait();
 
-        task();
+        task(zeroth_cpu_context_);
 
         spinning_barrier_.arrive_and_wait();
 
@@ -324,18 +334,23 @@ public:
 
     // template <class Fn>
     // auto execute_on_all_cpus(Fn&& task) -> std::enable_if<
-    //     !std::is_same_v<std::function<void()>, std::decay_t<Fn>> &&
-    //     std::is_convertible_v<std::decay_t<Fn>, std::function<void()>>>
+    //     !std::is_same_v<std::function<void(cpu_context const&)>,
+    //     std::decay_t<Fn>> && std::is_convertible_v<std::decay_t<Fn>,
+    //     std::function<void(cpu_context const&)>>>
     // {
-    //     std::function<void()> fn = std::forward<Fn>(task);
+    //     std::function<void(cpu_context const&)> fn = std::forward<Fn>(task);
     //     execute_on_all_cpus(fn);
 
     //     return {};
     // }
 
-    void execute(std::function<void()> const* tasks) { execute(tasks, size_); }
+    void execute(std::function<void(cpu_context const&)> const* tasks)
+    {
+        execute(tasks, size_);
+    }
 
-    void execute(std::vector<std::function<void()>> const& tasks)
+    void
+    execute(std::vector<std::function<void(cpu_context const&)>> const& tasks)
     {
         execute(tasks.data(), tasks.size());
     }

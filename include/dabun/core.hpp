@@ -4,6 +4,8 @@
 
 #include <cstring>
 #include <stdexcept>
+#include <type_traits>
+#include <utility>
 
 #define DABUN_STRINGIFY_0(s) #s
 #define DABUN_STRINGIFY(s) DABUN_STRINGIFY_0(s)
@@ -85,5 +87,11 @@ bit_cast(const From& src) noexcept
     std::memcpy(&dst, &src, sizeof(To));
     return dst;
 }
+
+#define DABUN_OP_RESULT_TYPE(OP, T1, T2)                                       \
+    decltype(std::declval<std::decay_t<T1>>()                                  \
+                 OP std::declval<std::decay_t<T2>>())
+
+#define DABUN_ALWAYS_INLINE __attribute__((always_inline)) inline
 
 } // namespace dabun

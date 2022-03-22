@@ -3,6 +3,8 @@
 #pragma once
 
 #include "dabun/core.hpp"
+
+#include <tuple>
 #include <type_traits>
 
 namespace dabun
@@ -18,6 +20,13 @@ template <typename T>
 constexpr inline T round_up(T a, identity_type_t<T> b) noexcept
 {
     return ceil_div(a, b) * b;
+}
+
+template <typename T>
+constexpr inline std::tuple<T, T> full_rest(T                  total,
+                                            identity_type_t<T> delta) noexcept
+{
+    return {total / delta, total % delta};
 }
 
 // Equals to the number of iterations of the loop

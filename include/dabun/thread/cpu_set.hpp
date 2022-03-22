@@ -4,7 +4,7 @@
 
 #include <boost/predef.h>
 
-#if defined(BOOST_OS_LINUX)
+#if !defined(__APPLE__)
 
 #    include "dabun/core.hpp"
 #    include <memory>

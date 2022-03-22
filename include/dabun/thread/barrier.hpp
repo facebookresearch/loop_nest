@@ -27,7 +27,9 @@ private:
     alignas(hardware_constructive_interference_size)
         std::atomic<std::size_t> generation{0};
 
-    hardware_constructive_interference_padding<std::atomic<std::size_t>> pad;
+    // [[maybe_unused]] hardware_constructive_interference_padding<
+    //     std::atomic<std::size_t>>
+    //     pad;
 
 public:
     explicit spinning_barrier(std::size_t threshold)

@@ -17,7 +17,7 @@
 #include "dabun/serialization.hpp"
 #include "dabun/transposer.hpp"
 
-#include "dabun/loop_tree/node.hpp"
+#include "dabun/loop_tree/all_nodes.hpp"
 #include "dabun/loop_tree/types.hpp"
 #include "dabun/loop_tree/utility.hpp"
 
