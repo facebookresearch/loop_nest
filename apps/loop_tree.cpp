@@ -62,9 +62,9 @@ int main()
        ----------> Definition
        */
 
-        int ArCr = 100;
-        int AcBr = 100;
-        int BcCc = 100;
+        int ArCr = 128;
+        int AcBr = 128;
+        int BcCc = 128;
 
         std::map<std::string, int> sizes = {
             {"ArCr", ArCr}, {"AcBr", AcBr}, {"BcCc", BcCc}};
@@ -116,7 +116,8 @@ int main()
         auto root = make_for_loop_node<DABUN_VEX, DABUN_ARITHMETIC>(
             "BcCc", 1,
             {make_for_loop_node<DABUN_VEX, DABUN_ARITHMETIC>("AcBr", 1,
-                                                             {tr, ln})});
+                                                             {tr, ln})},
+            true);
 
         auto tree = make_loop_tree_program<DABUN_VEX, DABUN_ARITHMETIC>(
             {root}, sizes, formulas, MAX_INTERPRETED_DEPTH);
@@ -144,6 +145,7 @@ int main()
                                                    {"B1", B1.data()},
                                                    {"B2", B2.data()}};
 
+        // while (1)
         fn(tensors);
 
         std::cout << "MAXABSDIFF: "

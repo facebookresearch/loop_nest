@@ -55,7 +55,7 @@ public:
 
     void clr(int cpu) { CPU_CLR(cpu, handle.get()); }
 
-    bool isset(int cpu) const { return CPU_ISSET(cpu, handle.get()); }
+    bool is_set(int cpu) const { return CPU_ISSET(cpu, handle.get()); }
 
     int count() const { return CPU_COUNT(handle.get()); }
 
@@ -136,7 +136,7 @@ public:
 
     void clr(int cpu) { handle->set(cpu, false); }
 
-    bool isset(int cpu) const { return handle->test(cpu); }
+    bool is_set(int cpu) const { return handle->test(cpu); }
 
     int count() const { return handle->count(); }
 

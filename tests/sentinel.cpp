@@ -145,7 +145,7 @@ TEST_CASE("Random threaded test", "[single-file]")
 
         // }
 
-
+        std::cout << "HWC: " << std::thread::hardware_concurrency() << "\n";
 
     }
 }

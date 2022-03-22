@@ -3,11 +3,20 @@
 #pragma once
 
 #include "dabun/loop_tree/node.hpp"
+#include "dabun/thread/parallel_for.hpp"
 
 namespace dabun
 {
 namespace loop_tree
 {
+
+inline auto get_working_cpu_pool()
+{
+    static auto pool = std::make_shared<thread::cpu_pool>(
+        std::thread::hardware_concurrency() / 2, true);
+    // static auto pool = std::make_shared<thread::cpu_pool>(2);
+    return pool;
+}
 
 template <extension VEX, class Arithmetic>
 class for_loop_node : public node<VEX, Arithmetic>
@@ -75,8 +84,7 @@ private:
             }
         }
 
-        return [to_advance](std::vector<Arithmetic*>& tensors, int delta = 1)
-        {
+        return [to_advance](std::vector<Arithmetic*>& tensors, int delta = 1) {
             for (auto const& p : to_advance)
             {
                 tensors[p.first] += p.second * delta;
@@ -107,8 +115,8 @@ private:
 
         return [to_advance](std::vector<Arithmetic*>&       tensors_out,
                             std::vector<Arithmetic*> const& tensors_in,
-                            int                             delta = 1)
-        {
+                            int                             delta = 1) {
+            tensors_out.resize(tensors_in.size());
             std::copy(tensors_in.begin(), tensors_in.end(),
                       tensors_out.begin());
             for (auto const& p : to_advance)
@@ -129,6 +137,10 @@ private:
         {
             if (formulas.count(name) && formulas.at(name).count(var) == 0)
             {
+                if (!is_parallel)
+                {
+                    std::cout << "NP: " << var << "\n";
+                }
                 strong_assert(!is_parallel);
                 // reduction variable, so adjust the tensor's alpha
                 to_adjust.push_back(tensors_idx.at(name));
@@ -150,19 +162,27 @@ private:
         // }
         // else
         // {
-        return [to_adjust](std::vector<int>& alpha_offsets, int adjustment)
+        if (to_adjust.size())
         {
-            for (auto const& idx : to_adjust)
-            {
-                alpha_offsets[idx] += adjustment;
-            }
-        };
+            return
+                [to_adjust](std::vector<int>& alpha_offsets, int adjustment) {
+                    for (auto const& idx : to_adjust)
+                    {
+                        alpha_offsets[idx] += adjustment;
+                    }
+                };
+        }
+        else
+        {
+            return [](std::vector<int>&, int) {};
+        }
         // }
     }
 
 public:
     std::string const& get_var() const { return var; }
     int                get_delta() const { return delta; }
+    bool               is_parallel_for() const { return is_parallel; }
 
     for_loop_node(std::string var, int delta,
                   std::vector<node_ptr<VEX, Arithmetic>> const& children,
@@ -252,29 +272,50 @@ public:
 
         LN_LOG(DEBUG) << "loop_tree: Executing interpreted for(" << var << ","
                       << delta << ")\n";
+
         if (is_parallel)
         {
-            return {[full, full_fns, tensor_advancer, alpha_offsets_adjuster,
+            auto per_iteration_tensors_ptr =
+                std::make_shared<std::vector<std::vector<Arithmetic*>>>(
+                    full + (rest ? 1 : 0));
+
+            return {[full, rest, full_fns, tensor_advancer_setter,
+                     per_iteration_tensors_ptr,
                      tail_fns](std::vector<Arithmetic*>& tensors,
-                               std::vector<int>&         alpha_offsets)
-                    {
-                        for (int i = 0; i < full; ++i)
-                        {
-                            for (auto const& fn : full_fns)
+                               std::vector<int>&         alpha_offsets) {
+                        auto& per_iteration_tensors =
+                            *per_iteration_tensors_ptr;
+
+                        auto cp = get_working_cpu_pool();
+
+                        auto task = [&](auto const&, int i) {
+                                        // std::cout << "TASK: " << i << std::endl;
+                            tensor_advancer_setter(per_iteration_tensors[i],
+                                                   tensors, i);
+
+                            if (i == full && tail_fns.size())
                             {
-                                fn(tensors, alpha_offsets);
+                                for (auto const& fn : tail_fns)
+                                {
+                                    fn(per_iteration_tensors[i], alpha_offsets);
+                                }
                             }
-                            tensor_advancer(tensors, 1);
-                            alpha_offsets_adjuster(alpha_offsets, 1);
-                        }
+                            else
+                            {
+                                for (auto const& fn : full_fns)
+                                {
+                                    fn(per_iteration_tensors[i], alpha_offsets);
+                                }
+                            }
+                        };
 
-                        for (auto const& fn : tail_fns)
-                        {
-                            fn(tensors, alpha_offsets);
-                        }
+                        // for (int i = 0; i < (full + (rest ? 1 : 0)); ++i)
+                        // {
+                        //     task(0, i);
+                        // }
 
-                        tensor_advancer(tensors, -full);
-                        alpha_offsets_adjuster(alpha_offsets, -full);
+                        thread::naive_parallel_for(
+                            *cp, 0, full + (rest ? 1 : 0), 1, task);
                     },
                     report};
         }
@@ -282,8 +323,7 @@ public:
         {
             return {[full, full_fns, tensor_advancer, alpha_offsets_adjuster,
                      tail_fns](std::vector<Arithmetic*>& tensors,
-                               std::vector<int>&         alpha_offsets)
-                    {
+                               std::vector<int>&         alpha_offsets) {
                         for (int i = 0; i < full; ++i)
                         {
                             for (auto const& fn : full_fns)

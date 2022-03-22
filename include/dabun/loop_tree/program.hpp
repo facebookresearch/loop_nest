@@ -124,6 +124,12 @@ simplify_loop_nests(node_ptr<VEX, Arithmetic> const& node,
 
     auto for_node =
         std::dynamic_pointer_cast<for_loop_node<VEX, Arithmetic>>(node);
+
+    if (for_node->is_parallel_for())
+    {
+        return node;
+    }
+
     node_ptr<VEX, Arithmetic> single_child = new_children.at(0);
 
     switch (single_child->kind())
