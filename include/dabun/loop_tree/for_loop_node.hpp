@@ -12,9 +12,9 @@ namespace loop_tree
 
 inline auto get_working_cpu_pool()
 {
-    static auto pool = std::make_shared<thread::cpu_pool>(
-        std::thread::hardware_concurrency() / 2, true);
-    // static auto pool = std::make_shared<thread::cpu_pool>(2);
+    // static auto pool = std::make_shared<thread::cpu_pool>(
+    //     std::thread::hardware_concurrency() / 2, true);
+    static auto pool = std::make_shared<thread::cpu_pool>(2);
     return pool;
 }
 
@@ -105,6 +105,10 @@ private:
             {
                 std::int64_t offset =
                     in_scope_tensor_strides.at(name).at(var) * delta;
+
+                std::cout << "Tensor " << name << " advances var: " << var
+                          << " by " << offset << "\n";
+
                 if (offset != 0)
                 {
                     int idx = tensors_idx.at(name);
@@ -289,7 +293,7 @@ public:
                         auto cp = get_working_cpu_pool();
 
                         auto task = [&](auto const&, int i) {
-                                        // std::cout << "TASK: " << i << std::endl;
+                            // std::cout << "TASK: " << i << std::endl;
                             tensor_advancer_setter(per_iteration_tensors[i],
                                                    tensors, i);
 
@@ -309,7 +313,11 @@ public:
                             }
                         };
 
-                        // for (int i = 0; i < (full + (rest ? 1 : 0)); ++i)
+                        // for (int i = 0; i < (full + (rest ? 1 : 0)); i += 2)
+                        // {
+                        //     task(0, i);
+                        // }
+                        // for (int i = 1; i < (full + (rest ? 1 : 0)); i += 2)
                         // {
                         //     task(0, i);
                         // }

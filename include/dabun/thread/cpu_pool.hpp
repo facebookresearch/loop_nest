@@ -143,7 +143,7 @@ private:
 
         // Makes no sense to have a operating set with less than 2 workers.
         // TODO(zi) Special pathway for operating set with only one worker.
-        strong_assert(size() > 1);
+        // strong_assert(size() > 1);
 
         for (std::size_t idx = 1; idx < size(); ++idx)
         {
