@@ -12,29 +12,38 @@
 namespace dabun::tests::baseline
 {
 
-std::function<void(float *, float const *, float const *, int)>
-slow_loop_nest_baseline(std::vector<std::pair<std::string, int>> const &order,
-                        std::map<std::string, int> const               &sizes,
-                        std::set<std::string> const &C_formula,
-                        std::set<std::string> const & /*A_formula*/,
-                        std::set<std::string> const & /*B_formula*/,
-                        std::map<std::string, int> const &C_strides,
-                        std::map<std::string, int> const &A_strides,
-                        std::map<std::string, int> const &B_strides,
-                        bool                              perform_relu = false)
+std::function<void(
+    float*, float const*, float const*,
+    int)> inline slow_loop_nest_baseline(std::vector<std::pair<std::string,
+                                                               int>> const&
+                                             order,
+                                         std::map<std::string, int> const&
+                                                                      sizes,
+                                         std::set<std::string> const& C_formula,
+                                         std::set<
+                                             std::string> const& /*A_formula*/,
+                                         std::set<
+                                             std::string> const& /*B_formula*/,
+                                         std::map<std::string, int> const&
+                                             C_strides,
+                                         std::map<std::string, int> const&
+                                             A_strides,
+                                         std::map<std::string, int> const&
+                                              B_strides,
+                                         bool perform_relu = false)
 {
-    return [=](float *Cptr, float const *Aptr, float const *Bptr, int alpha)
+    return [=](float* Cptr, float const* Aptr, float const* Bptr, int alpha)
     {
         std::map<std::string, std::vector<int>> limits;
-        for (auto const &s : sizes)
+        for (auto const& s : sizes)
         {
             limits[s.first].push_back(s.second);
         }
 
         if (alpha == 0)
         {
-            std::function<void(float *, int)> recursive_zeroing =
-                [&](float *C, int order_depth)
+            std::function<void(float*, int)> recursive_zeroing =
+                [&](float* C, int order_depth)
             {
                 if (order_depth == order.size())
                 {
@@ -77,9 +86,9 @@ slow_loop_nest_baseline(std::vector<std::pair<std::string, int>> const &order,
             recursive_zeroing(Cptr, 0);
         }
 
-        std::function<void(float *, float const *, float const *, int)>
+        std::function<void(float*, float const*, float const*, int)>
             recursive_compute =
-                [&](float *C, float const *A, float const *B, int order_depth)
+                [&](float* C, float const* A, float const* B, int order_depth)
         {
             if (order_depth == order.size())
             {
@@ -116,8 +125,8 @@ slow_loop_nest_baseline(std::vector<std::pair<std::string, int>> const &order,
 
         if (perform_relu)
         {
-            std::function<void(float *, int)> recursive_relu =
-                [&](float *C, int order_depth)
+            std::function<void(float*, int)> recursive_relu =
+                [&](float* C, int order_depth)
             {
                 if (order_depth == order.size())
                 {
@@ -163,30 +172,32 @@ slow_loop_nest_baseline(std::vector<std::pair<std::string, int>> const &order,
 }
 
 // Slightly optimized version for faster testing (10x faster)
-std::function<void(float *, float const *, float const *, int)>
-loop_nest_baseline(std::vector<std::pair<std::string, int>> const &order,
-                   std::map<std::string, int> const               &sizes,
-                   std::set<std::string> const                    &C_formula,
-                   std::set<std::string> const & /*A_formula*/,
-                   std::set<std::string> const & /*B_formula*/,
-                   std::map<std::string, int> const &C_strides,
-                   std::map<std::string, int> const &A_strides,
-                   std::map<std::string, int> const &B_strides,
-                   bool                              perform_relu = false)
+std::function<void(
+    float*, float const*, float const*,
+    int)> inline loop_nest_baseline(std::vector<std::pair<std::string,
+                                                          int>> const& order,
+                                    std::map<std::string, int> const&  sizes,
+                                    std::set<std::string> const& C_formula,
+                                    std::set<std::string> const& /*A_formula*/,
+                                    std::set<std::string> const& /*B_formula*/,
+                                    std::map<std::string, int> const& C_strides,
+                                    std::map<std::string, int> const& A_strides,
+                                    std::map<std::string, int> const& B_strides,
+                                    bool perform_relu = false)
 {
     // Just optimizing out the map lookups.
 
     std::map<std::string, int> var_to_id;
 
     int next = 0;
-    for (auto const &s : sizes)
+    for (auto const& s : sizes)
     {
         var_to_id[s.first] = next++;
     }
 
     std::vector<int> initial_limits(next);
 
-    for (auto const &s : sizes)
+    for (auto const& s : sizes)
     {
         initial_limits[var_to_id[s.first]] = s.second;
     }
@@ -216,7 +227,7 @@ loop_nest_baseline(std::vector<std::pair<std::string, int>> const &order,
     std::vector<int> init_len;
     std::vector<int> init_C_strides;
 
-    for (auto const &s : sizes)
+    for (auto const& s : sizes)
     {
         if (C_formula.count(s.first) > 0)
         {
@@ -225,14 +236,14 @@ loop_nest_baseline(std::vector<std::pair<std::string, int>> const &order,
         }
     }
 
-    return [=](float *Cptr, float const *Aptr, float const *Bptr, int alpha)
+    return [=](float* Cptr, float const* Aptr, float const* Bptr, int alpha)
     {
         auto limits = initial_limits;
 
         if (alpha == 0)
         {
-            std::function<void(float *, int)> recursive_zeroing =
-                [&](float *C, int init_depth)
+            std::function<void(float*, int)> recursive_zeroing =
+                [&](float* C, int init_depth)
             {
                 if (init_depth == init_len.size())
                 {
@@ -251,9 +262,9 @@ loop_nest_baseline(std::vector<std::pair<std::string, int>> const &order,
             recursive_zeroing(Cptr, 0);
         }
 
-        std::function<void(float *, float const *, float const *, int)>
+        std::function<void(float*, float const*, float const*, int)>
             recursive_compute =
-                [&](float *C, float const *A, float const *B, int order_depth)
+                [&](float* C, float const* A, float const* B, int order_depth)
         {
             if (order_depth == order_ids.size())
             {
@@ -290,8 +301,8 @@ loop_nest_baseline(std::vector<std::pair<std::string, int>> const &order,
 
         if (perform_relu)
         {
-            std::function<void(float *, int)> recursive_relu =
-                [&](float *C, int init_depth)
+            std::function<void(float*, int)> recursive_relu =
+                [&](float* C, int init_depth)
             {
                 if (init_depth == init_len.size())
                 {
