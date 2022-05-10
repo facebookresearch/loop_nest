@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.15.0)
 
 add_subdirectory(extern/Catch2)
 
-SET (CMAKE_CXX_COMPILER             "/usr/bin/clang++")
+#SET (CMAKE_CXX_COMPILER             "/usr/bin/clang++")
 
 project(dabun
   LANGUAGES CXX
