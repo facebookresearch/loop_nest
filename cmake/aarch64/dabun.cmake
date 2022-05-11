@@ -13,5 +13,8 @@ target_include_directories(${PROJECT_NAME}
 target_include_directories(${PROJECT_NAME}
   PUBLIC extern/xbyak_aarch64)
 
+target_include_directories(${PROJECT_NAME}
+  PUBLIC ${Boost_INCLUDE_DIRS})
+
 target_compile_options(dabun
   PRIVATE "-DDABUN_COMPILING_LIBDABUN")
