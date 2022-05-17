@@ -65,7 +65,7 @@
 - [ ] include/dabun/common.hpp
 - [ ] include/dabun/measure.hpp
 - [ ] include/dabun/log.hpp
-- [ ] include/dabun/peak_gflops.ipp
+- [x] include/dabun/peak_gflops.ipp
 - [ ] include/dabun/loop_nest.hpp
 - [ ] include/dabun/thread/barrier.hpp
 - [ ] include/dabun/thread/semi_dynamic_task_queue.hpp
@@ -92,3 +92,10 @@
 - [ ] include/dabun/utility/for_all.hpp
 - [ ] include/dabun/utility/vek.hpp
 - [ ] include/dabun/utility/array.hpp
+
+## Cleanup of src/
+
+- [ ] src/loop_nest.cpp
+- [ ] src/transposer.cpp
+- [ ] src/x86/multi_vmm.cpp
+- [ ] src/peak_gflops.cpp
