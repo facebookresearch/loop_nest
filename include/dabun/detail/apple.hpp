@@ -1,15 +1,14 @@
 #pragma once
 
-// From: https://github.com/herumi/xbyak/blob/master/xbyak/xbyak.h
-
 #if defined(__APPLE__)
 
-#include <cstdlib>
-#include <sys/sysctl.h>
+#    include <cstddef>
+#    include <cstdlib>
+#    include <sys/sysctl.h>
 
-#ifndef MAP_JIT
-#define MAP_JIT 0x800
-#endif
+#    ifndef MAP_JIT
+#        define MAP_JIT 0x800
+#    endif
 
 namespace dabun
 {
@@ -18,27 +17,31 @@ namespace detail
 
 inline constexpr int mojave_version = 18;
 
-inline int get_macOS_version_pure()
-{
-    char   buf[64];
-    size_t size = sizeof(buf);
-    int    err  = sysctlbyname("kern.osrelease", buf, &size, NULL, 0);
-    if (err != 0)
-    {
-        return 0;
-    }
-    char* endp;
-    int   major = strtol(buf, &endp, 10);
-    if (*endp != '.')
-    {
-        return 0;
-    }
-    return major;
-}
-
 inline int get_macOS_version()
 {
-    static const int version = get_macOS_version_pure();
+    static const int version = []()
+    {
+        char        buffer[64];
+        std::size_t size = sizeof(buffer);
+
+        if (auto err =
+                sysctlbyname("kern.osrelease", buffer, &size, nullptr, 0);
+            err != 0)
+        {
+            return 0;
+        }
+
+        char* endp = nullptr;
+
+        int ver_major = std::strtol(buffer, &endp, 10);
+
+        if (*endp != '.')
+        {
+            return 0;
+        }
+        return ver_major;
+    }();
+
     return version;
 }
 
