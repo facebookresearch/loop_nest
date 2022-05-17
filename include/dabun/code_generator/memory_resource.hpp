@@ -15,7 +15,7 @@
 #endif
 
 #if defined(__APPLE__)
-#    include "dabun/detail/apple.hpp"
+#    include "dabun/hask/apple.hpp"
 #endif
 
 namespace dabun
@@ -80,8 +80,7 @@ public:
 #    if defined(__APPLE__)
         int const mode =
             MAP_PRIVATE | MAP_ANONYMOUS |
-            ((detail::get_macOS_version() >= detail::mojave_version ? MAP_JIT
-                                                                    : 0));
+            ((hask::get_macOS_version() >= hask::mojave_version ? MAP_JIT : 0));
 #    else
         int const mode = MAP_PRIVATE | MAP_ANONYMOUS;
 #    endif
@@ -156,7 +155,7 @@ inline memory_resource* memory_resource::default_resource()
 
 #if defined(__APPLE__)
     static mmap_memory_resource mmap_resource;
-    if (detail::get_macOS_version() >= detail::mojave_version)
+    if (hask::get_macOS_version() >= hask::mojave_version)
     {
         return &mmap_resource;
     }

@@ -1,3 +1,8 @@
+// Copyright (c) Meta Platforms, Inc. and affiliates. All Rights Reserved.
+//
+// This source code is licensed under the MIT license found in the
+// LICENSE file in the root directory of this source tree.
+
 #pragma once
 
 #if defined(__APPLE__)
@@ -10,9 +15,7 @@
 #        define MAP_JIT 0x800
 #    endif
 
-namespace dabun
-{
-namespace detail
+namespace dabun::hask
 {
 
 inline constexpr int mojave_version = 18;
@@ -45,7 +48,6 @@ inline int get_macOS_version()
     return version;
 }
 
-} // namespace detail
-} // namespace dabun
+} // namespace dabun::hask
 
 #endif

@@ -6,6 +6,7 @@
 - [ ] include/dabun/check.hpp
 - [ ] include/dabun/qvec4.hpp
 - [ ] include/dabun/peak_gflops.hpp
+- [ ] include/dabun/peak_gflops.ipp
 - [ ] include/dabun/mpl.hpp
 - [ ] include/dabun/isa.hpp
 - [ ] include/dabun/loop_nest_descriptor.hpp
@@ -19,7 +20,7 @@
 - [ ] include/dabun/intcmp.hpp
 - [ ] include/dabun/code_generator.hpp
 - [ ] include/dabun/detail/most_frequent_queue.hpp
-- [ ] include/dabun/detail/apple.hpp
+- [x] include/dabun/hask/apple.hpp
 - [ ] include/dabun/detail/tmp_file_name.hpp
 - [ ] include/dabun/third_party/half.hpp
 - [ ] include/dabun/third_party/biovault_bfloat16.hpp
