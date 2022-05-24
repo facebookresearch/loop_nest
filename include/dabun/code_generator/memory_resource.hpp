@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "dabun/hask/aligned_alloc.hpp"
+#include <sysml/memory.hpp>
 
 #include <cstddef>
 #include <cstdlib>
@@ -54,7 +54,7 @@ public:
     void* do_allocate_bytes(std::size_t size) final override
     {
         constexpr std::size_t ALIGN_PAGE_SIZE = 4096;
-        return hask::checked_aligned_alloc(ALIGN_PAGE_SIZE, size);
+        return sysml::checked_aligned_alloc(ALIGN_PAGE_SIZE, size);
     }
 
     void do_deallocate_bytes(void* ptr) final override { std::free(ptr); }

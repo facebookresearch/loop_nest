@@ -7,7 +7,7 @@
 - [ ] include/dabun/qvec4.hpp
 - [ ] include/dabun/peak_gflops.hpp
 - [ ] include/dabun/peak_gflops.ipp
-- [ ] include/dabun/mpl.hpp
+- [x] include/dabun/mpl.hpp (removed)
 - [ ] include/dabun/isa.hpp
 - [ ] include/dabun/loop_nest_descriptor.hpp
 - [ ] include/dabun/float.hpp
@@ -37,13 +37,13 @@
 - [ ] include/dabun/x86/denormals.hpp
 - [ ] include/dabun/x86/loop_nest.hpp
 - [ ] include/dabun/elementwise_operation.hpp
-- [ ] include/dabun/hask/aligned_alloc.hpp
-- [ ] include/dabun/hask/miltuple.hpp
+- [x] include/dabun/hask/aligned_alloc.hpp (moved to sysml)
+- [x] include/dabun/hask/miltuple.hpp (moved to sysml)
 - [ ] include/dabun/hask/type_traits.hpp
 - [ ] include/dabun/hask/random.hpp
 - [ ] include/dabun/hask/number_array.hpp
-- [ ] include/dabun/mpl/cond.hpp
-- [ ] include/dabun/mpl/core.hpp
+- [x] include/dabun/mpl/cond.hpp (removed)
+- [x] include/dabun/mpl/core.hpp (removed)
 - [ ] include/dabun/namespace.hpp
 - [ ] include/dabun/one_constant.hpp
 - [ ] include/dabun/bf16x2.hpp
