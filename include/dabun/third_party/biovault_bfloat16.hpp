@@ -77,8 +77,8 @@ namespace biovault {
 			static_assert(sizeof(T) == sizeof(U), "Bit-casting must preserve size.");
 			// Use std::is_pod as older GNU versions do not support
 			// std::is_trivially_copyable.
-			static_assert(std::is_pod<T>::value, "T must be trivially copyable.");
-			static_assert(std::is_pod<U>::value, "U must be trivially copyable.");
+			// static_assert(std::is_pod<T>::value, "T must be trivially copyable.");
+			// static_assert(std::is_pod<U>::value, "U must be trivially copyable.");
 
 			T t;
 			std::memcpy(&t, &u, sizeof(U));

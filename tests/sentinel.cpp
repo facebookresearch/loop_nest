@@ -1,3 +1,7 @@
+#include <sysml/numeric.hpp>
+#include <sysml/type_traits.hpp>
+#include <sysml/numerical_error.hpp>
+
 #include "dabun/thread/cpu_pool.hpp"
 #include "dabun/thread/parallel_for.hpp"
 #include "dabun/utility/for_all.hpp"
@@ -5,6 +9,48 @@
 
 #include <catch2/catch.hpp>
 #include <iostream>
+
+TEST_CASE("ZZZZ", "[single-file]")
+{
+    float a[] = {1.f, 2.f, 3.f, 4.f};
+    float b[] = {1.f, 2.f, 3.f, 4.1f};
+
+    std::cout << sysml::is_any_of_v<int, float, double, short, int> << "\n";
+
+    std::cout << sysml::max_abs_difference(a, a + 4, b) << "\n";
+    std::cout << sysml::max_abs_difference_n(a, 4, b) << "\n";
+}
+
+TEST_CASE("WTF", "[single-file]")
+{
+    sysml::int16x4_t  a(1, 2, 3, 4);
+    sysml::uint16x4_t b(1, 2, 3, 4);
+
+    std::cout << a << "\n";
+    std::cout << b << "\n";
+
+    a += b;
+
+    std::cout << a << "\n";
+
+    a -= b;
+
+    std::cout << a << "\n";
+    std::cout << a * b << "\n";
+    std::cout << -a << "\n";
+
+    // std::cout << sysml::int16x4_t::sign_bitmask << "\n";
+
+    sysml::fp16 z = static_cast<sysml::fp16>(1.3);
+    z             = 3.f;
+
+    // z *= 4;
+
+    std::cout << z << "\n";
+    std::cout << (z < 12.f) << "\n";
+
+    // unsign
+}
 
 int Factorial(int number)
 {
@@ -27,6 +73,7 @@ TEST_CASE("Factorials of 1 and higher are computed (pass)", "[single-file]")
 
 TEST_CASE("Random threaded test", "[single-file]")
 {
+    return;
     // dabun::thread::cpu_pool oset({0, 1, 5, 12, 18});
     dabun::thread::cpu_pool oset(10);
     //  int                              i;
@@ -134,7 +181,6 @@ TEST_CASE("Random threaded test", "[single-file]")
 
         // std::cout << -(end + 3) << "\n";
 
-
         // std::cout << dabun::to_string(-end + 3, ',') << "\n";
 
         // {
@@ -146,6 +192,5 @@ TEST_CASE("Random threaded test", "[single-file]")
         // }
 
         std::cout << "HWC: " << std::thread::hardware_concurrency() << "\n";
-
     }
 }

@@ -2,6 +2,8 @@
 
 #pragma once
 
+#error "Deprecated"
+
 #include <tuple>
 
 namespace dabun::hask

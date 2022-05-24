@@ -15,3 +15,6 @@
 [submodule "extern/cpuinfo"]
 	path = extern/cpuinfo
 	url = https://github.com/pytorch/cpuinfo
+[submodule "extern/libsysml"]
+	path = extern/libsysml
+	url = git@github.com:facebookresearch/libsysml.git

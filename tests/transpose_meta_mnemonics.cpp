@@ -2,9 +2,9 @@
 #include <catch2/catch.hpp>
 
 #include "dabun/code_generator/code_generator.hpp"
-#include "dabun/hask/miltuple.hpp"
 #include "dabun/hask/random.hpp"
 #include "dabun/random_vector.hpp"
+#include "sysml/miltuple.hpp"
 
 #include <tuple>
 #include <utility>
@@ -142,9 +142,9 @@ private:
     }
 
     template <unsigned ElementSize>
-    void transpose_4x4_inplace(dabun::hask::miltuple<VReg const&, 4> const& r,
-                               dabun::hask::miltuple<VReg const&, 2> const& tmp,
-                               vreg_view<ElementSize> vview)
+    void transpose_4x4_inplace(sysml::miltuple<VReg const&, 4> const& r,
+                               sysml::miltuple<VReg const&, 2> const& tmp,
+                               vreg_view<ElementSize>                 vview)
     {
         auto const& [r0, r1, r2, r3] = r;
         auto const& [t0, t1]         = tmp;
@@ -169,9 +169,9 @@ private:
     }
 
     template <unsigned ElementSize>
-    void transpose_8x8_inplace(dabun::hask::miltuple<VReg const&, 8> const& r,
-                               dabun::hask::miltuple<VReg const&, 2> const& tmp,
-                               vreg_view<ElementSize> vview)
+    void transpose_8x8_inplace(sysml::miltuple<VReg const&, 8> const& r,
+                               sysml::miltuple<VReg const&, 2> const& tmp,
+                               vreg_view<ElementSize>                 vview)
     {
         auto const& [r0, r1, r2, r3, r4, r5, r6, r7] = r;
         auto const& [t0, t1]                         = tmp;
@@ -203,10 +203,9 @@ private:
     }
 
     template <unsigned ElementSize>
-    void
-    transpose_16x16_inplace(dabun::hask::miltuple<VReg const&, 16> const& r,
-                            dabun::hask::miltuple<VReg const&, 2> const&  tmp,
-                            vreg_view<ElementSize>                        vview)
+    void transpose_16x16_inplace(sysml::miltuple<VReg const&, 16> const& r,
+                                 sysml::miltuple<VReg const&, 2> const&  tmp,
+                                 vreg_view<ElementSize>                  vview)
     {
         auto const& [r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13,
                      r14, r15] = r;
@@ -231,9 +230,9 @@ private:
     }
 
     template <unsigned ElementSize>
-    void transpose_4x4_onto(dabun::hask::miltuple<VReg const&, 4> const& src,
-                            dabun::hask::miltuple<VReg const&, 4> const& dst,
-                            vreg_view<ElementSize>                       vview)
+    void transpose_4x4_onto(sysml::miltuple<VReg const&, 4> const& src,
+                            sysml::miltuple<VReg const&, 4> const& dst,
+                            vreg_view<ElementSize>                 vview)
 
     {
         auto const& [src0, src1, src2, src3] = src;

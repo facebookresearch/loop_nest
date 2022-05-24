@@ -3,7 +3,6 @@
 #include "dabun/arithmetic_operation.hpp"
 #include "dabun/check.hpp"
 #include "dabun/loop_nest.hpp"
-#include "dabun/measure.hpp"
 #include "dabun/random_vector.hpp"
 #include "loop_nest_baseline.hpp"
 

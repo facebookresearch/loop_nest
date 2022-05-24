@@ -6,11 +6,11 @@
 
 #ifdef DABUN_ARCH_X86_64
 
-#    include "dabun/x86/xbyak.hpp"
-
 #    include "dabun/code_generator/code_generator.hpp"
 #    include "dabun/math.hpp"
-#    include "dabun/measure.hpp"
+#    include "dabun/x86/xbyak.hpp"
+
+#    include <sysml/measure.hpp>
 
 #    include <utility>
 
@@ -33,7 +33,7 @@ private:
     static constexpr int num_vector_regs =
         isa_traits<ISA>::total_vector_registers;
 
-    class test : public code_generator<void(float *)>
+    class test : public code_generator<void(float*)>
     {
     public:
         test(int iterations)
@@ -67,7 +67,7 @@ public:
         auto  fn      = test(iterations).get_shared();
         float data[1] = {0};
 
-        auto secs = measure_fastest([&]() { fn(data); }, 100);
+        auto secs = sysml::measure_fastest([&]() { fn(data); }, 100);
 
         double gflops = 2.0 * iterations * 10 * (num_vector_regs - 2) *
                         vector_size / 1000000000;

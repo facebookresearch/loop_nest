@@ -2,7 +2,12 @@ cmake_minimum_required(VERSION 3.15.0)
 
 add_subdirectory(extern/Catch2)
 
-#SET (CMAKE_CXX_COMPILER             "/usr/bin/clang++")
+add_subdirectory(extern/libsysml/sysmlcpp)
+
+message(STATUS "${sysmlcpp_INCLUDE_DIRS} ????")
+
+
+SET (CMAKE_CXX_COMPILER             "/usr/bin/clang++")
 
 project(dabun
   LANGUAGES CXX
@@ -10,7 +15,7 @@ project(dabun
 
 configure_file(dabun_config.hpp.in config/dabun_config.hpp)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 option(DABUN_DEBUG "Set to ON to build debug version" OFF)
 option(DABUN_DEBUG_WERROR "Set to ON to enable all warnings in debug mode" ON)
@@ -70,6 +75,8 @@ if(NOT TARGET cpuinfo)
 endif()
 
 include_directories(${CPUINFO_SOURCE_DIR}/include)
+
+include_directories(extern/libsysml/sysmlcpp/include)
 
 ##
 ## Detect host architecture

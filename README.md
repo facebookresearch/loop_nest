@@ -2,7 +2,7 @@
 
 ## Cleanup of include/
 
-- [ ] include/dabun/aligned_vector.hpp
+- [x] include/dabun/aligned_vector.hpp
 - [ ] include/dabun/check.hpp
 - [ ] include/dabun/qvec4.hpp
 - [ ] include/dabun/peak_gflops.hpp
@@ -15,9 +15,9 @@
 - [ ] include/dabun/serialization.hpp
 - [ ] include/dabun/configuration.hpp
 - [ ] include/dabun/arithmetic_operation.hpp
-- [ ] include/dabun/math.hpp
+- [x] include/dabun/math.hpp
 - [ ] include/dabun/amx/amx_loop_nest.hpp
-- [ ] include/dabun/intcmp.hpp
+- [x] include/dabun/intcmp.hpp (moved to sysml)
 - [ ] include/dabun/code_generator.hpp
 - [ ] include/dabun/detail/most_frequent_queue.hpp
 - [x] include/dabun/hask/apple.hpp
@@ -65,7 +65,7 @@
 - [ ] include/dabun/arm/loop_nest.hpp
 - [ ] include/dabun/common.hpp
 - [ ] include/dabun/measure.hpp
-- [ ] include/dabun/log.hpp
+- [x] include/dabun/log.hpp
 - [x] include/dabun/peak_gflops.ipp
 - [ ] include/dabun/loop_nest.hpp
 - [ ] include/dabun/thread/barrier.hpp

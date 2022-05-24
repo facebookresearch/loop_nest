@@ -2,6 +2,12 @@
 
 #pragma once
 
+#error "Deprecated"
+
+#include <sysml/measure.hpp>
+
+#if 0
+
 #include <algorithm>
 #include <cassert>
 #include <chrono>
@@ -309,3 +315,5 @@ std::tuple<double, double, double> measure_all(Fn&& fn, int iterations = 1,
 }
 
 } // namespace dabun
+
+#endif

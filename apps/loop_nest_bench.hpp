@@ -2,8 +2,9 @@
 
 #include "dabun/arithmetic_operation.hpp"
 #include "dabun/loop_nest.hpp"
-#include "dabun/measure.hpp"
 #include "dabun/random_vector.hpp"
+
+#include <sysml/measure.hpp>
 
 #include <functional>
 #include <map>
@@ -56,9 +57,9 @@ void loop_nest_bench(std::vector<std::pair<std::string, int>> const& order,
 
     jit_fn.save_to_file("zi.asm");
 
-    auto secs =
-        measure_fastest([&]() { jit_fn(CN.data(), A.data(), B.data(), alpha); },
-                        total_iterations);
+    auto secs = sysml::measure_fastest(
+        [&]() { jit_fn(CN.data(), A.data(), B.data(), alpha); },
+        total_iterations);
 
     double gflops = flops / 1000000000;
 

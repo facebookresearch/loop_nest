@@ -1,5 +1,4 @@
 #include "dabun/check.hpp"
-#include "dabun/measure.hpp"
 #include "dabun/random_vector.hpp"
 #include "dabun/transposer.hpp"
 #include "transposer_baseline.hpp"

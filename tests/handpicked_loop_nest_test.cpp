@@ -5,7 +5,6 @@
 #include "dabun/check.hpp"
 #include "dabun/loop_nest.hpp"
 #include "dabun/loop_nest_descriptor.hpp"
-#include "dabun/measure.hpp"
 #include "dabun/random_vector.hpp"
 
 #include <catch2/catch.hpp>

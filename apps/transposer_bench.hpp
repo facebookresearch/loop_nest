@@ -1,5 +1,7 @@
-#include "dabun/measure.hpp"
+
 #include "dabun/transposer.hpp"
+
+#include <sysml/measure.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -47,8 +49,8 @@ void transposer_bench(std::vector<std::pair<std::string, int>> const& order,
 
     jit_fn.save_to_file("zi.asm");
 
-    auto secs = measure_fastest([&]() { jit_fn(B.data(), A.data()); },
-                                total_iterations);
+    auto secs = sysml::measure_fastest([&]() { jit_fn(B.data(), A.data()); },
+                                       total_iterations);
 
     double moved_gbytes = 1.0 * total_moved_bytes / 1000000000;
 

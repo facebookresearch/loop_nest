@@ -1,13 +1,14 @@
+#include "dabun/loop_nest.hpp"
 #include "baselines.hpp"
 #include "dabun/arithmetic_operation.hpp"
 #include "dabun/check.hpp"
 #include "dabun/elementwise_operation.hpp"
-#include "dabun/loop_nest.hpp"
-#include "dabun/measure.hpp"
 #include "dabun/one_constant.hpp"
 #include "dabun/random_vector.hpp"
 #include "loop_nest_baseline.hpp"
 #include "utility.hpp"
+
+#include <sysml/measure.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -27,7 +28,6 @@ int main()
 {
     using namespace dabun;
 
-
     // Simple reduction of matrix columns using the FMA loop nest
     // The trick is to use a fake tensor "A" - that is a tensor with
     // a single element and 0 strides.
@@ -38,7 +38,8 @@ int main()
         int AcBr = 333;
         int BcCc = 333;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        {{"AcBr", 512},
                         {"BcCc",
@@ -71,7 +72,7 @@ int main()
                 .get_shared();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fn = gen_loop_nest();
@@ -95,8 +96,8 @@ int main()
                                         CN.data())
                   << "\n";
 
-        auto secs =
-            measure_fastest([&]() { fn(CJ.data(), &A, B.data(), 0); }, 100);
+        auto secs = sysml::measure_fastest(
+            [&]() { fn(CJ.data(), &A, B.data(), 0); }, 100);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
 
@@ -105,13 +106,13 @@ int main()
 
     // return 0;
 
-
     {
         int ArCr = 4; // 126; // 123;
         int AcBr = 4; // 124;  // 126; // 123;
         int BcCc = 2; // 62;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
@@ -144,12 +145,12 @@ int main()
                        // A's strides for each variable
                        {{"ArCr", AcBr}, {"AcBr", 1}},
                        // B's strides for each variable
-                       {{"AcBr", 1}, {"BcCc", ArCr}}, dabun::fma, 372,
-                       nullptr, {}, dabun::elementwise_relu<DABUN_ISA>)
+                       {{"AcBr", 1}, {"BcCc", ArCr}}, dabun::fma, 372, nullptr,
+                       {}, dabun::elementwise_relu<DABUN_ISA>)
                 .get_shared();
         };
 
-        // auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        // auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         // std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fn = gen_loop_nest();
@@ -173,11 +174,11 @@ int main()
         fn(CJ.data(), A_float.data(), B_float.data(), 1);
 
         std::cout << "MAXABSDIFF: "
-                  << max_abs_difference_verbose(CN.data(), CN.data() + ArCr * BcCc,
-                                        CJ.data())
+                  << max_abs_difference_verbose(
+                         CN.data(), CN.data() + ArCr * BcCc, CJ.data())
                   << "\n";
 
-        auto secs = measure_fastest(
+        auto secs = sysml::measure_fastest(
             [&]() { fn(CJ.data(), A_float.data(), B_float.data(), 0); }, 10);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
@@ -196,7 +197,8 @@ int main()
         int AcBr = 256;
         int BcCc = 64;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
@@ -234,7 +236,7 @@ int main()
                 .get_shared();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fn = gen_loop_nest();
@@ -258,7 +260,7 @@ int main()
                                         CN.data())
                   << "\n";
 
-        auto secs = measure_fastest(
+        auto secs = sysml::measure_fastest(
             [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
@@ -279,7 +281,8 @@ int main()
         int AcBr = 256 + 3;
         int BcCc = 256 + 3;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
@@ -318,7 +321,7 @@ int main()
                 .get_shared();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fn = gen_loop_nest();
@@ -342,8 +345,8 @@ int main()
                                         CN.data())
                   << "\n";
 
-        auto secs =
-            measure_fastest([&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 1);
+        auto secs = sysml::measure_fastest(
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 1);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
 
@@ -361,7 +364,8 @@ int main()
         int AcBr = 333;
         int BcCc = 333;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
@@ -409,7 +413,7 @@ int main()
                 .get_shared();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fn = gen_loop_nest();
@@ -433,7 +437,7 @@ int main()
                                         CN.data())
                   << "\n";
 
-        auto secs = measure_fastest(
+        auto secs = sysml::measure_fastest(
             [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
@@ -455,7 +459,8 @@ int main()
         int AcBr = 333;
         int BcCc = 133;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
@@ -499,7 +504,7 @@ int main()
                 .get_shared();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fn = gen_loop_nest();
@@ -523,7 +528,7 @@ int main()
                                         CN.data())
                   << "\n";
 
-        auto secs = measure_fastest(
+        auto secs = sysml::measure_fastest(
             [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
@@ -547,7 +552,8 @@ int main()
         int AcBr = 256;
         int BcCc = 256;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
@@ -594,7 +600,7 @@ int main()
                 .get_unique();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fnx = gen_loop_nest();
@@ -623,7 +629,7 @@ int main()
                                         CN.data())
                   << " --- " << std::endl;
 
-        auto secs = measure_fastest(
+        auto secs = sysml::measure_fastest(
             [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 100);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
@@ -652,7 +658,8 @@ int main()
         int IHW = OHW + KHW - 1;
         int IOC = 32;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
@@ -694,7 +701,7 @@ int main()
                 .get_unique();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fn = gen_loop_nest();
@@ -717,7 +724,7 @@ int main()
                                         CN.data())
                   << " --- " << std::endl;
 
-        auto secs = measure_fastest(
+        auto secs = sysml::measure_fastest(
             [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 100);
 
         double gflops = 1.0 * OHW * OHW * KHW * KHW * IOC * 2 / 1000000000;
@@ -774,7 +781,8 @@ int main()
         25: d:1 s 16
         25: d:2 s 1
         */
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return loop_nest_code_generator<DABUN_ISA>(
                        {{"c:0", 1},
                         {"d:0", 1},
@@ -817,7 +825,7 @@ int main()
                 .get_unique();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fnx = gen_loop_nest();
@@ -856,7 +864,7 @@ int main()
                   << max_abs_difference(CJ.data(), CJ.data() + M * N, CN.data())
                   << "\n";
 
-        auto secs = measure_fastest(
+        auto secs = sysml::measure_fastest(
             [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 100);
 
         double gflops = 1.0 * K * M * N * 2 / 1000000000;
@@ -881,7 +889,8 @@ int main()
         int KS   = 3;
         int IS   = OS + KS - 1;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        {{"c_out", 16}, //
                         {"o_h", 1},
@@ -926,7 +935,7 @@ int main()
                 .get_shared();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fn = gen_loop_nest();
@@ -947,8 +956,8 @@ int main()
                                         CN.data())
                   << "\n";
 
-        auto secs =
-            measure_fastest([&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 1);
+        auto secs = sysml::measure_fastest(
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 1);
 
         double gflops = 2.0 * CIN * COUT * OS * OS * KS * KS / 1000000000;
 
@@ -1134,7 +1143,8 @@ int main()
         baseline_padded_Conv(COUT, CIN, OS, OS, KS, KS, PS, PS, A.data(),
                              B.data(), CN.data());
 
-        auto do_it = [&]() {
+        auto do_it = [&]()
+        {
             fn_corners(CJ.data() + out_bl_off, A.data() + in_bl_off,
                        B.data() + ker_bl_off, 0);
 
@@ -1172,7 +1182,7 @@ int main()
                                         CN.data())
                   << "\n";
 
-        auto secs = measure_fastest([&]() { do_it(); }, 10);
+        auto secs = sysml::measure_fastest([&]() { do_it(); }, 10);
 
         double gflops = 2.0 * CIN * COUT * OS * OS * KS * KS / 1000000000;
 
@@ -1197,7 +1207,8 @@ int main()
         int AcBr = 512;
         int BcCc = 512;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
@@ -1244,7 +1255,7 @@ int main()
                 .get_unique();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fnx = gen_loop_nest();
@@ -1273,7 +1284,7 @@ int main()
                                         CN.data())
                   << "\n";
 
-        auto secs = measure_fastest(
+        auto secs = sysml::measure_fastest(
             [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 100);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
@@ -1306,7 +1317,8 @@ int main()
         int KS   = 3;
         int IS   = OS + KS - 1;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        {{"g_out", 1}, //
                         {"o_h", 5},
@@ -1360,7 +1372,7 @@ int main()
                 .get_shared();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fn = gen_loop_nest();
@@ -1384,7 +1396,7 @@ int main()
                                         CN.data())
                   << "\n";
 
-        auto secs = measure_fastest(
+        auto secs = sysml::measure_fastest(
             [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 100);
 
         double gflops =
@@ -1407,7 +1419,8 @@ int main()
         int AcBr = 333;
         int BcCc = 333;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        {{"AcBr", 512},
                         {"BcCc",
@@ -1439,7 +1452,7 @@ int main()
                 .get_shared();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fn = gen_loop_nest();
@@ -1495,7 +1508,7 @@ int main()
                                         CN.data())
                   << "\n";
 
-        auto secs = measure_fastest(
+        auto secs = sysml::measure_fastest(
             [&]() { fn(CJ.data(), one_constant<float>, B.data(), 0); }, 100);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
@@ -1521,7 +1534,8 @@ int main()
         // int AcBr = 333;
         // int BcCc = 333;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
@@ -1559,7 +1573,7 @@ int main()
                 .get_shared();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fn = gen_loop_nest();
@@ -1583,7 +1597,7 @@ int main()
                                         CN.data())
                   << "\n";
 
-        auto secs = measure_fastest(
+        auto secs = sysml::measure_fastest(
             [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
@@ -1609,7 +1623,8 @@ int main()
         int k = AcBr;
         int r = ArCr;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        {{"r", 16}, //
                         {"r", 1},  //
@@ -1632,7 +1647,7 @@ int main()
                 .get_shared();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fn = gen_loop_nest();
@@ -1656,7 +1671,7 @@ int main()
                                         CN.data())
                   << "\n";
 
-        auto secs = measure_fastest(
+        auto secs = sysml::measure_fastest(
             [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
@@ -1680,7 +1695,8 @@ int main()
         int k = AcBr;
         int r = ArCr;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        {{"r", 16}, //
                         {"r", 1},  //
@@ -1702,7 +1718,7 @@ int main()
                 .get_shared();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fn = gen_loop_nest();
@@ -1726,7 +1742,7 @@ int main()
                                         CN.data())
                   << "\n";
 
-        auto secs = measure_fastest(
+        auto secs = sysml::measure_fastest(
             [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 100);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
@@ -1750,7 +1766,8 @@ int main()
         int AcBr = 1;
         int BcCc = 256 + 251;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form
                        // of {dimension, stride}.  For now the outer
@@ -1788,7 +1805,7 @@ int main()
                 .get_shared();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fn = gen_loop_nest();
@@ -1812,8 +1829,8 @@ int main()
                                         CN.data())
                   << "\n";
 
-        auto secs =
-            measure_fastest([&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 1);
+        auto secs = sysml::measure_fastest(
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 1);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
 
@@ -1832,7 +1849,8 @@ int main()
         int AcBr = 256 + 3;
         int BcCc = 259;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension
@@ -1873,7 +1891,7 @@ int main()
                 .get_shared();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fn = gen_loop_nest();
@@ -1897,8 +1915,8 @@ int main()
                                         CN.data())
                   << "\n";
 
-        auto secs =
-            measure_fastest([&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 1);
+        auto secs = sysml::measure_fastest(
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 1);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
 
@@ -1924,7 +1942,8 @@ int main()
         int IY = OY + KY - 1;
         int IZ = OZ + KZ - 1;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        // The first argument is the loop order in the form of
                        // {dimension, stride}.  For now the outer dimension has
@@ -1977,7 +1996,7 @@ int main()
                 .get_shared();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fn = gen_loop_nest();
@@ -2000,8 +2019,8 @@ int main()
                                         CN.data())
                   << "\n";
 
-        auto secs =
-            measure_fastest([&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 1);
+        auto secs = sysml::measure_fastest(
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 1);
 
         double gflops = 1.0 * OX * OY * OZ * KX * KY * KZ * 2 / 1000000000;
 
@@ -2027,7 +2046,8 @@ int main()
         int k = AcBr;
         int c = BcCc;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        {{"k", 64}, //
                         {"k", 1},  //
@@ -2048,7 +2068,7 @@ int main()
                 .get_shared();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fn = gen_loop_nest();
@@ -2071,7 +2091,7 @@ int main()
                                         CN.data())
                   << "\n";
 
-        auto secs = measure_fastest(
+        auto secs = sysml::measure_fastest(
             [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
@@ -2094,7 +2114,8 @@ int main()
         int k = AcBr;
         int c = BcCc;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        {{"k", 4},  //
                         {"k", 1},  //
@@ -2115,7 +2136,7 @@ int main()
                 .get_shared();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fn = gen_loop_nest();
@@ -2136,7 +2157,7 @@ int main()
                                         CN.data())
                   << "\n";
 
-        auto secs = measure_fastest(
+        auto secs = sysml::measure_fastest(
             [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 10);
 
         double gflops = 1.0 * AcBr * ArCr * BcCc * 2 / 1000000000;
@@ -2158,7 +2179,8 @@ int main()
         int KS   = 3;
         int IS   = OS + KS - 1;
 
-        auto gen_loop_nest = [&]() {
+        auto gen_loop_nest = [&]()
+        {
             return dabun::loop_nest_code_generator<DABUN_ISA>(
                        {{"c_out", 16}, //
                         {"o_h", 1},
@@ -2203,7 +2225,7 @@ int main()
                 .get_shared();
         };
 
-        auto compile_secs = measure_fastest(gen_loop_nest, 1);
+        auto compile_secs = sysml::measure_fastest(gen_loop_nest, 1);
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fn = gen_loop_nest();
@@ -2224,8 +2246,8 @@ int main()
                                         CN.data())
                   << "\n";
 
-        auto secs =
-            measure_fastest([&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 1);
+        auto secs = sysml::measure_fastest(
+            [&]() { fn(CJ.data(), A.data(), B.data(), 0); }, 1);
 
         double gflops = 2.0 * CIN * COUT * OS * OS * KS * KS / 1000000000;
 

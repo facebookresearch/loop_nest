@@ -5,13 +5,14 @@
 #include "dabun/isa.hpp"
 #ifdef DABUN_ARCH_AARCH64
 
-#include "dabun/code_generator/code_generator.hpp"
-#include "dabun/float.hpp"
-#include "dabun/isa.hpp"
-#include "dabun/math.hpp"
-#include "dabun/measure.hpp"
+#    include "dabun/code_generator/code_generator.hpp"
+#    include "dabun/float.hpp"
+#    include "dabun/isa.hpp"
+#    include "dabun/math.hpp"
 
-#include <utility>
+#    include <sysml/measure.hpp>
+
+#    include <utility>
 
 namespace dabun
 {
@@ -82,7 +83,7 @@ public:
     {
         auto fn = test().get_shared();
 
-        double secs = measure_fastest([&]() { fn(iterations); }, 100);
+        double secs = sysml::measure_fastest([&]() { fn(iterations); }, 100);
 
         double gflops = 2.0 * iterations * 10 * (16 + 6) *
                         (vector_size * 4 / sizeof(Arithmetic)) / 1000000000;
@@ -91,12 +92,12 @@ public:
     }
 };
 
-#ifndef DABUN_HEADER_ONLY
+#    ifndef DABUN_HEADER_ONLY
 
 extern template struct bench_gflops<aarch64, fp32>;
 extern template struct bench_gflops<aarch64, fp16>;
 
-#endif
+#    endif
 
 } // namespace arm
 } // namespace dabun

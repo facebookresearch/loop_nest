@@ -118,7 +118,7 @@ public:
     bool is_inplace() const final override { return false; }
 };
 
-#endif
+#endif // defined(__GNUC__)
 
 class inplace_memory_resource : public memory_resource
 {
