@@ -3,7 +3,9 @@
 #pragma once
 
 #include "dabun/loop_tree/node.hpp"
-#include "dabun/thread/parallel_for.hpp"
+
+#include <sysml/thread/cpu_pool.hpp>
+#include <sysml/thread/parallel_for.hpp>
 
 namespace dabun
 {
@@ -14,7 +16,7 @@ inline auto get_working_cpu_pool()
 {
     // static auto pool = std::make_shared<thread::cpu_pool>(
     //     std::thread::hardware_concurrency() / 2, true);
-    static auto pool = std::make_shared<thread::cpu_pool>(2);
+    static auto pool = std::make_shared<sysml::thread::cpu_pool>(2);
     return pool;
 }
 
@@ -84,7 +86,8 @@ private:
             }
         }
 
-        return [to_advance](std::vector<Arithmetic*>& tensors, int delta = 1) {
+        return [to_advance](std::vector<Arithmetic*>& tensors, int delta = 1)
+        {
             for (auto const& p : to_advance)
             {
                 tensors[p.first] += p.second * delta;
@@ -119,7 +122,8 @@ private:
 
         return [to_advance](std::vector<Arithmetic*>&       tensors_out,
                             std::vector<Arithmetic*> const& tensors_in,
-                            int                             delta = 1) {
+                            int                             delta = 1)
+        {
             tensors_out.resize(tensors_in.size());
             std::copy(tensors_in.begin(), tensors_in.end(),
                       tensors_out.begin());
@@ -168,13 +172,13 @@ private:
         // {
         if (to_adjust.size())
         {
-            return
-                [to_adjust](std::vector<int>& alpha_offsets, int adjustment) {
-                    for (auto const& idx : to_adjust)
-                    {
-                        alpha_offsets[idx] += adjustment;
-                    }
-                };
+            return [to_adjust](std::vector<int>& alpha_offsets, int adjustment)
+            {
+                for (auto const& idx : to_adjust)
+                {
+                    alpha_offsets[idx] += adjustment;
+                }
+            };
         }
         else
         {
@@ -286,13 +290,15 @@ public:
             return {[full, rest, full_fns, tensor_advancer_setter,
                      per_iteration_tensors_ptr,
                      tail_fns](std::vector<Arithmetic*>& tensors,
-                               std::vector<int>&         alpha_offsets) {
+                               std::vector<int>&         alpha_offsets)
+                    {
                         auto& per_iteration_tensors =
                             *per_iteration_tensors_ptr;
 
                         auto cp = get_working_cpu_pool();
 
-                        auto task = [&](auto const&, int i) {
+                        auto task = [&](auto const&, int i)
+                        {
                             // std::cout << "TASK: " << i << std::endl;
                             tensor_advancer_setter(per_iteration_tensors[i],
                                                    tensors, i);
@@ -322,7 +328,7 @@ public:
                         //     task(0, i);
                         // }
 
-                        thread::naive_parallel_for(
+                        sysml::thread::naive_parallel_for(
                             *cp, 0, full + (rest ? 1 : 0), 1, task);
                     },
                     report};
@@ -331,7 +337,8 @@ public:
         {
             return {[full, full_fns, tensor_advancer, alpha_offsets_adjuster,
                      tail_fns](std::vector<Arithmetic*>& tensors,
-                               std::vector<int>&         alpha_offsets) {
+                               std::vector<int>&         alpha_offsets)
+                    {
                         for (int i = 0; i < full; ++i)
                         {
                             for (auto const& fn : full_fns)
