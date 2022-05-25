@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.15.0)
 
 add_subdirectory(extern/Catch2)
 
-add_subdirectory(extern/libsysml/sysmlcpp)
+add_subdirectory(extern/libsysml/cpp)
 
 message(STATUS "${sysmlcpp_INCLUDE_DIRS} ????")
 
@@ -76,7 +76,7 @@ endif()
 
 include_directories(${CPUINFO_SOURCE_DIR}/include)
 
-include_directories(extern/libsysml/sysmlcpp/include)
+include_directories(extern/libsysml/cpp/include)
 
 ##
 ## Detect host architecture
