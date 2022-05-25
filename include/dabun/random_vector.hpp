@@ -1,5 +1,6 @@
 #pragma once
 
+#include "sysml/random.hpp"
 #include "dabun/aligned_vector.hpp"
 #include "dabun/bf16x2.hpp"
 #include "dabun/float.hpp"
@@ -27,7 +28,7 @@ struct random_initalizer_helper
         std::random_device rd;
         std::mt19937       gen(0); // rd());
 
-        std::uniform_real_distribution<float> dis(-1.0, 1.0);
+        sysml::uniform_distribution<float> dis(-1.0, 1.0);
 
         for (auto& f : res)
         {
@@ -48,7 +49,7 @@ struct random_initalizer_helper
         std::random_device rd;
         std::mt19937       gen(0); // rd());
 
-        std::uniform_real_distribution<double> dis(-1.0, 1.0);
+        sysml::uniform_distribution<double> dis(-1.0, 1.0);
 
         for (auto& f : res)
         {
@@ -68,7 +69,7 @@ struct random_initalizer_helper
         std::random_device rd;
         std::mt19937       gen(0); // rd());
 
-        std::uniform_int_distribution<Integer> dis(
+        sysml::uniform_distribution<Integer> dis(
             std::numeric_limits<Integer>::min(),
             std::numeric_limits<Integer>::max());
 
@@ -89,7 +90,7 @@ struct random_initalizer_helper
         std::random_device rd;
         std::mt19937       gen(0); // rd());
 
-        std::uniform_int_distribution<std::uint32_t> dis(0, 0xffffffffu);
+        sysml::uniform_distribution<std::uint32_t> dis(0, 0xffffffffu);
 
         for (auto& f : res)
         {

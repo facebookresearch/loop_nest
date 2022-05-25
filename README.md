@@ -68,13 +68,13 @@
 - [x] include/dabun/utility/log.hpp
 - [x] include/dabun/peak_gflops.ipp
 - [ ] include/dabun/loop_nest.hpp
-- [ ] include/dabun/thread/barrier.hpp
-- [ ] include/dabun/thread/semi_dynamic_task_queue.hpp (removed)
-- [ ] include/dabun/thread/parallel_for.hpp
-- [ ] include/dabun/thread/operating_cpu_set.hpp
-- [ ] include/dabun/thread/cpu_set.hpp
-- [ ] include/dabun/thread/cpu_pool.hpp
-- [ ] include/dabun/thread/core.hpp
+- [x] include/dabun/thread/barrier.hpp
+- [x] include/dabun/thread/semi_dynamic_task_queue.hpp (removed)
+- [x] include/dabun/thread/parallel_for.hpp
+- [x] include/dabun/thread/operating_cpu_set.hpp
+- [x] include/dabun/thread/cpu_set.hpp
+- [x] include/dabun/thread/cpu_pool.hpp
+- [x] include/dabun/thread/core.hpp
 - [ ] include/dabun/loop_tree/nested_for_loops_node.hpp
 - [ ] include/dabun/loop_tree/compiled_transpose_node.hpp
 - [ ] include/dabun/loop_tree/utility.hpp
