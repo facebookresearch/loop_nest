@@ -9,7 +9,7 @@ namespace dabun
 {
 
 template <class Float>
-void apply_relu(Float *Begin, Float *End)
+void apply_relu(Float* Begin, Float* End)
 {
     for (; Begin != End; ++Begin)
     {
@@ -26,8 +26,8 @@ void apply_relu(Float *Begin, Float *End)
 }
 
 template <class Float>
-printable_fp_t<Float> max_abs_difference(Float const *LBegin, Float const *LEnd,
-                                         Float const *RBegin)
+Float max_abs_difference(Float const* LBegin, Float const* LEnd,
+                         Float const* RBegin)
 {
     Float res = static_cast<Float>(0);
     for (; LBegin != LEnd; ++LBegin, ++RBegin)
@@ -43,13 +43,12 @@ printable_fp_t<Float> max_abs_difference(Float const *LBegin, Float const *LEnd,
             res = std::max(res, std::abs(*LBegin - *RBegin));
         }
     }
-    return printable(res);
+    return res;
 }
 
 template <class Float>
-printable_fp_t<Float> max_abs_difference_verbose(Float const *LBegin,
-                                                 Float const *LEnd,
-                                                 Float const *RBegin)
+Float max_abs_difference_verbose(Float const* LBegin, Float const* LEnd,
+                                 Float const* RBegin)
 {
     int   off = 0;
     Float res = 0;
@@ -57,10 +56,9 @@ printable_fp_t<Float> max_abs_difference_verbose(Float const *LBegin,
     {
         if constexpr (std::is_same_v<Float, fp16>)
         {
-            std::cout << off++ << " : " << printable(*LBegin) << " "
-                      << printable(static_cast<float>(*RBegin)) << " "
-                      << printable(
-                             std::abs(static_cast<float>(*LBegin - *RBegin)))
+            std::cout << off++ << " : " << *LBegin << " "
+                      << static_cast<float>(*RBegin) << " "
+                      << std::abs(static_cast<float>(*LBegin - *RBegin))
                       << "\n";
             res = static_cast<fp16>(
                 std::max(static_cast<float>(res),
@@ -69,19 +67,17 @@ printable_fp_t<Float> max_abs_difference_verbose(Float const *LBegin,
         }
         else
         {
-            std::cout << off++ << " : " << printable(*LBegin) << " "
-                      << printable(*RBegin) << " "
-                      << printable(std::abs(*LBegin - *RBegin)) << "\n";
+            std::cout << off++ << " : " << *LBegin << " " << *RBegin << " "
+                      << std::abs(*LBegin - *RBegin) << "\n";
             res = std::max(res, std::abs(*LBegin - *RBegin));
         }
     }
-    return printable(res);
+    return res;
 }
 
 template <class Float>
-printable_fp_t<Float>
-max_abs_difference_verbose(Float const *LBegin, Float const *LEnd,
-                           Float const *RBegin, float delta)
+Float max_abs_difference_verbose(Float const* LBegin, Float const* LEnd,
+                                 Float const* RBegin, float delta)
 {
     int   off = 0;
     Float res = 0;
@@ -89,14 +85,13 @@ max_abs_difference_verbose(Float const *LBegin, Float const *LEnd,
     {
         if (std::abs(*LBegin - *RBegin) > delta)
         {
-            std::cout << off << " : " << printable(*LBegin) << " "
-                      << printable(*RBegin) << " "
-                      << printable(std::abs(*LBegin - *RBegin)) << "\n";
+            std::cout << off << " : " << *LBegin << " " << *RBegin << " "
+                      << std::abs(*LBegin - *RBegin) << "\n";
         }
         res = std::max(res, std::abs(*LBegin - *RBegin));
         off++;
     }
-    return printable(res);
+    return res;
 }
 
 } // namespace dabun
