@@ -3,6 +3,7 @@
 #pragma once
 
 #include "dabun/loop_tree/node.hpp"
+#include "dabun/utility/tmp_file_name.hpp"
 
 namespace dabun
 {
@@ -99,7 +100,7 @@ public:
 
         if (spit_asm)
         {
-            asm_dump = ::dabun::detail::get_temporary_file_name(".asm");
+            asm_dump = ::dabun::utility::get_temporary_file_name(".asm");
             aot_fn.save_to_file(asm_dump);
         }
 

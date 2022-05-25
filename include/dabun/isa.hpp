@@ -4,15 +4,15 @@
 
 #ifndef DABUN_ISA
 
-#if defined(__AVX512F__)
-#define DABUN_ISA avx512
-#elif defined(__aarch64__)
-#define DABUN_ISA aarch64
-#else // default to avx2
+#    if defined(__AVX512F__)
+#        define DABUN_ISA avx512
+#    elif defined(__aarch64__)
+#        define DABUN_ISA aarch64
+#    else // default to avx2
 // #elif defined(__AVX2__)
-#define DABUN_ISA avx2
+#        define DABUN_ISA avx2
 // #error "ISA not supported"
-#endif
+#    endif
 
 #endif
 
@@ -82,11 +82,11 @@ struct isa_traits<aarch64>
 
 #if defined(__amd64__) || defined(__amd64) || defined(__x86_64__) ||           \
     defined(__x86_64)
-#define DABUN_ARCH_X86_64
+#    define DABUN_ARCH_X86_64
 #elif defined(__aarch64__)
-#define DABUN_ARCH_AARCH64
+#    define DABUN_ARCH_AARCH64
 #else
-#error "Unknown target architecture"
+#    error "Unknown target architecture"
 #endif
 
 namespace dabun
@@ -213,3 +213,9 @@ struct extension_to_deprecated_ISA<extension::neon_fp16>
 #endif
 
 } // namespace dabun
+
+#if defined(DABUN_ARCH_AARCH64)
+#    define DABUN_ISA_NAMESPACE arm
+#else
+#    define DABUN_ISA_NAMESPACE x86
+#endif

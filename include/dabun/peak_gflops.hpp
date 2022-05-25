@@ -1,9 +1,11 @@
-// Copyright 2004-present Facebook. All Rights Reserved.
+// Copyright (c) Meta Platforms, Inc. and affiliates. All Rights Reserved.
+//
+// This source code is licensed under the MIT license found in the
+// LICENSE file in the root directory of this source tree.
 
 #pragma once
 
 #include "dabun/isa.hpp"
-#include "dabun/namespace.hpp"
 
 #if defined(DABUN_ARCH_AARCH64)
 #    include "dabun/arm/peak_gflops.hpp"

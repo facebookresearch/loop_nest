@@ -16,12 +16,12 @@
 - [ ] include/dabun/configuration.hpp
 - [ ] include/dabun/arithmetic_operation.hpp
 - [x] include/dabun/math.hpp
-- [ ] include/dabun/amx/amx_loop_nest.hpp
+- [x] include/dabun/amx/amx_loop_nest.hpp (removed)
 - [x] include/dabun/intcmp.hpp (moved to sysml)
 - [ ] include/dabun/code_generator.hpp
-- [ ] include/dabun/detail/most_frequent_queue.hpp
+- [x] include/dabun/utility/most_frequent_queue.hpp
 - [x] include/dabun/hask/apple.hpp
-- [ ] include/dabun/detail/tmp_file_name.hpp
+- [x] include/dabun/utility/tmp_file_name.hpp
 - [ ] include/dabun/third_party/half.hpp
 - [ ] include/dabun/third_party/biovault_bfloat16.hpp
 - [ ] include/dabun/x86/peak_gflops.hpp
@@ -44,7 +44,7 @@
 - [ ] include/dabun/hask/number_array.hpp
 - [x] include/dabun/mpl/cond.hpp (removed)
 - [x] include/dabun/mpl/core.hpp (removed)
-- [ ] include/dabun/namespace.hpp
+- [x] include/dabun/namespace.hpp (moved content to isa.hpp)
 - [ ] include/dabun/one_constant.hpp
 - [ ] include/dabun/bf16x2.hpp
 - [ ] include/dabun/code_generator/xbyak.hpp
@@ -64,12 +64,12 @@
 - [ ] include/dabun/arm/elementwise_operation.hpp
 - [ ] include/dabun/arm/loop_nest.hpp
 - [ ] include/dabun/common.hpp
-- [ ] include/dabun/measure.hpp
-- [x] include/dabun/log.hpp
+- [x] include/dabun/measure.hpp (moved to sysml)
+- [x] include/dabun/utility/log.hpp
 - [x] include/dabun/peak_gflops.ipp
 - [ ] include/dabun/loop_nest.hpp
 - [ ] include/dabun/thread/barrier.hpp
-- [ ] include/dabun/thread/semi_dynamic_task_queue.hpp
+- [ ] include/dabun/thread/semi_dynamic_task_queue.hpp (removed)
 - [ ] include/dabun/thread/parallel_for.hpp
 - [ ] include/dabun/thread/operating_cpu_set.hpp
 - [ ] include/dabun/thread/cpu_set.hpp
@@ -87,7 +87,7 @@
 - [ ] include/dabun/loop_tree/program.hpp
 - [ ] include/dabun/loop_tree/types.hpp
 - [ ] include/dabun/loop_tree/report.hpp
-- [ ] include/dabun/fmt.hpp
+- [x] include/dabun/fmt.hpp (removed)
 - [ ] include/dabun/core.hpp
 - [ ] include/dabun/random_vector.hpp
 - [ ] include/dabun/utility/for_all.hpp

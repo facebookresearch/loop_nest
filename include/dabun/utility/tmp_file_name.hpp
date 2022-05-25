@@ -1,3 +1,8 @@
+// Copyright (c) Meta Platforms, Inc. and affiliates. All Rights Reserved.
+//
+// This source code is licensed under the MIT license found in the
+// LICENSE file in the root directory of this source tree.
+
 #pragma once
 
 #include <atomic>
@@ -5,9 +10,7 @@
 #include <string>
 #include <thread>
 
-namespace dabun
-{
-namespace detail
+namespace dabun::utility
 {
 
 inline std::string get_temporary_file_name(std::string const& suffix,
@@ -21,5 +24,4 @@ inline std::string get_temporary_file_name(std::string const& suffix,
     return oss.str();
 }
 
-} // namespace detail
-} // namespace dabun
+} // namespace dabun::utility

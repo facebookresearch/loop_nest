@@ -33,18 +33,18 @@
 
 #ifdef DABUN_ARCH_X86_64
 
-#include "dabun/log.hpp"
-#include "dabun/x86/oprof-jitdump.hpp"
-#include "dabun/x86/xbyak.hpp"
+#    include "dabun/utility/log.hpp"
+#    include "dabun/x86/oprof-jitdump.hpp"
+#    include "dabun/x86/xbyak.hpp"
 
-#include <cstdio>
-#include <cstring>
-#include <iostream>
-#include <string>
+#    include <cstdio>
+#    include <cstring>
+#    include <iostream>
+#    include <string>
 
-#include <fcntl.h>
-#include <sys/types.h>
-#include <time.h>
+#    include <fcntl.h>
+#    include <sys/types.h>
+#    include <time.h>
 
 namespace dabun
 {
@@ -58,11 +58,11 @@ private:
 
     bool use_arch_timestamp;
 
-#if defined(CLOCK_MONOTONIC)
+#    if defined(CLOCK_MONOTONIC)
     clockid_t perf_clk_id = CLOCK_MONOTONIC;
-#else
+#    else
     clockid_t perf_clk_id = CLOCK_REALTIME;
-#endif
+#    endif
 
     FILE*       m_perfJitDump = nullptr;
     std::string m_perfJitDumpName;
@@ -79,26 +79,26 @@ private:
      */
     inline uint64_t cpuCycles()
     {
-#ifdef __x86_64__
+#    ifdef __x86_64__
         uint64_t lo, hi;
         asm volatile("rdtsc" : "=a"((lo)), "=d"(hi));
         return lo | (hi << 32);
-#elif __powerpc64__
+#    elif __powerpc64__
         // This returns a time-base
         uint64_t tb;
         asm volatile("mfspr %0, 268" : "=r"(tb));
         return tb;
-#elif _MSC_VER
+#    elif _MSC_VER
         return (uint64_t)__rdtsc();
-#elif __aarch64__
+#    elif __aarch64__
         // FIXME: This returns the virtual timer which is not exactly
         // the core cycles but has a different frequency.
         uint64_t tb;
         asm volatile("mrs %0, cntvct_el0" : "=r"(tb));
         return tb;
-#else
+#    else
         not_implemented();
-#endif
+#    endif
     }
     inline uint64_t perfGetTimestamp(void)
     {

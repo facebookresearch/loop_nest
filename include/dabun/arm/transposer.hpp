@@ -5,25 +5,25 @@
 #include "dabun/isa.hpp"
 #ifdef DABUN_ARCH_AARCH64
 
-#include "dabun/arm/meta_mnemonics.hpp"
-#include "dabun/code_generator/code_generator.hpp"
-#include "dabun/common.hpp"
-#include "dabun/core.hpp"
-#include "dabun/float.hpp"
-#include "dabun/isa.hpp"
-#include "dabun/log.hpp"
-#include "dabun/math.hpp"
+#    include "dabun/arm/meta_mnemonics.hpp"
+#    include "dabun/code_generator/code_generator.hpp"
+#    include "dabun/common.hpp"
+#    include "dabun/core.hpp"
+#    include "dabun/float.hpp"
+#    include "dabun/isa.hpp"
+#    include "dabun/math.hpp"
+#    include "dabun/utility/log.hpp"
 
-#include <any>
-#include <cassert>
-#include <iostream>
-#include <map>
-#include <numeric>
-#include <optional>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <vector>
+#    include <any>
+#    include <cassert>
+#    include <iostream>
+#    include <map>
+#    include <numeric>
+#    include <optional>
+#    include <string>
+#    include <type_traits>
+#    include <utility>
+#    include <vector>
 
 namespace dabun
 {
@@ -815,12 +815,12 @@ public:
     }
 };
 
-#ifndef DABUN_HEADER_ONLY
+#    ifndef DABUN_HEADER_ONLY
 
 extern template class transposer_code_generator<aarch64, float>;
 extern template class transposer_code_generator<aarch64, fp16>;
 
-#endif
+#    endif
 
 } // namespace arm
 } // namespace dabun

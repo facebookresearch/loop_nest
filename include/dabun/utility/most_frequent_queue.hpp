@@ -11,9 +11,7 @@
 #include <set>
 #include <utility>
 
-namespace dabun
-{
-namespace detail
+namespace dabun::utility
 {
 
 // A queue that holds values of type T and a count for each value.  We
@@ -166,5 +164,4 @@ public:
     }
 };
 
-} // namespace detail
-} // namespace dabun
+} // namespace dabun::utility

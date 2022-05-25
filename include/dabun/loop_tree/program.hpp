@@ -12,10 +12,10 @@
 #include "dabun/arithmetic_operation.hpp"
 #include "dabun/configuration.hpp"
 #include "dabun/elementwise_operation.hpp"
-#include "dabun/log.hpp"
 #include "dabun/loop_nest.hpp"
 #include "dabun/serialization.hpp"
 #include "dabun/transposer.hpp"
+#include "dabun/utility/log.hpp"
 
 #include "dabun/loop_tree/all_nodes.hpp"
 #include "dabun/loop_tree/types.hpp"
@@ -362,7 +362,8 @@ public:
                                           std::move(report)),
             [sub_functions, alpha_offsets_size,
              tensors_idx = this->tensors_idx](
-                std::map<std::string, Arithmetic*> const& tensors) {
+                std::map<std::string, Arithmetic*> const& tensors)
+            {
                 std::vector<int>         alpha_offs(alpha_offsets_size);
                 std::vector<Arithmetic*> tensors_vec(tensors_idx.size());
                 for (auto const& e : tensors)

@@ -4,7 +4,6 @@
 
 #include "dabun/float.hpp"
 #include "dabun/isa.hpp"
-#include "dabun/namespace.hpp"
 
 #if defined(DABUN_ARCH_AARCH64)
 #include "dabun/arm/loop_nest.hpp"

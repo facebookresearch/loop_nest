@@ -15,35 +15,35 @@
 #include "dabun/isa.hpp"
 #ifdef DABUN_ARCH_AARCH64
 
-#include "dabun/loop_nest_descriptor.hpp"
-#include "dabun/arm/arithmetic_operation.hpp"
-#include "dabun/arm/configuration.hpp"
-#include "dabun/arm/elementwise_operation.hpp"
-#include "dabun/arm/meta_mnemonics.hpp"
-#include "dabun/arm/multi_vreg.hpp"
-#include "dabun/code_generator/code_generator.hpp"
-#include "dabun/common.hpp"
-#include "dabun/core.hpp"
-#include "dabun/isa.hpp"
-#include "dabun/log.hpp"
-#include "dabun/math.hpp"
+#    include "dabun/arm/arithmetic_operation.hpp"
+#    include "dabun/arm/configuration.hpp"
+#    include "dabun/arm/elementwise_operation.hpp"
+#    include "dabun/arm/meta_mnemonics.hpp"
+#    include "dabun/arm/multi_vreg.hpp"
+#    include "dabun/code_generator/code_generator.hpp"
+#    include "dabun/common.hpp"
+#    include "dabun/core.hpp"
+#    include "dabun/isa.hpp"
+#    include "dabun/loop_nest_descriptor.hpp"
+#    include "dabun/math.hpp"
+#    include "dabun/utility/log.hpp"
 
-#include <boost/multi_index/composite_key.hpp>
-#include <boost/multi_index/member.hpp>
-#include <boost/multi_index/ordered_index.hpp>
-#include <boost/multi_index_container.hpp>
+#    include <boost/multi_index/composite_key.hpp>
+#    include <boost/multi_index/member.hpp>
+#    include <boost/multi_index/ordered_index.hpp>
+#    include <boost/multi_index_container.hpp>
 
-#include <any>
-#include <cstdint>
-#include <limits>
-#include <map>
-#include <numeric>
-#include <optional>
-#include <set>
-#include <tuple>
-#include <type_traits>
-#include <variant>
-#include <vector>
+#    include <any>
+#    include <cstdint>
+#    include <limits>
+#    include <map>
+#    include <numeric>
+#    include <optional>
+#    include <set>
+#    include <tuple>
+#    include <type_traits>
+#    include <variant>
+#    include <vector>
 
 namespace dabun
 {
@@ -2852,7 +2852,7 @@ private:
 
     void issue_unrolled_operations_vector_vector(
         std::vector<operation_operation> /* operations */,
-        std::function<void()> const&     epilogue_fn)
+        std::function<void()> const& epilogue_fn)
     {
         auto instructions = std::move(instruction_IRs.front());
         instruction_IRs.pop_front();
@@ -3109,7 +3109,7 @@ private:
 
     void issue_unrolled_operations_scalar_scalar(
         std::vector<operation_operation> /* operations */,
-        std::function<void()> const&     epilogue_fn)
+        std::function<void()> const& epilogue_fn)
     {
         auto instructions = std::move(instruction_IRs.front());
         instruction_IRs.pop_front();
@@ -3630,7 +3630,7 @@ public:
     }
 
     loop_nest_fp16_code_generator(
-        loop_nest_descriptor const&                         arguments,
+        loop_nest_descriptor const&                 arguments,
         std::shared_ptr<operation_pair_base> const& op_pair,
         std::optional<int> user_operation_unroll_limit = std::nullopt,
         std::shared_ptr<elementwise_operation<aarch64>> elementwise_preop

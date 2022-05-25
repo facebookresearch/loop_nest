@@ -22,9 +22,9 @@
 #    include "dabun/common.hpp"
 #    include "dabun/core.hpp"
 #    include "dabun/isa.hpp"
-#    include "dabun/log.hpp"
 #    include "dabun/loop_nest_descriptor.hpp"
 #    include "dabun/math.hpp"
+#    include "dabun/utility/log.hpp"
 
 #    include <boost/multi_index/composite_key.hpp>
 #    include <boost/multi_index/member.hpp>
