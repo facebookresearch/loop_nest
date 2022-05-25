@@ -10,6 +10,7 @@
 #include "dabun/x86/aot_perf.hpp"
 #endif
 
+#include <utility>
 #include <cstdint>
 #include <fstream>
 #include <functional>
