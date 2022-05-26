@@ -35,7 +35,7 @@
 - [ ] include/dabun/loop_tree/utility.hpp
 - [ ] include/dabun/one_constant.hpp
 - [x] include/dabun/peak_gflops.hpp
-- [x] include/dabun/peak_gflops.ipp
+- [x] include/dabun/peak_gflops.ipp (merged to peak_gflops.hpp)
 - [ ] include/dabun/predef.hpp
 - [ ] include/dabun/random_vector.hpp
 - [ ] include/dabun/serialization.hpp
