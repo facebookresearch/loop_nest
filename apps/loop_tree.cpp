@@ -5,8 +5,8 @@
 #include "baselines.hpp"
 #include "dabun/arithmetic_operation.hpp"
 #include "dabun/check.hpp"
-#include "dabun/float.hpp"
 #include "dabun/loop_tree/program.hpp"
+#include "dabun/numeric.hpp"
 #include "dabun/random_vector.hpp"
 #include "dabun/transposer.hpp"
 #include "transposer_baseline.hpp"
@@ -14,14 +14,14 @@
 #include "utility.hpp"
 
 #ifndef DABUN_ISA
-#define DABUN_ISA avx2
+#    define DABUN_ISA avx2
 #endif
 
 // just for testing
 // some examples are expensive to do
 // when testing no jitter
 #ifndef SKIP_EXPENSIVE
-#define SKIP_EXPENSIVE false
+#    define SKIP_EXPENSIVE false
 #endif
 
 // just for testing:
@@ -29,12 +29,12 @@
 // to be interpreted (rather than
 // part of jitted loop nest)
 #ifndef MAX_INTERPRETED_DEPTH
-#define MAX_INTERPRETED_DEPTH 0
+#    define MAX_INTERPRETED_DEPTH 0
 #endif
 
 // TODO(zi) relax this when ARM implementation gets elementwise(bias) support
 #if defined(__aarch64__) && !defined(NELEMENTWISE)
-#define NELEMENTWISE
+#    define NELEMENTWISE
 #endif
 
 using namespace dabun;

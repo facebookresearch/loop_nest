@@ -53,11 +53,14 @@ class malloc_memory_resource : public memory_resource
 public:
     void* do_allocate_bytes(std::size_t size) final override
     {
-        constexpr std::size_t ALIGN_PAGE_SIZE = 4096;
+        constexpr size_t ALIGN_PAGE_SIZE = 4096;
         return sysml::checked_aligned_allocate(ALIGN_PAGE_SIZE, size);
     }
 
-    void do_deallocate_bytes(void* ptr) final override { std::free(ptr); }
+    void do_deallocate_bytes(void* ptr) final override
+    {
+        std::free(ptr);
+    }
 
     bool is_inplace() const final override { return false; }
 };

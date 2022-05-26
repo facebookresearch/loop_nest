@@ -59,6 +59,9 @@ void loop_nest_against_slow_baseline(
     jit_fn(CJ.data(), A.data(), B.data(), alpha);
     baseline_fn(CN.data(), A.data(), B.data(), alpha);
 
+    static int it = 0;
+    std::cout << (it++) << std::endl;
+
     REQUIRE(max_abs_difference(CJ.data(), CJ.data() + C_size, CN.data()) <
             1e-5 * args.reduction_size());
 }
@@ -68,6 +71,57 @@ void loop_nest_against_slow_baseline(
 TEST_CASE("ok?", "[wtfgh]")
 {
     using namespace dabun;
+
+    // return 0;
+
+    // Matrix-Matrix product
+    // C(r, c) = A(r, k) * B(k, c)
+    // if (0)
+    {
+        int ArCr = 333;
+        int AcBr = 333;
+        int BcCc = 133;
+
+        tests::baseline::loop_nest_against_slow_baseline<DABUN_ISA>(
+            // The first argument is the loop order in the form of
+            // {dimension, stride}.  For now the outer dimension
+            // has to divide the stride.  This is effectively the
+            // same as Halide's split into outer and inner
+            // variable, but can have arbitray number of splits.
+            {{"ArCr", 11},
+             {"AcBr", 11},
+             {"ArCr", 5},
+             {"AcBr", 5},
+             {"ArCr", 2},
+             {"AcBr", 2},
+
+             {"BcCc", 16},
+             {"AcBr", 1}, // inner loops, should handle
+                          // differently later
+             {"ArCr", 1},
+             {"BcCc", 1}},
+            // The second argument is a map of the dimension sizes
+            {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
+            // Vars of C (other variables are reduction variables)
+            {"ArCr", "BcCc"},
+            // Variables of A
+            {"ArCr", "AcBr"},
+            // Variables of B
+            {"AcBr", "BcCc"},
+            // C's strides for each variable.  Note that the
+            // strides data is a superset of the previous argument
+            // (variables of C).  I'm still deciding on the final
+            // design, possibly allowing for null strides that
+            // will just deduce them from the sizes, or some
+            // special structs indicating the layout (ie
+            // row-major, col-major).  In this case the vars have
+            // to be ordered though... Many decisions to make...
+            {{"ArCr", BcCc}, {"BcCc", 1}},
+            // A's strides for each variable
+            {{"ArCr", AcBr}, {"AcBr", 1}},
+            // B's strides for each variable
+            {{"AcBr", BcCc}, {"BcCc", 1}}, 2);
+    }
 
     // 2D convolution NCHW example:
     // O(c_out, o_h, o_w) = I(c_i, o_h + k_h, ow + k_w) * K(c_o, c_i,
@@ -284,57 +338,6 @@ TEST_CASE("ok?", "[wtfgh]")
             {{"ArCr", AcBr}, {"AcBr", 1}},
             // B's strides for each variable
             {{"AcBr", BcCc}, {"BcCc", 1}}, 512);
-    }
-
-    // return 0;
-
-    // Matrix-Matrix product
-    // C(r, c) = A(r, k) * B(k, c)
-    // if (0)
-    {
-        int ArCr = 333;
-        int AcBr = 333;
-        int BcCc = 133;
-
-        tests::baseline::loop_nest_against_slow_baseline<DABUN_ISA>(
-            // The first argument is the loop order in the form of
-            // {dimension, stride}.  For now the outer dimension
-            // has to divide the stride.  This is effectively the
-            // same as Halide's split into outer and inner
-            // variable, but can have arbitray number of splits.
-            {{"ArCr", 11},
-             {"AcBr", 11},
-             {"ArCr", 5},
-             {"AcBr", 5},
-             {"ArCr", 2},
-             {"AcBr", 2},
-
-             {"BcCc", 16},
-             {"AcBr", 1}, // inner loops, should handle
-                          // differently later
-             {"ArCr", 1},
-             {"BcCc", 1}},
-            // The second argument is a map of the dimension sizes
-            {{"AcBr", AcBr}, {"ArCr", ArCr}, {"BcCc", BcCc}},
-            // Vars of C (other variables are reduction variables)
-            {"ArCr", "BcCc"},
-            // Variables of A
-            {"ArCr", "AcBr"},
-            // Variables of B
-            {"AcBr", "BcCc"},
-            // C's strides for each variable.  Note that the
-            // strides data is a superset of the previous argument
-            // (variables of C).  I'm still deciding on the final
-            // design, possibly allowing for null strides that
-            // will just deduce them from the sizes, or some
-            // special structs indicating the layout (ie
-            // row-major, col-major).  In this case the vars have
-            // to be ordered though... Many decisions to make...
-            {{"ArCr", BcCc}, {"BcCc", 1}},
-            // A's strides for each variable
-            {{"ArCr", AcBr}, {"AcBr", 1}},
-            // B's strides for each variable
-            {{"AcBr", BcCc}, {"BcCc", 1}}, 2);
     }
 
     // return 0;
