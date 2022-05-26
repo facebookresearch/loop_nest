@@ -1,16 +1,13 @@
-![dabun logo](/assets/logo/icononly_transparent_nobuffer.png)
+c![dabun logo](/assets/logo/icononly_transparent_nobuffer.png)
 
 ## Cleanup of include/
 
-- [ ] include/dabun/aligned_wrapper.hpp
 - [ ] include/dabun/arm/arithmetic_operation.hpp
 - [ ] include/dabun/arm/configuration.hpp
 - [ ] include/dabun/arm/elementwise_operation.hpp
 - [ ] include/dabun/arm/loop_nest.hpp
 - [ ] include/dabun/arm/loop_nest_fp16.hpp
 - [ ] include/dabun/arm/meta_mnemonics.hpp
-- [x] include/dabun/arm/multi_vreg.hpp
-- [x] include/dabun/arm/peak_gflops.hpp
 - [ ] include/dabun/arm/transposer.hpp
 - [ ] include/dabun/arm/xbyak.hpp
 - [ ] include/dabun/check.hpp
@@ -34,8 +31,6 @@
 - [ ] include/dabun/loop_tree/types.hpp
 - [ ] include/dabun/loop_tree/utility.hpp
 - [ ] include/dabun/one_constant.hpp
-- [x] include/dabun/peak_gflops.hpp
-- [x] include/dabun/peak_gflops.ipp (merged to peak_gflops.hpp)
 - [ ] include/dabun/predef.hpp
 - [ ] include/dabun/random_vector.hpp
 - [ ] include/dabun/serialization.hpp
@@ -49,14 +44,15 @@
 - [ ] include/dabun/x86/denormals.hpp
 - [ ] include/dabun/x86/elementwise_operation.hpp
 - [ ] include/dabun/x86/loop_nest.hpp
-- [x] include/dabun/x86/multi_vmm.hpp
 - [ ] include/dabun/x86/oprof-jitdump.hpp
-- [x] include/dabun/x86/peak_gflops.hpp
 - [ ] include/dabun/x86/transposer.hpp
 - [ ] include/dabun/x86/xbyak.hpp
 - [x] include/dabun/aligned_vector.hpp
+- [x] include/dabun/aligned_wrapper.hpp (removed)
 - [x] include/dabun/amx/amx_loop_nest.hpp (removed)
 - [x] include/dabun/arithmetic_operation.hpp
+- [x] include/dabun/arm/multi_vreg.hpp
+- [x] include/dabun/arm/peak_gflops.hpp
 - [x] include/dabun/bf16x2.hpp (removed)
 - [x] include/dabun/code_generator.hpp
 - [x] include/dabun/code_generator/aot_fn.hpp
@@ -78,7 +74,9 @@
 - [x] include/dabun/mpl/core.hpp (removed)
 - [x] include/dabun/namespace.hpp (moved content to isa.hpp)
 - [x] include/dabun/numeric.hpp
+- [x] include/dabun/peak_gflops.hpp
 - [x] include/dabun/peak_gflops.ipp
+- [x] include/dabun/peak_gflops.ipp (merged to peak_gflops.hpp)
 - [x] include/dabun/qvec4.hpp (removed)
 - [x] include/dabun/third_party/biovault_bfloat16.hpp (removed)
 - [x] include/dabun/third_party/half.hpp (removed)
@@ -93,6 +91,8 @@
 - [x] include/dabun/utility/log.hpp
 - [x] include/dabun/utility/most_frequent_queue.hpp
 - [x] include/dabun/utility/tmp_file_name.hpp
+- [x] include/dabun/x86/multi_vmm.hpp
+- [x] include/dabun/x86/peak_gflops.hpp
 
 ## Cleanup of src/
 
