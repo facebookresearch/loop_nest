@@ -1,4 +1,7 @@
-// Copyright 2004-present Facebook. All Rights Reserved.
+// Copyright (c) Meta Platforms, Inc. and affiliates. All Rights Reserved.
+//
+// This source code is licensed under the MIT license found in the
+// LICENSE file in the root directory of this source tree.
 
 #pragma once
 
@@ -78,9 +81,8 @@ public:
     auto get_deleter()
     {
         assert(!resource_->is_inplace());
-        return [resource = this->resource_](xbyak_buffer_type* ptr) {
-            resource->deallocate_bytes(ptr);
-        };
+        return [resource = this->resource_](xbyak_buffer_type* ptr)
+        { resource->deallocate_bytes(ptr); };
     }
 
     bool is_inplace() const { return resource_->is_inplace(); }
@@ -97,7 +99,7 @@ private:
         ready();
         std::size_t size = getSize() * sizeof(xbyak_buffer_type);
         auto        ptr  = xbyak_allocator_adapter::release(
-            const_cast<xbyak_buffer_type*>(getCode()));
+                    const_cast<xbyak_buffer_type*>(getCode()));
         return T(ptr, size, get_deleter());
     }
 

@@ -1,4 +1,7 @@
-// Copyright 2004-present Facebook. All Rights Reserved.
+// Copyright (c) Meta Platforms, Inc. and affiliates. All Rights Reserved.
+//
+// This source code is licensed under the MIT license found in the
+// LICENSE file in the root directory of this source tree.
 
 #pragma once
 
@@ -57,10 +60,7 @@ public:
         return sysml::checked_aligned_allocate(ALIGN_PAGE_SIZE, size);
     }
 
-    void do_deallocate_bytes(void* ptr) final override
-    {
-        std::free(ptr);
-    }
+    void do_deallocate_bytes(void* ptr) final override { std::free(ptr); }
 
     bool is_inplace() const final override { return false; }
 };
