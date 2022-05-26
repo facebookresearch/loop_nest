@@ -9,8 +9,8 @@
 - [ ] include/dabun/arm/loop_nest.hpp
 - [ ] include/dabun/arm/loop_nest_fp16.hpp
 - [ ] include/dabun/arm/meta_mnemonics.hpp
-- [ ] include/dabun/arm/multi_vreg.hpp
-- [ ] include/dabun/arm/peak_gflops.hpp
+- [x] include/dabun/arm/multi_vreg.hpp
+- [x] include/dabun/arm/peak_gflops.hpp
 - [ ] include/dabun/arm/transposer.hpp
 - [ ] include/dabun/arm/xbyak.hpp
 - [ ] include/dabun/check.hpp
@@ -34,8 +34,8 @@
 - [ ] include/dabun/loop_tree/types.hpp
 - [ ] include/dabun/loop_tree/utility.hpp
 - [ ] include/dabun/one_constant.hpp
-- [ ] include/dabun/peak_gflops.hpp
-- [ ] include/dabun/peak_gflops.ipp
+- [x] include/dabun/peak_gflops.hpp
+- [x] include/dabun/peak_gflops.ipp
 - [ ] include/dabun/predef.hpp
 - [ ] include/dabun/random_vector.hpp
 - [ ] include/dabun/serialization.hpp
@@ -49,9 +49,9 @@
 - [ ] include/dabun/x86/denormals.hpp
 - [ ] include/dabun/x86/elementwise_operation.hpp
 - [ ] include/dabun/x86/loop_nest.hpp
-- [ ] include/dabun/x86/multi_vmm.hpp
+- [x] include/dabun/x86/multi_vmm.hpp
 - [ ] include/dabun/x86/oprof-jitdump.hpp
-- [ ] include/dabun/x86/peak_gflops.hpp
+- [x] include/dabun/x86/peak_gflops.hpp
 - [ ] include/dabun/x86/transposer.hpp
 - [ ] include/dabun/x86/xbyak.hpp
 - [x] include/dabun/aligned_vector.hpp
