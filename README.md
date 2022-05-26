@@ -2,7 +2,7 @@
 
 ## Cleanup of include/
 
-- [ ] include/dabun/aligned_vector.hpp
+- [x] include/dabun/aligned_vector.hpp
 - [ ] include/dabun/check.hpp
 - [ ] include/dabun/qvec4.hpp
 - [ ] include/dabun/peak_gflops.hpp
