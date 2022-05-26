@@ -1,4 +1,4 @@
-c![dabun logo](/assets/logo/icononly_transparent_nobuffer.png)
+![dabun logo](/assets/logo/icononly_transparent_nobuffer.png)
 
 ## Cleanup of include/
 
@@ -30,8 +30,8 @@ c![dabun logo](/assets/logo/icononly_transparent_nobuffer.png)
 - [ ] include/dabun/loop_tree/transpose_node.hpp
 - [ ] include/dabun/loop_tree/types.hpp
 - [ ] include/dabun/loop_tree/utility.hpp
-- [ ] include/dabun/one_constant.hpp
-- [ ] include/dabun/predef.hpp
+- [x] include/dabun/one_constant.hpp
+- [x] include/dabun/predef.hpp
 - [ ] include/dabun/random_vector.hpp
 - [ ] include/dabun/serialization.hpp
 - [ ] include/dabun/utility/array.hpp
@@ -46,7 +46,7 @@ c![dabun logo](/assets/logo/icononly_transparent_nobuffer.png)
 - [ ] include/dabun/x86/loop_nest.hpp
 - [ ] include/dabun/x86/oprof-jitdump.hpp
 - [ ] include/dabun/x86/transposer.hpp
-- [ ] include/dabun/x86/xbyak.hpp
+- [x] include/dabun/x86/xbyak.hpp
 - [x] include/dabun/aligned_vector.hpp
 - [x] include/dabun/aligned_wrapper.hpp (removed)
 - [x] include/dabun/amx/amx_loop_nest.hpp (removed)
