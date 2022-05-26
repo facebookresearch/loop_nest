@@ -40,8 +40,8 @@ struct peak_gflops_impl
 
 #    if defined(DABUN_ARCH_AARCH64)
 
-DABUN_MAYBE_EXTN_TPL_INSTNTON struct peak_gflops_impl<aarch64, fp32>;
-DABUN_MAYBE_EXTN_TPL_INSTNTON struct peak_gflops_impl<aarch64, fp16>;
+DABUN_MAYBE_EXTN_TPL_INSTNTON struct peak_gflops_impl<aarch64, fp32_t>;
+DABUN_MAYBE_EXTN_TPL_INSTNTON struct peak_gflops_impl<aarch64, fp16_t>;
 
 #    else
 

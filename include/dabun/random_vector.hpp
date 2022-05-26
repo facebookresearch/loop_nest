@@ -1,10 +1,10 @@
 #pragma once
 
-#include "sysml/random.hpp"
 #include "dabun/aligned_vector.hpp"
 #include "dabun/bf16x2.hpp"
-#include "dabun/float.hpp"
+#include "dabun/numeric.hpp"
 #include "dabun/qvec4.hpp"
+#include "sysml/random.hpp"
 
 #include <limits>
 #include <random>
@@ -41,7 +41,8 @@ struct random_initalizer_helper
 
     template <class Float = T>
     static auto get_random_vector(unsigned size, unsigned extra_elements)
-        -> std::enable_if_t<std::is_floating_point_v<Float> || is_fp16_v<Float>,
+        -> std::enable_if_t<std::is_floating_point_v<Float> ||
+                                std::is_same_v<Float, fp16_t>,
                             aligned_vector<Float>>
     {
         aligned_vector<Float> res(size + extra_elements);
@@ -102,7 +103,8 @@ struct random_initalizer_helper
 
     template <class Float = T>
     static auto get_zero_vector(unsigned size, unsigned extra_elements)
-        -> std::enable_if_t<std::is_floating_point_v<Float> || is_fp16_v<Float>,
+        -> std::enable_if_t<std::is_floating_point_v<Float> ||
+                                std::is_same_v<Float, fp16_t>,
                             aligned_vector<Float>>
     {
         aligned_vector<Float> res(size + extra_elements);

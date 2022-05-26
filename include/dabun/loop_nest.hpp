@@ -2,13 +2,13 @@
 
 #pragma once
 
-#include "dabun/float.hpp"
 #include "dabun/isa.hpp"
+#include "dabun/numeric.hpp"
 
 #if defined(DABUN_ARCH_AARCH64)
-#include "dabun/arm/loop_nest.hpp"
+#    include "dabun/arm/loop_nest.hpp"
 #else
-#include "dabun/x86/loop_nest.hpp"
+#    include "dabun/x86/loop_nest.hpp"
 #endif
 
 namespace dabun

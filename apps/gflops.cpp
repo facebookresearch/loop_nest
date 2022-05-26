@@ -1,4 +1,4 @@
-#include "dabun/float.hpp"
+#include "dabun/numeric.hpp"
 #include "dabun/peak_gflops.hpp"
 
 #include <iostream>
@@ -6,11 +6,11 @@
 using namespace dabun;
 
 #ifndef DABUN_ARITHMETIC
-#define DABUN_ARITHMETIC float
+#    define DABUN_ARITHMETIC float
 #endif
 
 #ifndef DABUN_ISA
-#define DABUN_ISA avx2
+#    define DABUN_ISA avx2
 #endif
 
 int main()

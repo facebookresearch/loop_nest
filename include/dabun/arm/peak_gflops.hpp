@@ -6,9 +6,9 @@
 #ifdef DABUN_ARCH_AARCH64
 
 #    include "dabun/code_generator/code_generator.hpp"
-#    include "dabun/float.hpp"
 #    include "dabun/isa.hpp"
 #    include "dabun/math.hpp"
+#    include "dabun/numeric.hpp"
 
 #    include <sysml/measure.hpp>
 
@@ -94,8 +94,8 @@ public:
 
 #    ifndef DABUN_HEADER_ONLY
 
-extern template struct bench_gflops<aarch64, fp32>;
-extern template struct bench_gflops<aarch64, fp16>;
+extern template struct bench_gflops<aarch64, fp32_t>;
+extern template struct bench_gflops<aarch64, fp16_t>;
 
 #    endif
 

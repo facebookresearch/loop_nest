@@ -26,6 +26,7 @@
 #    include "dabun/isa.hpp"
 #    include "dabun/loop_nest_descriptor.hpp"
 #    include "dabun/math.hpp"
+#    include "dabun/numeric.hpp"
 #    include "dabun/utility/log.hpp"
 
 #    include <boost/multi_index/composite_key.hpp>
@@ -55,7 +56,7 @@ class loop_nest_fp16_code_generator;
 
 template <>
 class loop_nest_fp16_code_generator<aarch64>
-    : public code_generator<void(fp16* C, fp16 const* A, fp16 const* B,
+    : public code_generator<void(fp16_t* C, fp16_t const* A, fp16_t const* B,
                                  int alpha)>,
       public meta_mnemonics<loop_nest_fp16_code_generator<aarch64>>
 
@@ -110,7 +111,7 @@ private:
 
 private:
     using base =
-        code_generator<void(fp16* C, fp16 const* A, fp16 const* B, int)>;
+        code_generator<void(fp16_t* C, fp16_t const* A, fp16_t const* B, int)>;
     using Vmm         = VReg;
     using multi_vregs = multi_vreg<Vmm, SReg, HReg>;
 
@@ -2536,13 +2537,13 @@ private:
                          << C_VMMs[c][0].getIdx() + C_VMMs[c].size() - 1
                          << "]]\n";
 
-            C_VMMs[c].reduce<fp16>(*this);
+            C_VMMs[c].reduce<fp16_t>(*this);
         }
         for (auto const& c : ordered_stores)
         {
             if (C_traits.access == SCALAR && vectorized_var != "NONE")
             {
-                C_VMMs[c].full_reduce<fp16>(*this, 8);
+                C_VMMs[c].full_reduce<fp16_t>(*this, 8);
             }
         }
 

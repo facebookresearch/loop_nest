@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "dabun/float.hpp"
+#include "dabun/numeric.hpp"
 
 #include <cassert>
 #include <type_traits>
@@ -90,7 +90,7 @@ public:
     void half(Code_Generator& code_generator)
     {
         static_assert(std::is_same_v<Float, float> ||
-                      std::is_same_v<Float, fp16>);
+                      std::is_same_v<Float, fp16_t>);
 
         int h = (size_ + 1) / 2;
         for (int i = 0; i + h < size_; ++i)
@@ -100,7 +100,7 @@ public:
                 code_generator.fadd(VReg(first_ + i).s4, VReg(first_ + i).s4,
                                     VReg(first_ + i + h).s4);
             }
-            else if constexpr (std::is_same_v<Float, fp16>)
+            else if constexpr (std::is_same_v<Float, fp16_t>)
             {
                 code_generator.fadd(VReg(first_ + i).h8, VReg(first_ + i).h8,
                                     VReg(first_ + i + h).h8);
@@ -114,7 +114,7 @@ public:
     void reduce(Code_Generator& code_generator)
     {
         static_assert(std::is_same_v<Float, float> ||
-                      std::is_same_v<Float, fp16>);
+                      std::is_same_v<Float, fp16_t>);
 
         while (size_ > 1)
         {
@@ -127,7 +127,7 @@ public:
                      int zero_vector = 0)
     {
         static_assert(std::is_same_v<Float, float> ||
-                      std::is_same_v<Float, fp16>);
+                      std::is_same_v<Float, fp16_t>);
 
         reduce<Float>(code_generator);
         assert(size_ == 1);
@@ -149,7 +149,7 @@ public:
                 code_generator.faddp(SReg(first_), VReg(first_).s2);
             }
         }
-        else if constexpr (std::is_same_v<Float, fp16>)
+        else if constexpr (std::is_same_v<Float, fp16_t>)
         {
             switch (mask)
             {

@@ -2,22 +2,22 @@
 
 #ifndef DABUN_HEADER_ONLY
 
-#include "dabun/transposer.hpp"
+#    include "dabun/transposer.hpp"
 
 namespace dabun
 {
 
-#if defined(DABUN_ARCH_AARCH64)
+#    if defined(DABUN_ARCH_AARCH64)
 
 namespace arm
 {
 
-template class transposer_code_generator<aarch64, fp32>;
-template class transposer_code_generator<aarch64, fp16>;
+template class transposer_code_generator<aarch64, fp32_t>;
+template class transposer_code_generator<aarch64, fp16_t>;
 
 } // namespace arm
 
-#else
+#    else
 
 namespace x86
 {
@@ -28,7 +28,7 @@ template class transposer_code_generator<avx512>;
 
 } // namespace x86
 
-#endif
+#    endif
 
 } // namespace dabun
 

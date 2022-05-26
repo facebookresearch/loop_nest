@@ -2,22 +2,22 @@
 
 #ifndef DABUN_HEADER_ONLY
 
-#include "dabun/peak_gflops.hpp"
+#    include "dabun/peak_gflops.hpp"
 
 namespace dabun
 {
 
-#if defined(DABUN_ARCH_AARCH64)
+#    if defined(DABUN_ARCH_AARCH64)
 
 namespace arm
 {
 
-template struct bench_gflops<aarch64, fp32>;
-template struct bench_gflops<aarch64, fp16>;
+template struct bench_gflops<aarch64, fp32_t>;
+template struct bench_gflops<aarch64, fp16_t>;
 
 } // namespace arm
 
-#else
+#    else
 
 namespace x86
 {
@@ -28,7 +28,7 @@ template struct bench_gflops<avx2_plus, float>;
 
 } // namespace x86
 
-#endif
+#    endif
 
 } // namespace dabun
 

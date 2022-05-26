@@ -9,9 +9,9 @@
 #    include "dabun/code_generator/code_generator.hpp"
 #    include "dabun/common.hpp"
 #    include "dabun/core.hpp"
-#    include "dabun/float.hpp"
 #    include "dabun/isa.hpp"
 #    include "dabun/math.hpp"
+#    include "dabun/numeric.hpp"
 #    include "dabun/utility/log.hpp"
 
 #    include <any>
@@ -817,8 +817,8 @@ public:
 
 #    ifndef DABUN_HEADER_ONLY
 
-extern template class transposer_code_generator<aarch64, float>;
-extern template class transposer_code_generator<aarch64, fp16>;
+extern template class transposer_code_generator<aarch64, fp32_t>;
+extern template class transposer_code_generator<aarch64, fp16_t>;
 
 #    endif
 

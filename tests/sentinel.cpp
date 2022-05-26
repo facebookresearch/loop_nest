@@ -42,8 +42,8 @@ TEST_CASE("WTF", "[single-file]")
 
     // std::cout << sysml::int16x4_t::sign_bitmask << "\n";
 
-    sysml::fp16 z = static_cast<sysml::fp16>(1.3);
-    z             = 3.f;
+    sysml::fp16_t z = static_cast<sysml::fp16_t>(1.3);
+    z               = 3.f;
 
     // z *= 4;
 
@@ -135,7 +135,8 @@ TEST_CASE("Random threaded test", "[single-file]")
 
     // std::cout
     //     << std::alignment_of_v<
-    //            sysml::detail::primitive_aligned_wrapper<int, 1024>> << "\n\n";
+    //            sysml::detail::primitive_aligned_wrapper<int, 1024>> <<
+    //            "\n\n";
 
     // std::cout << sizeof(dabun::detail::primitive_aligned_wrapper<int, 1024>)
     //           << "\n\n";
