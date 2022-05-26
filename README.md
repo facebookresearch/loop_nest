@@ -4,13 +4,13 @@
 
 - [x] include/dabun/aligned_vector.hpp
 - [ ] include/dabun/check.hpp
-- [ ] include/dabun/qvec4.hpp
+- [x] include/dabun/qvec4.hpp (removed)
 - [ ] include/dabun/peak_gflops.hpp
 - [ ] include/dabun/peak_gflops.ipp
 - [x] include/dabun/mpl.hpp (removed)
 - [ ] include/dabun/isa.hpp
 - [ ] include/dabun/loop_nest_descriptor.hpp
-- [ ] include/dabun/float.hpp
+- [x] include/dabun/numeric.hpp
 - [ ] include/dabun/transposer.hpp
 - [ ] include/dabun/serialization.hpp
 - [ ] include/dabun/configuration.hpp
@@ -22,8 +22,8 @@
 - [x] include/dabun/utility/most_frequent_queue.hpp
 - [x] include/dabun/hask/apple.hpp
 - [x] include/dabun/utility/tmp_file_name.hpp
-- [ ] include/dabun/third_party/half.hpp
-- [ ] include/dabun/third_party/biovault_bfloat16.hpp
+- [x] include/dabun/third_party/half.hpp (removed)
+- [x] include/dabun/third_party/biovault_bfloat16.hpp (removed)
 - [ ] include/dabun/x86/peak_gflops.hpp
 - [ ] include/dabun/x86/oprof-jitdump.hpp
 - [ ] include/dabun/x86/address_packer.hpp
@@ -46,7 +46,7 @@
 - [x] include/dabun/mpl/core.hpp (removed)
 - [x] include/dabun/namespace.hpp (moved content to isa.hpp)
 - [ ] include/dabun/one_constant.hpp
-- [ ] include/dabun/bf16x2.hpp
+- [x] include/dabun/bf16x2.hpp (removed)
 - [ ] include/dabun/code_generator/xbyak.hpp
 - [ ] include/dabun/code_generator/memory_resource.hpp
 - [ ] include/dabun/code_generator/code_generator.hpp
