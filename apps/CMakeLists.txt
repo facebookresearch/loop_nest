@@ -11,6 +11,7 @@ function(dabun_app name vex float isa)
 endfunction(dabun_app)
 
 function(dabun_x86_apps vex float isa)
+  dabun_app(address_packer_search ${vex} ${float} ${isa})
   dabun_app(gflops ${vex} ${float} ${isa})
   dabun_app(loop_nest ${vex} ${float} ${isa})
   dabun_app(loop_nest_bench ${vex} ${float} ${isa})

@@ -13,9 +13,6 @@
 - [ ] include/dabun/check.hpp
 - [ ] include/dabun/common.hpp
 - [ ] include/dabun/core.hpp
-- [ ] include/dabun/hask/number_array.hpp
-- [ ] include/dabun/hask/random.hpp
-- [ ] include/dabun/hask/type_traits.hpp
 - [ ] include/dabun/isa.hpp
 - [ ] include/dabun/loop_nest.hpp
 - [ ] include/dabun/loop_tree/all_nodes.hpp
@@ -30,13 +27,8 @@
 - [ ] include/dabun/loop_tree/transpose_node.hpp
 - [ ] include/dabun/loop_tree/types.hpp
 - [ ] include/dabun/loop_tree/utility.hpp
-- [x] include/dabun/one_constant.hpp
-- [x] include/dabun/predef.hpp
 - [ ] include/dabun/random_vector.hpp
 - [ ] include/dabun/serialization.hpp
-- [ ] include/dabun/utility/array.hpp
-- [ ] include/dabun/utility/for_all.hpp
-- [ ] include/dabun/utility/vek.hpp
 - [ ] include/dabun/x86/address_packer.hpp
 - [ ] include/dabun/x86/aot_perf.hpp
 - [ ] include/dabun/x86/arithmetic_operation.hpp
@@ -46,7 +38,6 @@
 - [ ] include/dabun/x86/loop_nest.hpp
 - [ ] include/dabun/x86/oprof-jitdump.hpp
 - [ ] include/dabun/x86/transposer.hpp
-- [x] include/dabun/x86/xbyak.hpp
 - [x] include/dabun/aligned_vector.hpp
 - [x] include/dabun/aligned_wrapper.hpp (removed)
 - [x] include/dabun/amx/amx_loop_nest.hpp (removed)
@@ -65,6 +56,9 @@
 - [x] include/dabun/hask/aligned_alloc.hpp (moved to sysml)
 - [x] include/dabun/hask/apple.hpp
 - [x] include/dabun/hask/miltuple.hpp (moved to sysml)
+- [x] include/dabun/hask/number_array.hpp  (remove/to libsysml)
+- [x] include/dabun/hask/random.hpp  (remove/to libsysml)
+- [x] include/dabun/hask/type_traits.hpp (remove/to libsysml)
 - [x] include/dabun/intcmp.hpp (moved to sysml)
 - [x] include/dabun/loop_nest_descriptor.hpp
 - [x] include/dabun/math.hpp
@@ -74,9 +68,11 @@
 - [x] include/dabun/mpl/core.hpp (removed)
 - [x] include/dabun/namespace.hpp (moved content to isa.hpp)
 - [x] include/dabun/numeric.hpp
+- [x] include/dabun/one_constant.hpp
 - [x] include/dabun/peak_gflops.hpp
 - [x] include/dabun/peak_gflops.ipp
 - [x] include/dabun/peak_gflops.ipp (merged to peak_gflops.hpp)
+- [x] include/dabun/predef.hpp
 - [x] include/dabun/qvec4.hpp (removed)
 - [x] include/dabun/third_party/biovault_bfloat16.hpp (removed)
 - [x] include/dabun/third_party/half.hpp (removed)
@@ -88,11 +84,15 @@
 - [x] include/dabun/thread/parallel_for.hpp
 - [x] include/dabun/thread/semi_dynamic_task_queue.hpp (removed)
 - [x] include/dabun/transposer.hpp
+- [x] include/dabun/utility/array.hpp (removed/merged to vec)
+- [x] include/dabun/utility/for_all.hpp (moved to libsysml)
 - [x] include/dabun/utility/log.hpp
 - [x] include/dabun/utility/most_frequent_queue.hpp
 - [x] include/dabun/utility/tmp_file_name.hpp
+- [x] include/dabun/utility/vek.hpp  (moved to libsysml)
 - [x] include/dabun/x86/multi_vmm.hpp
 - [x] include/dabun/x86/peak_gflops.hpp
+- [x] include/dabun/x86/xbyak.hpp
 
 ## Cleanup of src/
 

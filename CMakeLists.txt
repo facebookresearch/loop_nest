@@ -6,8 +6,7 @@ add_subdirectory(extern/libsysml/cpp)
 
 message(STATUS "${sysmlcpp_INCLUDE_DIRS} ????")
 
-
-SET (CMAKE_CXX_COMPILER             "/usr/bin/clang++")
+# SET (CMAKE_CXX_COMPILER             "/usr/bin/clang++")
 
 project(dabun
   LANGUAGES CXX

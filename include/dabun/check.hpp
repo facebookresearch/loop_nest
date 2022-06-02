@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dabun/numeric.hpp"
+#include "sysml/math.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -26,22 +27,14 @@ void apply_relu(Float* Begin, Float* End)
 }
 
 template <class Float>
-Float max_abs_difference(Float const* LBegin, Float const* LEnd,
-                         Float const* RBegin)
+auto max_abs_difference(Float const* LBegin, Float const* LEnd,
+                        Float const* RBegin)
 {
-    Float res = static_cast<Float>(0);
+    decltype(sysml::absolute_difference(*LBegin, *RBegin)) res = 0;
+
     for (; LBegin != LEnd; ++LBegin, ++RBegin)
     {
-        if constexpr (std::is_same_v<Float, fp16_t>)
-        {
-            res = static_cast<fp16_t>(
-                std::max(static_cast<float>(res),
-                         std::abs(static_cast<float>(*LBegin) - *RBegin)));
-        }
-        else
-        {
-            res = std::max(res, std::abs(*LBegin - *RBegin));
-        }
+        res = std::max(res, sysml::absolute_difference(*LBegin, *RBegin));
     }
     return res;
 }

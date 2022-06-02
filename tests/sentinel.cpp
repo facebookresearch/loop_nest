@@ -5,9 +5,6 @@
 #include <sysml/thread/cpu_pool.hpp>
 #include <sysml/thread/parallel_for.hpp>
 
-#include "dabun/utility/for_all.hpp"
-#include "dabun/utility/vek.hpp"
-
 #include <catch2/catch.hpp>
 #include <iostream>
 
