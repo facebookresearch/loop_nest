@@ -30,13 +30,13 @@
 - [ ] include/dabun/random_vector.hpp
 - [ ] include/dabun/serialization.hpp
 - [ ] include/dabun/x86/address_packer.hpp
-- [ ] include/dabun/x86/aot_perf.hpp
+- [x] include/dabun/x86/aot_perf.hpp
 - [ ] include/dabun/x86/arithmetic_operation.hpp
 - [ ] include/dabun/x86/configuration.hpp
 - [ ] include/dabun/x86/denormals.hpp
 - [ ] include/dabun/x86/elementwise_operation.hpp
 - [ ] include/dabun/x86/loop_nest.hpp
-- [ ] include/dabun/x86/oprof-jitdump.hpp
+- [x] include/dabun/x86/oprof-jitdump.hpp
 - [ ] include/dabun/x86/transposer.hpp
 - [x] include/dabun/aligned_vector.hpp
 - [x] include/dabun/aligned_wrapper.hpp (removed)
