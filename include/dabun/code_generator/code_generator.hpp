@@ -5,7 +5,9 @@
 
 #pragma once
 
-#include "dabun/code_generator/aot_fn.hpp"
+#include <sysml/code_generator/code_generated_fn.hpp>
+#include <sysml/code_generator/memory_resource.hpp>
+
 #include "dabun/code_generator/memory_resource.hpp"
 #include "dabun/code_generator/xbyak.hpp"
 
@@ -17,9 +19,10 @@
 #include <cstdint>
 #include <set>
 #include <stdexcept>
+#include <type_traits>
 #include <vector>
 
-namespace dabun
+namespace sysml::code_generator
 {
 
 class xbyak_allocator_adapter : public Xbyak::Allocator
@@ -81,7 +84,7 @@ public:
     auto get_deleter()
     {
         assert(!resource_->is_inplace());
-        return [resource = this->resource_](xbyak_buffer_type* ptr)
+        return [resource = this->resource_](void* ptr)
         { resource->deallocate_bytes(ptr); };
     }
 
@@ -164,25 +167,25 @@ public:
     }
 
     template <class Signature>
-    unique_aot_fn<Signature> get_unique_fn() &&
+    unique_code_generated_fn<Signature> get_unique_fn() &&
     {
-        return get_unique_or_shared<unique_aot_fn<Signature>>();
+        return get_unique_or_shared<unique_code_generated_fn<Signature>>();
     }
 
     template <class Signature>
-    shared_aot_fn<Signature> get_shared_fn() &&
+    shared_code_generated_fn<Signature> get_shared_fn() &&
     {
-        return get_unique_or_shared<shared_aot_fn<Signature>>();
+        return get_unique_or_shared<shared_code_generated_fn<Signature>>();
     }
 
     template <class Signature>
-    aot_fn_ref<Signature> get_reference_fn() &&
+    code_generated_fn_ref<Signature> get_reference_fn() &&
     {
         assert(xbyak_allocator_adapter::is_inplace());
         ready();
         std::size_t size = getSize() * sizeof(xbyak_buffer_type);
         auto        ptr  = const_cast<xbyak_buffer_type*>(getCode());
-        return aot_fn_ref<Signature>(ptr, size);
+        return code_generated_fn_ref<Signature>(ptr, size);
     }
 };
 
@@ -193,7 +196,7 @@ template <class Ret, class... Args>
 class code_generator<Ret(Args...)> : public basic_code_generator
 {
 private:
-    using Signature = identity_type_t<Ret(Args...)>;
+    using Signature = std::type_identity_t<Ret(Args...)>;
 
 public:
     explicit code_generator(
@@ -202,19 +205,19 @@ public:
     {
     }
 
-    unique_aot_fn<Signature> get_unique() &&
+    unique_code_generated_fn<Signature> get_unique() &&
     {
         basic_code_generator* base = this;
         return std::move(*base).template get_unique_fn<Signature>();
     }
 
-    shared_aot_fn<Signature> get_shared() &&
+    shared_code_generated_fn<Signature> get_shared() &&
     {
         basic_code_generator* base = this;
         return std::move(*base).template get_shared_fn<Signature>();
     }
 
-    aot_fn_ref<Signature> get_reference() &&
+    code_generated_fn_ref<Signature> get_reference() &&
     {
         basic_code_generator* base = this;
         return std::move(*base).template get_reference_fn<Signature>();
@@ -228,7 +231,7 @@ template <class BasicCodeGenerator, class Ret, class... Args>
 class with_signature<BasicCodeGenerator, Ret(Args...)>
 {
 private:
-    using Signature = identity_type_t<Ret(Args...)>;
+    using Signature = std::type_identity_t<Ret(Args...)>;
 
     BasicCodeGenerator& self()
     {
@@ -238,20 +241,28 @@ private:
     }
 
 public:
-    unique_aot_fn<Signature> get_unique() &&
+    unique_code_generated_fn<Signature> get_unique() &&
     {
         return std::move(self()).template get_unique_fn<Signature>();
     }
 
-    shared_aot_fn<Signature> get_shared() &&
+    shared_code_generated_fn<Signature> get_shared() &&
     {
         return std::move(self()).template get_shared_fn<Signature>();
     }
 
-    aot_fn_ref<Signature> get_reference() &&
+    code_generated_fn_ref<Signature> get_reference() &&
     {
         return std::move(self()).template get_reference_fn<Signature>();
     }
 };
 
+} // namespace sysml::code_generator
+
+namespace dabun
+{
+using ::sysml::code_generator::basic_code_generator;
+using ::sysml::code_generator::code_generator;
+using ::sysml::code_generator::xbyak_allocator_adapter;
+using ::sysml::code_generator::with_signature;
 } // namespace dabun

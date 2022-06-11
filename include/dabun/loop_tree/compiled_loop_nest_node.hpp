@@ -159,8 +159,8 @@ public:
                               strides.at(inputs[1]), unroll_limit);
 #endif
 
-        shared_aot_fn<void(Arithmetic*, Arithmetic const*, Arithmetic const*,
-                           int)>
+        shared_code_generated_fn<void(Arithmetic*, Arithmetic const*,
+                                      Arithmetic const*, int)>
             aot_fn;
 
         loop_nest_compiler<VEX, Arithmetic> generated(
@@ -245,10 +245,9 @@ public:
         }
         else if (extra_tensors.size() == 1)
         {
-            auto aot_casted =
-                aot_fn_cast<void(Arithmetic*, Arithmetic const*,
-                                 Arithmetic const*, int, Arithmetic const*)>(
-                    std::move(aot_fn));
+            auto aot_casted = code_generated_fn_cast<void(
+                Arithmetic*, Arithmetic const*, Arithmetic const*, int,
+                Arithmetic const*)>(std::move(aot_fn));
 
             return {[aot_casted, alpha, last_iteration,
                      input_idx_0      = tensors_idx.at(inputs[0]),
@@ -271,7 +270,7 @@ public:
         }
         else if (extra_tensors.size() == 2)
         {
-            auto aot_casted = aot_fn_cast<void(
+            auto aot_casted = code_generated_fn_cast<void(
                 Arithmetic*, Arithmetic const*, Arithmetic const*, int,
                 Arithmetic const*, Arithmetic const*)>(std::move(aot_fn));
 

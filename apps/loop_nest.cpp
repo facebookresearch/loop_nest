@@ -8,6 +8,7 @@
 #include "loop_nest_baseline.hpp"
 #include "utility.hpp"
 
+#include <sysml/code_generator/code_generated_fn.hpp>
 #include <sysml/measure.hpp>
 
 #include <algorithm>
@@ -604,9 +605,10 @@ int main()
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fnx = gen_loop_nest();
-        auto fny = aot_fn_cast<void(int)>(std::move(fnx));
-        auto fn  = aot_fn_cast<void(float*, float const*, float const*, int)>(
-            std::move(fny));
+        auto fny = sysml::code_generator::code_generated_fn_cast<void(int)>(
+            std::move(fnx));
+        auto fn = sysml::code_generator::code_generated_fn_cast<void(
+            float*, float const*, float const*, int)>(std::move(fny));
 
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn1");
@@ -829,9 +831,10 @@ int main()
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fnx = gen_loop_nest();
-        auto fny = aot_fn_cast<void(int)>(std::move(fnx));
-        auto fn  = aot_fn_cast<void(float*, float const*, float const*, int)>(
-            std::move(fny));
+        auto fny = sysml::code_generator::code_generated_fn_cast<void(int)>(
+            std::move(fnx));
+        auto fn = sysml::code_generator::code_generated_fn_cast<void(
+            float*, float const*, float const*, int)>(std::move(fny));
 
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn1");
@@ -1259,9 +1262,10 @@ int main()
         std::cout << "Compile: " << compile_secs << std::endl;
 
         auto fnx = gen_loop_nest();
-        auto fny = aot_fn_cast<void(int)>(std::move(fnx));
-        auto fn  = aot_fn_cast<void(float*, float const*, float const*, int)>(
-            std::move(fny));
+        auto fny = sysml::code_generator::code_generated_fn_cast<void(int)>(
+            std::move(fnx));
+        auto fn = sysml::code_generator::code_generated_fn_cast<void(
+            float*, float const*, float const*, int)>(std::move(fny));
 
         fn.save_to_file("zi.asm");
         // fn.register_perf("fn1");
