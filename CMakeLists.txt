@@ -99,6 +99,11 @@ execute_process(COMMAND uname -m
   COMMAND tr -d '\n'
   OUTPUT_VARIABLE DABUN_HOST_ARCHITECTURE)
 
+if("${DABUN_HOST_ARCHITECTURE}" STREQUAL "arm64")
+  set(DABUN_HOST_ARCHITECTURE aarch64)
+endif()
+
+
 message(STATUS "Host architecture detected: ${DABUN_HOST_ARCHITECTURE}")
 
 set(DABUN_COMMON_SRC_CPP_FILES
@@ -109,8 +114,6 @@ set(DABUN_COMMON_SRC_CPP_FILES
 if("${DABUN_HOST_ARCHITECTURE}" STREQUAL "x86_64")
   include(cmake/x86_64/dabun.cmake)
 elseif("${DABUN_HOST_ARCHITECTURE}" STREQUAL "aarch64")
-  include(cmake/aarch64/dabun.cmake)
-elseif("${DABUN_HOST_ARCHITECTURE}" STREQUAL "arm64")
   include(cmake/aarch64/dabun.cmake)
 else()
   message(FATAL_ERROR "Host architecture ${DABUN_HOST_ARCHITECTURE} not supported.")
