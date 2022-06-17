@@ -4,7 +4,20 @@ add_subdirectory(extern/Catch2)
 
 add_subdirectory(extern/libsysml/cpp)
 
-message(STATUS "${sysmlcpp_INCLUDE_DIRS} ????")
+
+# TODO: This is probably a very bad and non-standard solution, figure
+# out what's standard and/or better
+
+get_target_property(LIBSYSML_INCLUDES sysmlcpp INCLUDE_DIRECTORIES)
+
+# foreach(dir ${LIBSYSML_INCLUDES})
+#  message(STATUS "Including libsysml include dir: ${dir}")
+#  include_directories(${dir})
+#endforeach()
+
+
+message(STATUS "${libsysml_INCLUDE_DIRS} ????")
+include_directories(${libsysml_INCLUDE_DIRS})
 
 # SET (CMAKE_CXX_COMPILER             "/usr/bin/clang++")
 
@@ -73,7 +86,7 @@ if(NOT TARGET cpuinfo)
   set_property(TARGET cpuinfo PROPERTY POSITION_INDEPENDENT_CODE ON)
 endif()
 
-include_directories(${CPUINFO_SOURCE_DIR}/include)
+# include_directories(${CPUINFO_SOURCE_DIR}/include)
 
 include_directories(extern/libsysml/cpp/include)
 

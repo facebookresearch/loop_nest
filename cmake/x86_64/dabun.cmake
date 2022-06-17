@@ -12,8 +12,8 @@ target_include_directories(${PROJECT_NAME}
 target_include_directories(${PROJECT_NAME}
   PUBLIC include)
 
-target_include_directories(${PROJECT_NAME}
-  PUBLIC extern/xbyak)
+# target_include_directories(${PROJECT_NAME}
+#   PUBLIC extern/xbyak)
 
 target_compile_options(dabun
   PRIVATE "-DDABUN_COMPILING_LIBDABUN")
