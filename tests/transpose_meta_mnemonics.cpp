@@ -2,9 +2,9 @@
 #include <catch2/catch.hpp>
 
 #include "dabun/code_generator/code_generator.hpp"
-#include "dabun/hask/random.hpp"
 #include "dabun/random_vector.hpp"
 #include "sysml/miltuple.hpp"
+#include "sysml/random.hpp"
 
 #include <tuple>
 #include <utility>
